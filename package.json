@@ -1,0 +1,109 @@
+{
+  "name": "mifela-inventory",
+  "version": "1.0.0",
+  "description": "Mifela Inventory System",
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
+    "build": "vite build",
+    "obfuscate-backend": "javascript-obfuscator electron --output electron-dist --target node --string-array-encoding base64 --control-flow-flattening true --control-flow-flattening-threshold 0.2",
+    "dist": "npm run build && npm run obfuscate-backend && electron-builder --publish always"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.16.0",
+    "better-sqlite3": "^13.0.3",
+    "better-sqlite3-multiple-ciphers": "^13.0.3",
+    "chart.js": "^4.5.1",
+    "chokidar": "^5.0.0",
+    "cors": "^2.8.6",
+    "electron-log": "^5.0.0",
+    "electron-updater": "^6.1.8",
+    "express": "^5.2.1",
+    "firebase": "^13.1.0",
+    "html2pdf.js": "^0.14.0",
+    "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "razorpay": "^2.9.6",
+    "serialport": "^13.0.0",
+    "usb": "^3.2.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "javascript-obfuscator": "^5.4.1",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "vite": "^7.3.1",
+    "vite-plugin-javascript-obfuscator": "^3.1.0",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.mifela.pos",
+    "productName": "Mifela",
+    "extraMetadata": {
+      "main": "electron-dist/main.js"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/chokidar/**/*",
+      "node_modules/anymatch/**/*",
+      "node_modules/readdirp/**/*",
+      "**/node_modules/better-sqlite3-multiple-ciphers/**"
+    ],
+    "executableName": "Mifela",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "generic"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "deleteAppDataOnUninstall": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "Mifela POS",
+      "shortcutName": "Mifela POS"
+    }
+  }
+}

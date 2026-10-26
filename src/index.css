@@ -1,0 +1,435 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================
+   CUSTOM ANIMATIONS & UTILITIES
+   (Ported from index.html <style>)
+   ========================================= */
+
+/* --- Fonts --- */
+body { 
+    font-family: 'Inter', sans-serif; 
+    transition: padding-top 0.3s ease; /* Smooth transition for banner push */
+}
+
+
+
+/* --- Network State Styles --- */
+/* Dim non-essential elements when offline */
+body.app-offline .network-required {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(100%);
+}
+
+/* --- Keyframes --- */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInFromRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideOutToRight {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100%); }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
+/* --- Utility Classes --- */
+.loader-spin {
+    animation: spin 1s linear infinite;
+}
+
+.animate-slideDown {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+.view-section {
+    display: none;
+}
+.view-section.active {
+    display: block;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+/* --- Scrollbar --- */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* --- Modal Transitions --- */
+.modal-backdrop {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none;
+}
+.modal-backdrop.flex {
+    opacity: 1;
+    pointer-events: auto;
+}
+.modal-card {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+.modal-backdrop.flex .modal-card {
+    opacity: 1;
+    transform: scale(1);
+    transition-delay: 0.05s;
+}
+
+/* --- Toast Notifications --- */
+.toast {
+    opacity: 0;
+    transform: translateX(100%);
+    animation: slideInFromRight 0.3s ease-out forwards;
+}
+.toast.fading-out {
+    animation: slideOutToRight 0.3s ease-in forwards;
+}
+
+/* --- Buttons & Cards --- */
+.btn-pop,
+.plan-card button,
+.tab-button,
+.header-btn,
+#logout-btn {
+    transition: transform 0.15s ease-out, background-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.btn-pop:hover,
+.plan-card button:not(:disabled):hover,
+.tab-button:not(.active):hover,
+.header-btn:not(.active):hover,
+#logout-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.btn-pop:active,
+.plan-card button:not(:disabled):active,
+.tab-button:active,
+.header-btn:active,
+#logout-btn:active {
+    transform: scale(0.98);
+}
+
+/* --- Card Hover Effects --- */
+.widget-card,
+.report-card,
+.plan-card {
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.widget-card:hover,
+.report-card:hover,
+.plan-card:not(.current):hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.plan-card {
+    border: 2px solid #e5e7eb;
+}
+.plan-card.current {
+    border-color: #4F46E5; /* indigo-600 */
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+}
+
+/* --- Staggered Row Animation --- */
+.table-row-animate {
+    opacity: 0;
+    animation-fill-mode: both;
+    animation-name: fadeInUp;
+    animation-duration: 0.3s;
+}
+
+/* --- Form Input Transitions --- */
+input, textarea, select {
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+input:focus, textarea:focus, select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+}
+
+.form-section-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.25rem;
+    margin-top: 1rem;
+}
+
+/* --- Transaction Tabs --- */
+.tx-tab {
+    @apply px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 focus:z-10 focus:ring-2 focus:ring-indigo-500;
+}
+.tx-tab.active {
+    @apply bg-indigo-50 text-indigo-700 border-indigo-500 z-10;
+}
+
+/* --- Mobile FAB --- */
+#mobile-scan-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #4F46E5;
+    color: white;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+    display: none; 
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    transition: transform 0.2s;
+}
+#mobile-scan-btn:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+    #mobile-scan-btn { display: flex; }
+    .hide-on-mobile { display: none; }
+}
+
+/* --- Helper Classes --- */
+.animate-scaleIn {
+    animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* --- Print Styles --- */
+@media print {
+    /* 🚀 FIX 1: Strip the global margin. It destroys thermal printing! */
+    @page {
+        size: auto;
+        margin: 0; 
+    }
+
+    body * {
+        visibility: hidden;
+    }
+    #print-invoice, #print-invoice * {
+        visibility: visible;
+    }
+    
+    /* 🚀 FIX 2: Default A4 Invoice Styles */
+    #print-invoice {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        /* Moved the 0.5in margin here as padding so A4 still looks good */
+        padding: 0.5in; 
+        font-family: Arial, sans-serif;
+        color: #000;
+        box-sizing: border-box;
+    }
+    
+    /* 🚀 FIX 3: Thermal Receipt Styles (58mm) */
+    body.printing-receipt #print-invoice {
+        padding: 2mm !important; /* Tiny padding */
+        width: 58mm !important;  /* Force the narrow width */
+        margin: 0 !important;
+        font-family: 'Courier New', Courier, monospace; /* Monospace stops text wrapping issues */
+    }
+
+    /* --- Barcode Label Styles --- */
+    body.printing-labels #print-invoice {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .label-sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.1in;
+        padding: 0.5in;
+    }
+    
+    .label-single-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        page-break-after: always;
+    }
+    
+    /* ... existing invoice table styles ... */
+    #print-invoice h1 {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    #print-invoice h2 {
+        font-size: 18px;
+        font-weight: bold;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    #print-invoice table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    #print-invoice th, #print-invoice td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    #print-invoice th {
+        background-color: #f2f2f2;
+    }
+    #print-invoice .summary-table {
+        width: 50%;
+        margin-left: 50%;
+        margin-top: 20px;
+    }
+    #print-invoice .summary-table td {
+        border: none;
+    }
+    #print-invoice .summary-table .total {
+        font-weight: bold;
+        font-size: 18px;
+        border-top: 2px solid #000;
+    }
+
+}
+/* Fix for PO Modal Header */
+#po-create-modal .bg-gray-50 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+}
+
+#po-modal-close {
+    background: #fff;
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s;
+}
+
+#po-modal-close:hover {
+    transform: rotate(90deg);
+    background: #fee2e2;
+    color: #ef4444;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.shadow-indigo-200 {
+    box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.3);
+}
+
+.animate-scaleIn {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.98) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+
+/* Premium SaaS Card Styling */
+.settings-view .bg-white {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0; /* Sharper border */
+}
+
+/* Make focused inputs "Glow" */
+input:focus, textarea:focus, select:focus {
+    background-color: #ffffff !important;
+    border-color: #4f46e5 !important;
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1) !important;
+}
+
+/* Branch Selector Bar Depth */
+#store-context-bar {
+    background: #f8fafc;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+}
+.plan-feature-list {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+    list-style: none;
+    padding: 0;
+}
+
+.plan-feature-list li {
+    font-size: 13px;
+    color: #374151;
+    display: flex;
+    align-items: flex-start;
+}
+
+.plan-feature-list li.con {
+    color: #9ca3af;
+    opacity: 0.7;
+}
+
+/* Ensure card content fills height */
+.plan-card-new {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+/* Disable the ugly blue text highlighting globally */
+body {
+    -webkit-user-select: none; /* Safari/Chrome/Electron */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* IE/Edge */
+    user-select: none;         /* Standard */
+}
+
+/* Re-enable text selection strictly inside input fields and textareas so users can still copy/paste/edit their typed text */
+input, textarea, select, [contenteditable="true"] {
+    -webkit-user-select: auto;
+    -moz-user-select: auto;
+    -ms-user-select: auto;
+    user-select: auto;
+}

@@ -1,0 +1,308 @@
+/* --- Base and Original Styles --- */
+body { 
+    font-family: 'Inter', sans-serif; 
+}
+/* ... existing styles ... */
+
+/* --- Utility to hide scrollbars --- */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* ... existing styles ... */
+/* Make the tabs look like distinct modules, not just buttons */
+.tab-button {
+    border-radius: 12px 12px 0 0;
+    padding: 10px 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.tab-button.active {
+    opacity: 1;
+    background-color: white;
+    color: #4f46e5; /* Indigo-600 */
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+}
+/* --- Print Styles --- */
+@media print {
+    /* 🚀 FIX 1: Strip the global margin. It destroys thermal printing! */
+    @page {
+        size: auto;
+        margin: 0; 
+    }
+
+    body * {
+        visibility: hidden;
+    }
+    #print-invoice, #print-invoice * {
+        visibility: visible;
+    }
+    
+    /* 🚀 FIX 2: Default A4 Invoice Styles */
+    #print-invoice {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        /* Moved the 0.5in margin here as padding so A4 still looks good */
+        padding: 0.5in; 
+        font-family: Arial, sans-serif;
+        color: #000;
+        box-sizing: border-box;
+    }
+    
+    /* 🚀 FIX 3: Thermal Receipt Styles (58mm) */
+    body.printing-receipt #print-invoice {
+        padding: 2mm !important; /* Tiny padding */
+        width: 58mm !important;  /* Force the narrow width */
+        margin: 0 !important;
+        font-family: 'Courier New', Courier, monospace; /* Monospace stops text wrapping issues */
+    }
+
+    /* --- Barcode Label Styles --- */
+    body.printing-labels #print-invoice {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .label-sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.1in;
+        padding: 0.5in;
+    }
+    
+    .label-single-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        page-break-after: always;
+    }
+    
+    /* ... existing invoice table styles ... */
+    #print-invoice h1 {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    #print-invoice h2 {
+        font-size: 18px;
+        font-weight: bold;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    #print-invoice table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    #print-invoice th, #print-invoice td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    #print-invoice th {
+        background-color: #f2f2f2;
+    }
+    #print-invoice .summary-table {
+        width: 50%;
+        margin-left: 50%;
+        margin-top: 20px;
+    }
+    #print-invoice .summary-table td {
+        border: none;
+    }
+    #print-invoice .summary-table .total {
+        font-weight: bold;
+        font-size: 18px;
+        border-top: 2px solid #000;
+    }
+}
+
+
+/* ... existing animation styles ... */
+/* === ANIMATION STYLES === */
+
+/* --- Keyframe Animations --- */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* --- Fade and Slide Up --- */
+@keyframes fadeInUp {
+    from { 
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInFromRight {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOutToRight {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100%); }
+}
+
+/* --- Loading Spinner --- */
+.loader-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* --- Page View Transitions --- */
+.view-section {
+    display: none; /* Hidden by default */
+    animation-duration: 0.2s;
+    animation-timing-function: ease-in-out;
+}
+
+.view-section.active {
+    display: block; /* Show the active tab */
+    animation-name: fadeIn;
+}
+
+/* --- Modal Transitions --- */
+.modal-backdrop {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none;
+}
+.modal-backdrop.flex {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-card {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+.modal-backdrop.flex .modal-card {
+    opacity: 1;
+    transform: scale(1);
+    transition-delay: 0.05s;
+}
+
+/* --- Toast Notifications --- */
+.toast {
+    opacity: 0;
+    transform: translateX(100%);
+    animation: slideInFromRight 0.3s ease-out forwards;
+}
+.toast.fading-out {
+    animation: slideOutToRight 0.3s ease-in forwards;
+}
+
+/* --- Button & Card Hover Transitions --- */
+.btn-pop, 
+.plan-card button,
+.tab-button,
+.header-btn,
+#logout-btn {
+    transition: transform 0.15s ease-out, background-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.btn-pop:hover,
+.plan-card button:not(:disabled):hover,
+.tab-button:not(.active):hover,
+.header-btn:not(.active):hover,
+#logout-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+.btn-pop:active,
+.plan-card button:not(:disabled):active,
+.tab-button:active,
+.header-btn:active,
+#logout-btn:active {
+    transform: scale(0.98);
+}
+
+.plan-card {
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    border: 2px solid #e5e7eb; /* border-gray-200 */
+}
+.plan-card:not(.current):hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+.plan-card.current {
+    border-color: #3f51b5; /* border-indigo-600 */
+    box-shadow: 0 0 0 3px rgba(63,81,181,0.3);
+}
+
+
+/* --- Staggered Animation Classes --- */
+.widget-card,
+.report-card,
+.table-row-animate {
+    /* Start invisible, will be staggered in by JS */
+    opacity: 0; 
+    animation-fill-mode: both; /* Keep final state */
+}
+.widget-card,
+.report-card {
+    animation-name: scaleIn;
+    animation-duration: 0.3s;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.widget-card:hover,
+.report-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.table-row-animate {
+    animation-name: fadeInUp;
+    animation-duration: 0.3s;
+}
+
+/* --- Form Input Transitions --- */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+textarea,
+select {
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+input:focus,
+textarea:focus,
+select:focus {
+    --tw-ring-color: rgb(99 102 241 / 0.5);
+    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+    box-shadow: var(--tw-shadow, 0 0 #0000), var(--tw-ring-offset-shadow), var(--tw-ring-shadow);
+    border-color: #6366f1;
+}

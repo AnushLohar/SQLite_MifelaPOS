@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow new offline terminals to register their hardware keys and profile
+    match /provisioned_nodes/{nodeId} {
+      allow create: if true; 
+      
+      // Lock down reads and modifications for security
+      allow read, update, delete: if false; 
+    }
+    
+  }
+}
