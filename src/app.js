@@ -1,5 +1,4 @@
 // src/app.js
-// src/app.js
 import './index.css'; 
 
 import { initializeAuth, logoutUser } from './services/auth.js';
@@ -7,7 +6,6 @@ import { handleGlobalScan } from './utils/scanner.js';
 import { initDOMElements, DOM, showModal, showToast } from './utils/dom.js'; 
 import { initNetworkMonitoring, getNetworkStatus } from './services/network.js'; // 🚀 MAKE SURE getNetworkStatus IS IMPORTED
 import { escapeHTML } from './utils/security.js';
-import { extractReceiptData } from './services/geminiScanner.js';
 import { renderReviewScreen } from './components/scannerReview.js';
 import { setupNotificationDrawer } from './components/notifications.js';
 
@@ -2517,6 +2515,33 @@ window.executeFinalProvisioning = async function(data) {
         
         if (tokenInput.length < 5) throw new Error("Invalid token format. Verification failed.");
         
+        btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Verifying Token...';
+        
+        // 1. Establish the terminal's hardware fingerprint
+        let fingerprint = 'UNKNOWN_NODE';
+        if (window.electronAPI && window.electronAPI.getMachineId) {
+            fingerprint = await window.electronAPI.getMachineId();
+        }
+
+        const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
+        const fbDb = getFirestore();
+
+        // 2. 🛡️ RAZORPAY TOKEN VERIFIER: Query the cloud ledger for this specific node
+        const nodeDoc = await getDoc(doc(fbDb, "provisioned_nodes", fingerprint));
+        if (!nodeDoc.exists()) {
+            throw new Error("License record not found. Please complete the Razorpay checkout first.");
+        }
+        
+        const nodeData = nodeDoc.data();
+        
+        // Strictly compare the user's pasted token with the Cloud Function's generated verificationToken
+        if (nodeData.verificationToken !== tokenInput && nodeData.paymentToken !== tokenInput) {
+            throw new Error("Invalid Razorpay verification token. Cryptography aborted.");
+        }
+        if (nodeData.status !== 'PAID' && nodeData.status !== 'ACTIVE') {
+            throw new Error("Razorpay transaction is not in a PAID state.");
+        }
+
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Encrypting Node...';
 
         if (!window.hashSecurely) {
@@ -2537,13 +2562,10 @@ window.executeFinalProvisioning = async function(data) {
 
         if (!provisionRes.success) throw new Error(provisionRes.error || "Hardware Cryptography Generation Failed.");
 
-        const { publicKey, fingerprint } = provisionRes.data;
+        const { publicKey } = provisionRes.data;
 
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Syncing to Cloud...';
         
-        const { getFirestore, doc, setDoc } = await import("firebase/firestore");
-        const fbDb = getFirestore();
-
         await setDoc(doc(fbDb, "provisioned_nodes", fingerprint), {
             storeName: data.storeName,
             ownerName: data.ownerName,
@@ -2554,12 +2576,12 @@ window.executeFinalProvisioning = async function(data) {
             gstin: data.gstin,
             publicKey: publicKey,
             hardwareFingerprint: fingerprint,
-            paymentToken: tokenInput, 
+            verificationToken: tokenInput, // Sync the verified token
             status: 'ACTIVE',         
             createdAt: new Date().toISOString()
-        });
+        }, { merge: true });
 
-        // 🚀 SECURE WRITE: Save vault and system details to SQLite, not localStorage
+        // SECURE WRITE: Save vault and system details to SQLite
         await window.electronAPI.saveStoreSettings('SYS_VAULT', {
             adminId: data.adminId,
             adminHash: hashedAdminPass,

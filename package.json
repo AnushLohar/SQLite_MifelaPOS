@@ -27,7 +27,7 @@
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "razorpay": "^2.9.6",
+    "razorpay": "^2.9.8",
     "serialport": "^13.0.0",
     "usb": "^3.2.1"
   },
