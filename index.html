@@ -1077,33 +1077,48 @@
             <p class="text-xs font-bold text-indigo-200 mt-1 uppercase tracking-widest">Lifetime Offline License</p>
         </div>
         
-        <div class="p-8 flex-1 bg-white">
-            <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl mb-6 flex gap-3 text-amber-800 text-xs font-medium">
-                
-                <p>To protect this terminal, hardware encryption cannot begin until the software license payment is verified via Razorpay.</p>
-            </div>
-
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 space-y-2">
-                <div class="flex justify-between items-end mb-2">
-                    <span class="text-xs font-bold text-slate-400 line-through">₹30,000.00</span>
-                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Save ₹5,000</span>
+        <div class="p-8 flex-1 bg-white overflow-y-auto custom-scrollbar">
+            <!-- Phase 1: Payment & Verification -->
+            <div id="licensing-step-1">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 space-y-2">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-xs font-bold text-slate-400 line-through">₹30,000.00</span>
+                        <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Save ₹5,000</span>
+                    </div>
+                    <div class="flex justify-between text-sm font-black text-slate-800 pt-2 border-t border-slate-200"><span class="uppercase tracking-widest">Total Due</span><span>₹25,000.00</span></div>
                 </div>
-                <div class="flex justify-between text-xs font-bold text-slate-500"><span class="uppercase tracking-widest">Base License (Lifetime)</span><span>₹21,186.44</span></div>
-                <div class="flex justify-between text-xs font-bold text-slate-500"><span class="uppercase tracking-widest">GST (18%)</span><span>₹3,813.56</span></div>
-                <div class="flex justify-between text-sm font-black text-slate-800 pt-2 border-t border-slate-200"><span class="uppercase tracking-widest">Total Due</span><span>₹25,000.00</span></div>
+
+                <button id="btn-open-gateway" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm flex items-center justify-center gap-2 mb-3 uppercase tracking-widest">
+                    1. Complete Payment Online <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </button>
+
+                <button id="btn-verify-automated" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 text-sm uppercase tracking-widest flex items-center justify-center gap-2">
+                    2. Verify Payment
+                </button>
+                <div id="license-auto-error" class="hidden text-center text-red-600 text-[10px] font-bold mt-3 uppercase tracking-widest"></div>
             </div>
 
-            <button id="btn-open-gateway" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm flex items-center justify-center gap-2 mb-3 uppercase tracking-widest">
-                1. Complete Payment Online <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-            </button>
-
-            <button id="btn-verify-automated" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 text-sm uppercase tracking-widest flex items-center justify-center gap-2">
-                2. Verify & Encrypt
-            </button>
-            <div id="license-auto-error" class="hidden text-center text-red-600 text-[10px] font-bold mt-3 uppercase tracking-widest"></div>
+            <!-- Phase 2: Crypto Gen & Consent (Revealed via JS) -->
+            <div id="licensing-step-2" class="hidden mt-6 pt-5 border-t border-slate-200">
+                <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-3">3. Cryptography & Consent</h4>
+                <div id="license-gen-status" class="text-xs font-bold text-indigo-600 mb-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100 flex items-center gap-2">
+                    <!-- Status dynamically injected -->
+                </div>
+                
+                <div class="flex items-start gap-3 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <input type="checkbox" id="final-consent-check" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    <label for="final-consent-check" class="text-[10px] font-bold text-slate-600 leading-relaxed cursor-pointer select-none uppercase tracking-wider">
+                        I consent to the hardware cryptographic locking process and accept the Terms of Service.
+                    </label>
+                </div>
+                
+                <button id="btn-finalize-start" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm uppercase tracking-widest flex items-center justify-center gap-2">
+                    4. Initialize Terminal
+                </button>
+            </div>
         </div>
         
-        <div class="p-4 border-t border-slate-100 bg-slate-50 text-center">
+        <div class="p-4 border-t border-slate-100 bg-slate-50 text-center shrink-0">
             <button id="btn-cancel-licensing" class="text-xs font-bold text-slate-500 hover:text-slate-800 uppercase tracking-widest">Cancel Setup</button>
         </div>
     </div>
@@ -1112,9 +1127,7 @@
       <!-- 2. SETUP / INITIALIZATION VIEW -->
       <div id="auth-view-setup"
         class="hidden bg-white rounded-[2rem] shadow-2xl overflow-hidden max-w-6xl w-full flex-col md:flex-row border border-slate-100 min-h-[650px] animate-scaleIn">
-        <!-- 🚀 LIGHTER INDIGO GRADIENT -->
-        <div
-          class="md:w-4/12 bg-gradient-to-br from-indigo-500 to-indigo-700 p-10 flex flex-col justify-between text-white relative overflow-hidden shrink-0">
+        <div class="md:w-4/12 bg-gradient-to-br from-indigo-500 to-indigo-700 p-10 flex flex-col justify-between text-white relative overflow-hidden shrink-0">
           <div class="relative z-10">
             <h1 class="text-4xl font-black tracking-tighter mb-2">mifela<span class="text-indigo-200">.</span></h1>
             <p class="text-indigo-100 text-sm font-bold tracking-wide uppercase">System Initialization</p>
@@ -1123,14 +1136,11 @@
             <div>
               <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-3">
                 <svg class="w-5 h-5 text-indigo-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
-                  </path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                 </svg>
               </div>
               <h3 class="font-black text-xl mb-1">Local Configuration</h3>
-              <p class="text-indigo-100 text-sm leading-relaxed font-medium">Define your master store settings to create
-                your local database vault.</p>
+              <p class="text-indigo-100 text-sm leading-relaxed font-medium">Define your master store settings to create your local database vault.</p>
             </div>
           </div>
           <div class="absolute -bottom-32 -right-32 w-80 h-80 bg-indigo-400 rounded-full opacity-40 blur-[80px]"></div>
@@ -1140,91 +1150,58 @@
           <div class="p-8">
             <h2 class="text-2xl font-black text-slate-800 tracking-tight mb-6">Store & Admin Configuration</h2>
             <form id="setup-store-form" class="space-y-6">
-              <div
-                class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5">
-                <h4
-                  class="col-span-full text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-slate-100 pb-2 mb-2">
-                  1. Store Logistics</h4>
+              <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5">
+                <h4 class="col-span-full text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-slate-100 pb-2 mb-2">1. Store Logistics</h4>
+                
                 <div>
-                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Store Name
-                    *</label>
-                  <input type="text" id="setup-store-name"
-                    class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                    required>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Store Name *</label>
+                  <input type="text" id="setup-store-name" class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" required>
                 </div>
                 <div>
-                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Owner Name
-                    *</label>
-                  <input type="text" id="setup-owner-name"
-                    class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                    required>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Owner Name *</label>
+                  <input type="text" id="setup-owner-name" class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" required>
                 </div>
                 <div>
-                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Support
-                    Email *</label>
-                  <input type="email" id="setup-email"
-                    class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                    required>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Support Email *</label>
+                  <input type="email" id="setup-email" class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" required>
                 </div>
                 <div>
-                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Contact
-                    Number *</label>
-                  <input type="tel" id="setup-contact"
-                    class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                    required>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Contact Number *</label>
+                  <input type="tel" id="setup-contact" class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" required>
                 </div>
                 <div class="md:col-span-2">
-                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Address &
-                    State *</label>
+                  <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Address & State *</label>
                   <div class="flex gap-2">
-                    <input type="text" id="setup-address"
-                      class="w-2/3 border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                      placeholder="Street, City" required>
-                    <input type="text" id="setup-state"
-                      class="w-1/3 border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                      placeholder="State" required>
+                    <input type="text" id="setup-address" class="w-2/3 border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" placeholder="Street, City" required>
+                    <input type="text" id="setup-state" class="w-1/3 border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none" placeholder="State" required>
                   </div>
                 </div>
                 <div class="md:col-span-2 grid grid-cols-3 gap-3">
                   <div class="col-span-2">
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">GSTIN /
-                      Tax ID</label>
-                    <input type="text" id="setup-gstin"
-                      class="w-full border border-slate-300 p-3 rounded-xl font-bold font-mono uppercase text-slate-800 focus:border-indigo-500 outline-none">
+                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">GSTIN / Tax ID</label>
+                    <input type="text" id="setup-gstin" class="w-full border border-slate-300 p-3 rounded-xl font-bold font-mono uppercase text-slate-800 focus:border-indigo-500 outline-none">
                   </div>
                   <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Default
-                      Tax %</label>
-                    <input type="number" id="setup-tax-rate" value="0"
-                      class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none">
+                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Default Tax %</label>
+                    <input type="number" id="setup-tax-rate" value="0" class="w-full border border-slate-300 p-3 rounded-xl font-bold text-slate-800 focus:border-indigo-500 outline-none">
                   </div>
                 </div>
               </div>
 
               <div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
-                <h4 class="col-span-full text-xs font-black text-indigo-800 uppercase tracking-widest border-b border-indigo-200/50 pb-2 mb-2">
-                  2. Master Credentials
-                </h4>
+                <h4 class="col-span-full text-xs font-black text-indigo-800 uppercase tracking-widest border-b border-indigo-200/50 pb-2 mb-2">2. Master Credentials</h4>
                 
                 <div>
                   <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1.5">Create Password *</label>
-                  <input type="password" id="setup-admin-pass"
-                    class="w-full border border-indigo-200 p-3 rounded-xl font-bold text-indigo-900 tracking-widest focus:border-indigo-500 outline-none transition-colors"
-                    placeholder="••••••••" required>
+                  <input type="password" id="setup-admin-pass" class="w-full border border-indigo-200 p-3 rounded-xl font-bold text-indigo-900 tracking-widest focus:border-indigo-500 outline-none transition-colors" placeholder="••••••••" required>
                 </div>
-                
                 <div>
                   <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1.5">Confirm Password *</label>
-                  <input type="password" id="setup-confirm-pass"
-                    class="w-full border border-indigo-200 p-3 rounded-xl font-bold text-indigo-900 tracking-widest focus:border-indigo-500 outline-none transition-colors"
-                    placeholder="••••••••" required>
+                  <input type="password" id="setup-confirm-pass" class="w-full border border-indigo-200 p-3 rounded-xl font-bold text-indigo-900 tracking-widest focus:border-indigo-500 outline-none transition-colors" placeholder="••••••••" required>
                 </div>
-                
                 <div>
                   <label class="block text-[10px] font-black text-red-500 uppercase tracking-widest mb-1.5">Recovery PIN *</label>
-                  <input type="password" id="setup-recovery-pin" maxlength="6"
-                    class="w-full border border-red-200 bg-red-50 text-center p-3 rounded-xl font-black text-red-900 tracking-[0.5em] focus:border-red-500 outline-none transition-colors"
-                    placeholder="000000" required>
+                  <input type="password" id="setup-recovery-pin" maxlength="6" class="w-full border border-red-200 bg-red-50 text-center p-3 rounded-xl font-black text-red-900 tracking-[0.5em] focus:border-red-500 outline-none transition-colors" placeholder="000000" required>
                 </div>
               </div>
 
@@ -1237,11 +1214,11 @@
                       I agree to the <a href="#" class="text-indigo-600 font-bold hover:underline" onclick="event.preventDefault(); window.showTermsAndConditions();">Terms of Service</a> and explicitly consent to the collection and processing of my business and user information under the data protection protocol.
                   </label>
               </div>
-
-              <button type="submit" id="trigger-init-btn"
-                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-200 uppercase tracking-widest transition-all active:scale-95 text-sm mt-6">
-                Encrypt & Initialize System
+              <button type="submit" id="setup-store-btn" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-200 transition-all transform active:scale-95 text-sm tracking-wide mt-4 flex justify-center items-center gap-2">
+                Initialize Store
               </button>
+
+              
             </form>
           </div>
         </div>
