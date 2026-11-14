@@ -15,16 +15,16 @@ export function openPublicToSModal() {
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
-                
+
                 <div class="p-8 overflow-y-auto flex-1 text-sm text-slate-600 space-y-6 custom-scrollbar bg-white">
                     <div>
                         <h4 class="font-black text-slate-900 text-base uppercase tracking-wider mb-2">1. Acceptable Use</h4>
                         <p class="leading-relaxed">You agree not to misuse the Mifela platform or assist anyone else in doing so. You must not attempt to bypass, circumvent, or exploit our security measures, rate limiters, or APIs.</p>
                     </div>
-                    
+
                     <div>
                         <h4 class="font-black text-slate-900 text-base uppercase tracking-wider mb-2">2. Data Privacy & Ownership</h4>
-                        <p class="leading-relaxed">Your data remains yours. We respect your privacy. All customer data, transaction ledgers, and directory records are stored securely and handled strictly in accordance with our Privacy Policy.</p>
+                        <p class="leading-relaxed">Your data remains ours. We respect your privacy. All customer data, transaction ledgers, and directory records are stored securely and handled strictly in accordance with our Privacy Policy.</p>
                     </div>
 
                     <div>
@@ -34,7 +34,7 @@ export function openPublicToSModal() {
 
                     <!-- Add your full legal text here -->
                 </div>
-                
+
                 <div class="px-8 py-5 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
                     <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden');" class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black tracking-wide rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-95">Accept & Close</button>
                 </div>

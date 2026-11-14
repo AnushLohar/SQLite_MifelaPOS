@@ -1176,7 +1176,7 @@ if (window.scannerAPI && typeof window.scannerAPI.onNewScan === 'function') {
 // 📜 TERMS & CONDITIONS MODAL
 // ============================================================================
 
-export function showTermsAndConditions() {
+window.showTermsAndConditions = function() {
     const modalId = 'mifela-terms-modal';
     if (document.getElementById(modalId)) return;
 
@@ -1253,7 +1253,7 @@ export function showTermsAndConditions() {
         printWindow.document.close();
         setTimeout(() => { printWindow.print(); }, 500);
     };
-}
+};
 
 // ============================================================================
 // 📦 INVENTORY UTILS
@@ -2152,7 +2152,7 @@ window.checkStartupSequence = async function() {
         return; 
     }
 
-    // 🚀 SECURE READ: Fetch vault state directly from SQLite
+    // 1. Fetch vault state directly from SQLite
     const vault = await window.electronAPI.getDoc('store_settings', 'SYS_VAULT');
     const vaultExists = !!vault;
 
@@ -2163,15 +2163,17 @@ window.checkStartupSequence = async function() {
 
     const isProvisioned = (state && state.status !== 'UNPROVISIONED') || hasStoredToken;
 
-    // Tamper Protection: If SQLite says provisioned but the vault was destroyed, force a reset
-    if (isProvisioned && !vaultExists) {
-        console.warn("Security Enclave intact but Local Vault missing. Forcing recovery...");
+    // 2. Terminal Boot Routing
+    if (!isProvisioned || (isProvisioned && !vaultExists)) {
+        if (isProvisioned && !vaultExists) {
+            console.warn("Security Enclave intact but Local Vault missing. Forcing recovery...");
+        }
+        
+        // Show the STATIC HTML form from index.html
         window.showAuthView('setup');
-        return;
-    }
-
-    if (!isProvisioned) {
-        window.showAuthView('setup');
+        
+        // Pull down hardware or cloud data to pre-fill the form
+        window.autoFillSetupForm(); 
         return;
     }
 
@@ -2183,8 +2185,6 @@ window.checkStartupSequence = async function() {
 
     if (state && state.status === 'UNPROVISIONED' && !hasStoredToken) {
         window.showAuthView('activation');
-        
-        // 🚀 THE FIX: Start listening for the remote token broadcast
         if (typeof window.listenForRemoteActivation === 'function') {
             window.listenForRemoteActivation();
         }
@@ -2192,12 +2192,135 @@ window.checkStartupSequence = async function() {
         window.showAuthView('login');
     }
 };
+
+window.autoFillSetupForm = async function() {
+    const btn = document.getElementById('trigger-init-btn');
+    if (btn) {
+        btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Fetching Profile...';
+        btn.disabled = true;
+    }
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val) {
+            el.value = val;
+            // Force React/DOM updates
+            el.dispatchEvent(new Event('input', { bubbles: true })); 
+        }
+    };
+
+    try {
+        let detectedState = '';
+        try {
+            const ipRes = await fetch('https://ipapi.co/json/');
+            const ipData = await ipRes.json();
+            if (ipData.region) {
+                detectedState = ipData.region;
+                setVal('setup-state', detectedState);
+            }
+        } catch (e) { console.warn("IP Geo failed"); }
+
+        let fingerprint = 'UNKNOWN_NODE';
+        if (window.electronAPI && typeof window.electronAPI.getMachineId === 'function') {
+            fingerprint = await window.electronAPI.getMachineId();
+        }
+
+        const { doc: firestoreDoc, getDoc, collection, query, where, getDocs } = await import("firebase/firestore");
+        const { getAuth } = await import("firebase/auth");
+        
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        let dataFound = false;
+
+        // TIER 1: Fetch by Hardware Fingerprint (Matches the screenshot data)
+        try {
+            const nodeDocRef = firestoreDoc(db, "provisioned_nodes", fingerprint);
+            const nodeSnap = await getDoc(nodeDocRef);
+
+            if (nodeSnap.exists()) {
+                const storeData = nodeSnap.data();
+                
+                setVal('setup-owner-name', storeData.ownerName || '');
+                setVal('setup-email', storeData.email || '');
+                setVal('setup-store-name', storeData.storeName || '');
+                
+                let phoneStr = storeData.contact || storeData.phone || '';
+                if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
+                else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
+                setVal('setup-contact', phoneStr);
+                
+                setVal('setup-address', storeData.address || '');
+                if (storeData.state) setVal('setup-state', storeData.state);
+                
+                // Matches the HTML ID from index.html
+                setVal('setup-gstin', storeData.gstin || storeData.taxId || '');
+                
+                if (storeData.currency) setVal('setup-currency', storeData.currency);
+                if (storeData.taxRate !== undefined) setVal('setup-tax-rate', storeData.taxRate);
+
+                dataFound = true;
+            }
+        } catch (err) {
+            console.warn("Tier 1 Node Fetch Failed:", err.message);
+        }
+
+        // TIER 2: Fallback to Cloud Directory
+        if (!dataFound && user) {
+            try {
+                const targetAppId = "1:19471193085:web:2da2bd605292e4aad5bf94";
+                const storesRef = collection(db, `artifacts/${targetAppId}/stores`);
+                const q = query(storesRef, where("ownerId", "==", user.uid));
+                const storeSnap = await getDocs(q);
+
+                if (!storeSnap.empty) {
+                    const storeData = storeSnap.docs[0].data();
+                    
+                    setVal('setup-owner-name', user.displayName || 'Admin');
+                    setVal('setup-email', storeData.email || user.email || '');
+                    setVal('setup-store-name', storeData.storeName || '');
+                    
+                    let phoneStr = storeData.phone || '';
+                    if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
+                    else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
+                    setVal('setup-contact', phoneStr);
+                    
+                    setVal('setup-address', storeData.address || '');
+                    if (storeData.state) setVal('setup-state', storeData.state);
+                    
+                    setVal('setup-gstin', storeData.taxId || storeData.gstin || '');
+                    dataFound = true;
+                } else {
+                    setVal('setup-owner-name', user.displayName || '');
+                    setVal('setup-email', user.email || '');
+                }
+            } catch (err) {
+                console.warn("Tier 2 Store Fetch Failed:", err.message);
+                setVal('setup-owner-name', user.displayName || '');
+                setVal('setup-email', user.email || '');
+            }
+        }
+
+        if (dataFound && typeof showToast === 'function') {
+            showToast('Profile Loaded', 'Terminal details fetched securely.', 'info');
+        }
+
+    } catch (fatalError) {
+        console.error("Auto-fill Critical Error:", fatalError);
+    } finally {
+        if (btn) {
+            btn.innerHTML = 'Encrypt & Initialize System';
+            btn.disabled = false;
+        }
+    }
+};
+
+window.renderStoreSetupModal = undefined;
 window.showLockScreen = function() {
     window.showAuthView('login');
 };
 
 let pendingSetupDetails = null;
-
 
 window.completeStartup = async function(e) {
     if (e) e.preventDefault();
@@ -2207,8 +2330,7 @@ window.completeStartup = async function(e) {
 
     form.querySelectorAll('input').forEach(inp => inp.classList.remove('border-red-500', 'bg-red-50'));
 
-    const adminIdInput = document.getElementById('setup-admin-id');
-    const customAdminId = adminIdInput ? adminIdInput.value.trim().toLowerCase() : 'admin';
+    const customAdminId = 'admin';
 
     const fields = {
         storeName: document.getElementById('setup-store-name'),
@@ -2217,14 +2339,16 @@ window.completeStartup = async function(e) {
         contact: document.getElementById('setup-contact'),
         address: document.getElementById('setup-address'),
         state: document.getElementById('setup-state'),
+        taxId: document.getElementById('setup-tax'), // <-- ENSURE THIS SAYS setup-tax
         adminPass: document.getElementById('setup-admin-pass'),
+        confirmPass: document.getElementById('setup-confirm-pass'),
         recoveryPin: document.getElementById('setup-recovery-pin')
     };
 
     let isValid = true;
     Object.values(fields).forEach(input => {
         if (!input || !input.value.trim()) {
-            if(input) input.classList.add('border-red-500', 'bg-red-50');
+            if (input) input.classList.add('border-red-500', 'bg-red-50');
             isValid = false;
         }
     });
@@ -2234,9 +2358,22 @@ window.completeStartup = async function(e) {
         return;
     }
 
+    const consentCheck = document.getElementById('setup-consent');
+    if (consentCheck && !consentCheck.checked) {
+        if (typeof showToast === 'function') showToast('Consent Required', 'Please accept the data processing terms to continue.', 'error');
+        return;
+    }
+
     if (fields.adminPass.value.trim().length < 4) {
         fields.adminPass.classList.add('border-red-500');
         if (typeof showToast === 'function') showToast('Security Error', 'Admin Password must be at least 4 characters.', 'error');
+        return;
+    }
+
+    if (fields.adminPass.value.trim() !== fields.confirmPass.value.trim()) {
+        fields.adminPass.classList.add('border-red-500');
+        fields.confirmPass.classList.add('border-red-500');
+        if (typeof showToast === 'function') showToast('Security Error', 'Passwords do not match.', 'error');
         return;
     }
 
@@ -2246,7 +2383,6 @@ window.completeStartup = async function(e) {
         return;
     }
 
-    // Capture valid details in memory and open the new Billing Modal
     pendingSetupDetails = { fields, customAdminId };
     
     const billingModal = document.getElementById('license-billing-modal');
@@ -3304,3 +3440,239 @@ window.listenForRemoteActivation = async function() {
         console.warn("Could not setup remote activation listener:", e);
     }
 };
+
+// Patch to add consent checkbox to the store setup modal
+(function addConsentToStoreSetup() {
+// Find the setup store modal HTML by locating the function that creates it
+const originalRenderSetupModal = window.renderStoreSetupModal;
+
+if (typeof originalRenderSetupModal === 'function') {
+// Patch the renderStoreSetupModal function
+window.renderStoreSetupModal = function(passedUser, passedProfile) {
+const modalId = 'setup-store-modal';
+const existing = document.getElementById(modalId);
+if (existing) existing.remove();
+
+// Extract existing HTML generation logic from original function
+const user = passedUser || {};
+const userProfile = passedProfile || {};
+
+const defaultEmail = user.email || userProfile.email || document.getElementById('reg-email')?.value.trim() || '';
+let defaultPhone = user.phoneNumber || userProfile.phone || '';
+const defaultName = user.displayName || userProfile.name || userProfile.displayName || document.getElementById('reg-fullname')?.value.trim() || '';
+const defaultStoreName = userProfile.companyName || userProfile.storeName || document.getElementById('reg-storename')?.value.trim() || '';
+
+if (defaultPhone.startsWith('+91')) {
+defaultPhone = defaultPhone.substring(3);
+} else if (defaultPhone.startsWith('+')) {
+defaultPhone = defaultPhone.substring(1);
+}
+
+const isPhoneLinked = !!user.phoneNumber || !!userProfile.phone;
+const isEmailLinked = !!user.email || !!userProfile.email;
+const isNameLinked = !!defaultName;
+const isStoreNameLinked = !!defaultStoreName;
+
+const phoneAttrs = isPhoneLinked ? 'disabled readonly' : 'required';
+const phoneClass = isPhoneLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
+const phoneBadge = isPhoneLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
+
+const emailAttrs = isEmailLinked ? 'disabled readonly' : 'required';
+const emailClass = isEmailLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
+const emailBadge = isEmailLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
+
+const nameAttrs = isNameLinked ? 'disabled readonly' : 'required';
+const nameClass = isNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
+const nameBadge = isNameLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
+
+const storeNameAttrs = isStoreNameLinked ? 'disabled readonly' : 'required';
+const storeNameClass = isStoreNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
+const storeNameBadge = isStoreNameLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
+
+const html = `
+<div id="${modalId}" class="fixed inset-0 z-[100] bg-gray-900 bg-opacity-90 flex items-center justify-center animate-fadeIn p-4 transition-opacity">
+<div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-scaleIn">
+<div class="bg-indigo-600 p-6 text-white text-center shrink-0">
+<h2 class="text-2xl font-black tracking-tight">Welcome to Mifela Inventory</h2>
+<p class="text-indigo-100 text-sm mt-1 font-medium">Please configure your main store profile to continue.</p>
+</div>
+
+<div class="p-8 overflow-y-auto custom-scrollbar flex-1">
+<form id="setup-store-form" class="space-y-6">
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide flex justify-between items-center">
+<span>Your Full Name ${isNameLinked ? '' : '*'}</span>
+${nameBadge}
+</label>
+<input type="text" id="setup-admin-name" class="w-full border border-gray-300 p-3 rounded-xl outline-none transition-colors shadow-sm ${nameClass}" placeholder="e.g. John Doe" value="${escapeHTML(defaultName)}" ${nameAttrs}>
+</div>
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide flex justify-between items-center">
+<span>Store Name ${isStoreNameLinked ? '' : '*'}</span>
+${storeNameBadge}
+</label>
+<input type="text" id="setup-name" class="w-full border border-gray-300 p-3 rounded-xl outline-none transition-colors shadow-sm ${storeNameClass}" placeholder="e.g. My Supermarket" value="${escapeHTML(defaultStoreName)}" ${storeNameAttrs}>
+</div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide flex justify-between items-center">
+<span>Phone Number ${isPhoneLinked ? '' : '*'}</span>
+${phoneBadge}
+</label>
+<div class="relative flex items-center shadow-sm rounded-xl">
+<span class="absolute left-3 text-gray-400 font-bold pointer-events-none select-none">+91</span>
+<input type="tel" id="setup-phone" class="w-full border border-gray-300 p-3 pl-11 rounded-xl outline-none transition-colors ${phoneClass}" placeholder="99999 99999" value="${defaultPhone}" ${phoneAttrs}>
+</div>
+</div>
+
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide flex justify-between items-center">
+<span>Support Email ${isEmailLinked ? '' : '*'}</span>
+${emailBadge}
+</label>
+<input type="email" id="setup-email" class="w-full border border-gray-300 p-3 rounded-xl outline-none transition-colors shadow-sm ${emailClass}" placeholder="store@example.com" value="${defaultEmail}" ${emailAttrs}>
+</div>
+</div>
+
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Full Physical Address *</label>
+<textarea id="setup-address" rows="2" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-colors shadow-sm" placeholder="Street, Area, City..." required></textarea>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">State/Region *</label>
+<input type="text" id="setup-state" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-colors shadow-sm" placeholder="e.g. Maharashtra" required>
+</div>
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">GSTIN / Tax ID *</label>
+<input type="text" id="setup-tax" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono border-l-4 border-l-indigo-500 transition-colors shadow-sm" placeholder="Enter Tax ID" required>
+</div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">PAN NO</label>
+<input type="text" id="setup-store-pan" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono transition-colors shadow-sm" placeholder="ABCDE1234F">
+</div>
+</div>
+
+<div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Currency</label>
+<select id="setup-currency" class="w-full border border-gray-300 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer">
+<option value="INR">INR (₹)</option>
+<option value="USD">USD ($)</option>
+<option value="EUR">EUR (€)</option>
+</select>
+</div>
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Default Tax Rate (%)</label>
+<input type="number" id="setup-rate" class="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" placeholder="0" value="0">
+</div>
+</div>
+
+<div class="space-y-1.5">
+<label class="text-xs font-bold text-gray-600 uppercase tracking-wide">
+<span>Data Processing Consent ${isEmailLinked ? '' : '*'}</span>
+</label>
+<div class="relative flex items-center shadow-sm rounded-xl">
+<input type="checkbox" id="setup-consent" required class="w-4 h-4 rounded border border-indigo-600 bg-indigo-600 cursor-pointer ml-2">
+<span class="ml-3 text-sm text-slate-700">I accept the Data Processing Terms and Privacy Policy</span>
+</div>
+</div>
+</form>
+</div>
+
+<div class="p-6 border-t border-gray-100 bg-white shrink-0">
+<button type="submit" form="setup-store-form" id="setup-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-600/30 transform active:scale-[0.98] flex items-center justify-center gap-2 text-lg">
+<span>🚀</span> Create Store & Start
+</button>
+<button type="button" id="setup-logout-btn" class="w-full mt-3 text-gray-500 font-semibold text-sm hover:text-gray-900 transition-colors py-2">
+Sign Out
+</button>
+</div>
+</div>
+</div>
+`;
+
+document.body.insertAdjacentHTML('beforeend', html);
+document.body.classList.add('overflow-hidden');
+
+// Setup tax pan interaction (if elements exist)
+const setupTaxInput = document.getElementById('setup-tax');
+const setupPanInput = document.getElementById('setup-store-pan');
+if (setupTaxInput && setupPanInput) {
+setupTaxInput.addEventListener('input', (e) => {
+let val = e.target.value.toUpperCase().trim();
+e.target.value = val;
+if (val.length >= 15 && !setupPanInput.value) {
+setupPanInput.value = val.substring(2, 12);
+setupPanInput.classList.add('bg-indigo-50', 'transition-colors');
+setTimeout(() => setupPanInput.classList.remove('bg-indigo-50'), 800);
+}
+});
+}
+
+// Setup consent checkbox behavior (if element exists)
+const setupConsentInput = document.getElementById('setup-consent');
+if (setupConsentInput) {
+// Enable submit only when consent is checked
+const setupSubmitBtn = document.getElementById('setup-submit-btn');
+const updateConsentState = () => {
+if (setupConsentInput.checked) {
+setupSubmitBtn.disabled = false;
+} else {
+setupSubmitBtn.disabled = true;
+}
+};
+setupConsentInput.addEventListener('change', updateConsentState);
+// Initial state
+updateConsentState();
+}
+
+document.getElementById('setup-logout-btn').onclick = () => {
+logoutUser();
+document.getElementById(modalId).remove();
+}
+
+// This is the original setup form submission handler
+document.getElementById('setup-store-form').onsubmit = async (e) => {
+e.preventDefault();
+
+const btn = document.getElementById('setup-submit-btn');
+const originalText = btn.innerHTML;
+btn.innerHTML = '<span class="animate-spin">⏳</span> Configuring Local DB...';
+btn.disabled = true;
+
+const details = {
+adminName: document.getElementById('setup-admin-name').value.trim(),
+storeName: document.getElementById('setup-name').value.trim(),
+phone: document.getElementById('setup-phone').value.trim(),
+email: document.getElementById('setup-email').value.trim(),
+address: document.getElementById('setup-address').value.trim(),
+state: document.getElementById('setup-state').value.trim(),
+taxId: document.getElementById('setup-tax').value.trim(),
+pan: document.getElementById('setup-store-pan')?.value.trim().toUpperCase() || '',
+currency: document.getElementById('setup-currency').value,
+taxRate: document.getElementById('setup-rate').value
+};
+
+try {
+await window.electronAPI.saveStoreSettings(details);
+document.getElementById(modalId).remove();
+await initializeAuth();
+} catch (error) {
+console.error(error);
+alert("Local Setup Failed: " + error.message);
+btn.innerHTML = originalText;
+btn.disabled = false;
+}
+};
+};
+}
+})();
