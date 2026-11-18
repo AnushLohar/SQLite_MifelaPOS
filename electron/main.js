@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import electronLog from 'electron-log';
 import pkg from 'electron-updater';                 // CommonJS → get the whole package
 const { autoUpdater } = pkg;                       // named export from the package
-import { initDB, getDB } from './database/connection.js';   // <-- missing import
+import { initKnex } from './database/knex.js';   // <-- Knex connection
 import { registerDBHandlers } from './database/controllers.js';
 import { LicenseManager } from './security/licenseVerifier.js';
 import { getHardwareFingerprint } from './security/fingerprint.js';
@@ -135,10 +135,10 @@ if (!gotTheLock) {
   //  When the app is ready – initialise everything
   // ---------------------------------------------------------------
   app.whenReady().then(() => {
-  // 1️⃣ Initialise SQLite (now that initDB is imported)
+  // 1️⃣ Initialise SQLite (now that initKnex is imported)
   try {
-    initDB();                         // <-- will succeed
-    registerDBHandlers();             // if you need it
+    initKnex();                         // <-- will succeed
+    registerDBHandlers();
     electronLog.info('✅ Database connected and IPC handlers registered.');
   } catch (dbError) {
     electronLog.error('❌ FATAL: DB init failed', dbError);
@@ -166,7 +166,7 @@ function registerIpcHandlers() {
     ipcMain.handle('app:get-version', () => app.getVersion());
 
   // ---- security/get-state -------------------------------------------------
-  ipcMain.handle('security:get-state', () => LicenseManager.verifyLocalState());
+  ipcMain.handle('security:get-state', async () => LicenseManager.verifyLocalState());
 
   // ---- security:provision (generate & store RSA keypair) ------------------
   ipcMain.handle('security:provision', async (_, { email, storeName }) => {
@@ -216,7 +216,7 @@ function registerIpcHandlers() {
 ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
     try {
         const fp = await getHardwareFingerprint();
-        const signature = LicenseManager.executeChallenge(challengeHex, fp);
+        const signature = await LicenseManager.executeChallenge(challengeHex, fp);
         return { success: true, signature };
     } catch (error) {
         return { success: false, error: error.message };
@@ -224,7 +224,7 @@ ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
 });
 
   // ---- license extension --------------------------------------------------
-  ipcMain.handle('security:extend-license', () => {
+  ipcMain.handle('security:extend-license', async () => {
     return LicenseManager.updateVerificationDate();
   });
 
@@ -241,30 +241,42 @@ ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
 
     if (!printWorker) createPrintWorker();
 
-    return new Promise((resolve, reject) => {
-      const html = content.includes('<!DOCTYPE html>')
-        ? content
-        : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${content}</body></html>`;
+    // Sanitize HTML: strip <script> tags and inline event handlers to prevent XSS
+    const sanitizedHtml = content.includes('<!DOCTYPE html>')
+      ? content
+      : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${content}</body></html>`;
+    const safeHtml = sanitizeHtml(sanitizedHtml);
 
-      printWorker.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Print worker did not respond in time'));
+      }, 10000);
+
+      const onRenderResult = (_event, result) => {
+        clearTimeout(timeoutId);
+        printWorker.webContents.removeListener('ipc-message', onRenderResult);
+        if (result.success) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(result.error || 'Print failed'));
+        }
+      };
 
       printWorker.webContents.once('did-finish-load', () => {
-        setTimeout(async () => {
-          try {
-            await printWorker.webContents.print({
-              silent: silentPrint,
-              deviceName: printerName.trim() !== '' ? printerName : undefined,
-              color: false,
-              printBackground: true,
-              margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
-            });
-            resolve({ success: true });
-          } catch (e) {
-            console.error('Electron Print failed:', e);
-            reject(e);
-          }
-        }, 50);
+        // Send the sanitized HTML to the print page via the preload bridge
+        printWorker.webContents.send('print:render-html', safeHtml, {
+          silent: silentPrint,
+          deviceName: printerName.trim() !== '' ? printerName : undefined,
+          color: false,
+          printBackground: true,
+          margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+        });
       });
+
+      printWorker.webContents.on('ipc-message', onRenderResult);
+
+      // Load a blank local page (not a data: URL with renderer-controlled HTML)
+      printWorker.loadFile(path.join(__dirname, 'printBlank.html'));
     });
   });
 
@@ -309,6 +321,44 @@ ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
       return { success: false, error: e.message };
     }
   });
+
+// ------------------------------------------------------------------
+//  Print security helpers
+// ------------------------------------------------------------------
+
+// Strip <script> tags and inline event handlers to prevent XSS in the print worker
+function sanitizeHtml(html) {
+  if (typeof html !== 'string') return '';
+  return html
+    // Remove <script>...</script> blocks
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove inline event handlers (onclick, onerror, onload, etc.)
+    .replace(/\s(on\w+)\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')
+    // Remove javascript: URLs
+    .replace(/javascript\s*:/gi, '')
+    // Remove <style> blocks containing expression() (IE legacy XSS vector)
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+}
+
+// Render sanitized HTML in the isolated print worker and report back the result
+ipcMain.handle('print:render', async (_, html, options) => {
+  if (!printWorker || printWorker.isDestroyed()) {
+    return { success: false, error: 'Print worker not available' };
+  }
+  try {
+    await printWorker.webContents.print({
+      silent: options.silent !== undefined ? options.silent : true,
+      deviceName: options.deviceName || undefined,
+      color: options.color !== undefined ? options.color : false,
+      printBackground: options.printBackground !== undefined ? options.printBackground : true,
+      margins: options.margins || { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+    });
+    return { success: true };
+  } catch (e) {
+    console.error('Electron Print failed:', e);
+    return { success: false, error: e.message };
+  }
+});
 
   // ---- raw printer byte-stream (ESC/POS / TSC) ---------------------------
   ipcMain.handle('print:raw', async (_, { data, printerName }) => {
@@ -356,25 +406,32 @@ ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
 
     // 3. Fallback: render the raw payload as a monospace document and print it
     if (!printWorker) createPrintWorker();
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:monospace;font-size:8px;margin:0;padding:0;white-space:pre;">${escapeHtmlForPrint(String(data))}</body></html>`;
+    const safeHtml = sanitizeHtml(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:monospace;font-size:8px;margin:0;padding:0;white-space:pre;">${escapeHtmlForPrint(String(data))}</body></html>`);
     return new Promise((resolve, reject) => {
-      printWorker.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Print worker did not respond in time'));
+      }, 10000);
+
       printWorker.webContents.once('did-finish-load', () => {
-        setTimeout(async () => {
-          try {
-            await printWorker.webContents.print({
-              silent: true,
-              deviceName: printerName && printerName.trim() !== '' ? printerName : undefined,
-              color: false,
-              printBackground: true,
-              margins: { marginType: 'none' },
-            });
-            resolve({ success: true });
-          } catch (e) {
-            resolve({ success: false, error: e.message });
-          }
-        }, 50);
+        printWorker.webContents.send('print:render-html', safeHtml, {
+          silent: true,
+          deviceName: printerName && printerName.trim() !== '' ? printerName : undefined,
+          color: false,
+          printBackground: true,
+          margins: { marginType: 'none' },
+        });
       });
+
+      printWorker.webContents.once('ipc-message', (_event, result) => {
+        clearTimeout(timeoutId);
+        if (result.success) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(result.error || 'Raw print failed'));
+        }
+      });
+
+      printWorker.loadFile(path.join(__dirname, 'printBlank.html'));
     });
   });
 
@@ -483,9 +540,10 @@ function createPrintWorker() {
   printWorker = new BrowserWindow({
     show: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'printPreload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
   });
 

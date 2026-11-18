@@ -1080,16 +1080,43 @@
         <div class="p-8 flex-1 bg-white overflow-y-auto custom-scrollbar">
             <!-- Phase 1: Payment & Verification -->
             <div id="licensing-step-1">
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 space-y-2">
-                    <div class="flex justify-between items-end mb-2">
-                        <span class="text-xs font-bold text-slate-400 line-through">₹30,000.00</span>
-                        <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Save ₹5,000</span>
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-6 space-y-4 shadow-inner">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Standard Price</h4>
+                            <span class="text-sm font-bold text-slate-400 line-through">₹30,000.00</span>
+                        </div>
+                        <div class="text-right">
+                            <h4 class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Launch Offer</h4>
+                            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">- ₹5,000.00</span>
+                        </div>
                     </div>
-                    <div class="flex justify-between text-sm font-black text-slate-800 pt-2 border-t border-slate-200"><span class="uppercase tracking-widest">Total Due</span><span>₹25,000.00</span></div>
+
+                    <div class="space-y-2.5 pt-4 border-t border-slate-200/60">
+                        <div class="flex justify-between text-xs font-medium text-slate-500">
+                            <span>Base License Fee</span>
+                            <span class="font-mono">₹20,500.00</span>
+                        </div>
+                        <div class="flex justify-between text-xs font-medium text-slate-500">
+                            <span>GST (18% Digital Service)</span>
+                            <span class="font-mono">₹3,690.00</span>
+                        </div>
+                        <div class="flex justify-between text-xs font-medium text-slate-500 pb-2">
+                            <span>Razorpay Gateway (2% + Platform)</span>
+                            <span class="font-mono">₹810.00</span>
+                        </div>
+                        <div class="flex justify-between items-center text-lg font-black text-slate-900 pt-3 border-t-2 border-indigo-100">
+                            <span class="uppercase tracking-tighter text-xs text-indigo-600">Total Payable</span>
+                            <span class="font-mono tracking-tighter text-2xl">₹25,000.00</span>
+                        </div>
+                    </div>
                 </div>
 
-                <button id="btn-open-gateway" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm flex items-center justify-center gap-2 mb-3 uppercase tracking-widest">
-                    1. Complete Payment Online <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                <button id="btn-open-gateway" class="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm flex items-center justify-center gap-2 mb-3 uppercase tracking-widest group">
+                    1. Complete Payment Online
+                    <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
                 </button>
 
                 <button id="btn-verify-automated" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 text-sm uppercase tracking-widest flex items-center justify-center gap-2">

@@ -1751,10 +1751,7 @@ export async function handleProductSubmit(e) {
             const currentPlanStr = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
             const plan = (currentPlanStr || 'free').toLowerCase();
             
-            let skuLimit = 100; // Free
-            if (plan === 'silver' || plan === 'standard') skuLimit = 1000;
-            if (plan === 'gold') skuLimit = 5000;
-            if (plan === 'platinum' || plan === 'premium') skuLimit = 100000; 
+            
 
             try {
                 // We use our offline getCountFromServer mock here

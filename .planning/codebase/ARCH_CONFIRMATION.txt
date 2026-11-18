@@ -1,0 +1,19 @@
+## Mapping Complete
+
+**Focus:** arch
+**Documents written:**
+- `.planning/codebase/ARCHITECTURE.md` (45 lines) — Architecture overview & layers
+- `.planning/codebase/STRUCTURE.md` (105 lines) — Directory layout, key files, naming conventions
+- `.planning/codebase/DATA_FLOW.md` (232 lines) — IPC channel registry & end-to-end data flows
+- `.planning/codebase/DATABASE.md` (210 lines) — Schema, access layer, concurrency, concerns
+- `.planning/codebase/SECURITY.md` (150 lines) — Licensing, fingerprinting, controls & concerns
+- `.planning/codebase/COMPONENTS.md` (102 lines) — Component & module reference
+- `.planning/codebase/CONCERNS.md` (54 lines) — Tech debt & security considerations
+- `.planning/codebase/CONVENTIONS.md` (58 lines) — Coding conventions
+- `.planning/codebase/INTEGRATIONS.md` (70 lines) — External APIs & services
+- `.planning/codebase/STACK.md` (76 lines) — Technology stack
+- `.planning/codebase/TESTING.md` (35 lines) — Testing patterns
+
+Total: 11 documents, ~1,137 lines.
+
+Ready for orchestrator summary.

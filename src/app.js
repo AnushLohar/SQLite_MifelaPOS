@@ -1,9 +1,9 @@
 // src/app.js
-import './index.css'; 
+import './index.css';
 
 import { initializeAuth, logoutUser } from './services/auth.js';
-import { handleGlobalScan } from './utils/scanner.js'; 
-import { initDOMElements, DOM, showModal, showToast } from './utils/dom.js'; 
+import { handleGlobalScan } from './utils/scanner.js';
+import { initDOMElements, DOM, showModal, showToast } from './utils/dom.js';
 import { initNetworkMonitoring, getNetworkStatus } from './services/network.js'; // 🚀 MAKE SURE getNetworkStatus IS IMPORTED
 import { escapeHTML } from './utils/security.js';
 import { renderReviewScreen } from './components/scannerReview.js';
@@ -11,7 +11,7 @@ import { setupNotificationDrawer } from './components/notifications.js';
 
 import { handleNavigationView } from './components/navigation.js';
 import { performAutoIpUpdate, renderDynamicDashboard } from './components/dashboard.js';
-import { createInitialStore, loadSettingsPage } from './components/settings.js'; 
+import { createInitialStore, loadSettingsPage } from './components/settings.js';
 import { initAutoUpdater } from './utils/Updater.js';
 
 // --- Component Handlers ---
@@ -22,37 +22,22 @@ import { handleTransactionFilterChange, clearTransactionFilters } from './compon
 import { handleSaveProfileStore, handleSaveSettings } from './components/settings.js';
 import { handleAddStaff, loadStaffList, resetStaffForm } from './components/staff.js';
 import { exportInventoryToCSV, exportTransactionsToCSV, exportPartnersToCSV, exportStaffPaymentsToCSV } from './utils/export.js';
-import { initializeApp } from "firebase/app";
-import { initializeFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyB2n1fa2T7gYwWRmoqr674YW1rXlujCOXM",
-  authDomain: "mifela-pos-sqlite.firebaseapp.com",
-  projectId: "mifela-pos-sqlite",
-  storageBucket: "mifela-pos-sqlite.firebasestorage.app",
-  messagingSenderId: "19471193085",
-  appId: "1:19471193085:web:2da2bd605292e4aad5bf94"
-};
-
-const fbApp = initializeApp(firebaseConfig);
-const db = initializeFirestore(fbApp, {
-    experimentalForceLongPolling: true,
-    useFetchStreams: false
-});
-
-window.fbApp = fbApp;
-window.db = db;
+// --- Firebase configuration ---
+// Firebase is initialized lazily via ensureFirebase() from firebase-init.js.
+// The web API key is safe to embed (Firestore Security Rules control access).
+// ------------------------------------------------------------------
+import { ensureFirebase, isFirebaseReady } from './services/firebase-init.js';
 
 // ============================================================================
 // 🚀 THE FIX: GLOBAL STATE & BYPASSES (MUST BE DECLARED FIRST)
 // ============================================================================
 
-window.getActiveStoreId = function() {
+window.getActiveStoreId = function () {
     return localStorage.getItem('mifela_active_store') || 'DEFAULT_STORE';
 };
 
-window.getActiveUserId = function() {
+window.getActiveUserId = function () {
     try {
         const session = JSON.parse(localStorage.getItem('mifela_user_session') || '{}');
         return session.id || session.email || 'admin_sys';
@@ -61,14 +46,14 @@ window.getActiveUserId = function() {
     }
 };
 
-window.setStoreAndUserRefs = function(userId, storeId) {
+window.setStoreAndUserRefs = function (userId, storeId) {
     const activeUserId = userId || 'admin_sys';
     const activeStoreId = storeId || 'DEFAULT_STORE';
     localStorage.setItem('mifela_active_store', activeStoreId);
     localStorage.setItem('mifela_active_user', activeUserId);
 };
 
-window.ensureDatabaseReady = async function(maxRetries = 15, delay = 300) {
+window.ensureDatabaseReady = async function (maxRetries = 15, delay = 300) {
     for (let i = 0; i < maxRetries; i++) {
         if (window.dbAPI && typeof window.dbAPI.getProducts === 'function') {
             const storeId = localStorage.getItem('mifela_active_store');
@@ -77,7 +62,7 @@ window.ensureDatabaseReady = async function(maxRetries = 15, delay = 300) {
         await new Promise(res => setTimeout(res, delay));
     }
     console.warn("⚠️ Database readiness check timed out, forcing bypass.");
-    return true; 
+    return true;
 };
 
 (function injectOfflineBypasses() {
@@ -95,30 +80,30 @@ window.ensureDatabaseReady = async function(maxRetries = 15, delay = 300) {
                 localStorage.setItem('mifela_user_session', JSON.stringify(session));
             }
         }
-    } catch (e) {}
+    } catch (e) { }
 })();
 
 // ============================================================================
 // 🔐 SECURITY VAULT HELPERS
 // ============================================================================
 
-window.hashSecurely = async function(plaintext) {
+window.hashSecurely = async function (plaintext) {
     const msgUint8 = new TextEncoder().encode(plaintext);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-window.openResetPasswordModal = function() {
+window.openResetPasswordModal = function () {
     const resetModal = document.getElementById('pos-password-reset-modal');
     if (resetModal && resetModal.parentElement !== document.body) document.body.appendChild(resetModal);
-    
+
     const errorMsg = document.getElementById('reset-error-msg');
-    if(errorMsg) errorMsg.classList.add('hidden');
-    
+    if (errorMsg) errorMsg.classList.add('hidden');
+
     const pinInput = document.getElementById('reset-recovery-pin');
     const passInput = document.getElementById('reset-new-pass');
-    if(pinInput) pinInput.value = '';
-    if(passInput) passInput.value = '';
+    if (pinInput) pinInput.value = '';
+    if (passInput) passInput.value = '';
 
     if (resetModal) {
         resetModal.classList.remove('hidden');
@@ -127,7 +112,7 @@ window.openResetPasswordModal = function() {
     }
 };
 
-window.closeResetPasswordModal = function() {
+window.closeResetPasswordModal = function () {
     const resetModal = document.getElementById('pos-password-reset-modal');
     if (resetModal) {
         resetModal.classList.add('hidden');
@@ -135,7 +120,7 @@ window.closeResetPasswordModal = function() {
     }
 };
 
-window.submitPasswordReset = async function(e) {
+window.submitPasswordReset = async function (e) {
     e.preventDefault();
     const pin = document.getElementById('reset-recovery-pin').value.trim();
     const newPass = document.getElementById('reset-new-pass').value.trim();
@@ -149,13 +134,13 @@ window.submitPasswordReset = async function(e) {
     try {
         // 🚀 SECURE READ/WRITE
         const vault = await window.electronAPI.getDoc('store_settings', 'SYS_VAULT');
-        
+
         if (!vault) {
             localStorage.removeItem('mifela_sys_initialized');
             window.location.reload();
             throw new Error("Vault corrupted. Rebooting terminal setup...");
         }
-        
+
         const inputPinHash = await window.hashSecurely(pin);
 
         if (vault.recoveryHash !== inputPinHash) throw new Error("Invalid Master Recovery PIN.");
@@ -166,7 +151,7 @@ window.submitPasswordReset = async function(e) {
 
         window.closeResetPasswordModal();
         if (typeof showToast === 'function') showToast('Vault Updated', 'Admin password successfully reset.', 'success');
-        
+
         document.getElementById('lock-email').value = 'admin';
         document.getElementById('lock-password').focus();
 
@@ -182,9 +167,9 @@ window.submitPasswordReset = async function(e) {
 
 const originalWarn = console.warn;
 console.warn = (...args) => {
-    if (args[0] && typeof args[0] === 'string' && 
+    if (args[0] && typeof args[0] === 'string' &&
         (args[0].includes('Unrecognized feature') || args[0].includes('web-share') || args[0].includes('local-network-access'))) {
-        return; 
+        return;
     }
     originalWarn.apply(console, args);
 };
@@ -193,7 +178,7 @@ const APP_VERSION = '1.0.0';
 
 async function initializeApplication() {
     console.log(`🚀 Initializing Mifela Offline POS v${APP_VERSION}...`);
-    
+
     initNetworkMonitoring();
 
     try {
@@ -205,9 +190,9 @@ async function initializeApplication() {
     }
 
     setupSystemListeners();
-    initAutoUpdater(); 
+    initAutoUpdater();
     setupNotificationDrawer();
-    
+
     document.addEventListener('keydown', handleGlobalScan);
     attachGlobalListeners();
     updateAboutSection();
@@ -217,7 +202,7 @@ async function initializeApplication() {
 
     // Initialize navigation cleanly once
     if (typeof window.showNavItemsForRole === 'function') {
-        window.showNavItemsForRole('admin'); 
+        window.showNavItemsForRole('admin');
     }
     handleNavigationView();
 
@@ -228,10 +213,10 @@ async function initializeApplication() {
     setTimeout(() => {
         const authContainer = document.getElementById('auth-container');
         const lockScreen = document.getElementById('pos-lock-screen');
-        
-        if ((authContainer && !authContainer.classList.contains('hidden')) || 
+
+        if ((authContainer && !authContainer.classList.contains('hidden')) ||
             (lockScreen && !lockScreen.classList.contains('hidden'))) {
-            return; 
+            return;
         }
 
         const session = localStorage.getItem('mifela_user_session');
@@ -302,12 +287,12 @@ async function initializeApplication() {
 
     setTimeout(() => {
         if (DOM.loadingScreen && !DOM.loadingScreen.classList.contains('hidden')) {
-             if(DOM.auth && DOM.auth.view && DOM.auth.view.classList.contains('hidden') === false) {
-                 DOM.loadingScreen.classList.add('hidden');
-             }
+            if (DOM.auth && DOM.auth.view && DOM.auth.view.classList.contains('hidden') === false) {
+                DOM.loadingScreen.classList.add('hidden');
+            }
         }
     }, 2000);
-} 
+}
 // ============================================================================
 // 🔄 ELECTRON AUTO-UPDATER
 // ============================================================================
@@ -362,7 +347,7 @@ async function initializeUpdateManager() {
     if (navBtn) {
         navBtn.onclick = () => {
             modal.classList.remove('hidden');
-            modal.classList.add('flex'); 
+            modal.classList.add('flex');
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 modal.querySelector('div').classList.remove('scale-95');
@@ -375,7 +360,7 @@ async function initializeUpdateManager() {
         modal.querySelector('div').classList.add('scale-95');
         setTimeout(() => {
             modal.classList.add('hidden');
-            modal.classList.remove('flex'); 
+            modal.classList.remove('flex');
         }, 200);
     };
 
@@ -421,15 +406,15 @@ async function initializeUpdateManager() {
             if (iconWrapper) iconWrapper.innerHTML = `<svg class="h-6 w-6 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"></path></svg>`;
             if (progressContainer) progressContainer.classList.remove('hidden');
             if (btnCheck) btnCheck.classList.add('hidden');
-            
+
             const releaseNotesHTML = data.releaseNotes || "<p class='text-sm text-gray-500'>General bug fixes and performance improvements.</p>";
-            
+
             if ((DOM.auth && !DOM.auth.view.classList.contains('hidden'))) {
                 window._queuedUpdateModal = { type: 'available', version: data.version, notes: releaseNotesHTML };
             } else {
                 showUpdateAvailableModal(data.version, releaseNotesHTML);
             }
-        } 
+        }
         else if (type === 'update-downloaded') {
             if (statusTitle) statusTitle.innerText = "Ready to Install";
             if (statusText) statusText.innerText = "The update has been downloaded. Restart the app to apply the new features.";
@@ -437,7 +422,7 @@ async function initializeUpdateManager() {
             if (progressContainer) progressContainer.classList.add('hidden');
             if (btnCheck) btnCheck.classList.add('hidden');
             if (btnInstall) btnInstall.classList.remove('hidden');
-            
+
             if ((DOM.auth && !DOM.auth.view.classList.contains('hidden'))) {
                 window._queuedUpdateModal = { type: 'ready', version: data.version };
             } else {
@@ -509,10 +494,10 @@ function showUpdateReadyModal(version) {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', readyHtml);
     const readyModal = document.getElementById(modalId);
-    
+
     setTimeout(() => {
         readyModal.classList.remove('opacity-0');
         readyModal.querySelector('div').classList.remove('scale-95');
@@ -618,7 +603,7 @@ function renderRecoveryScreen(user, deleteDate) {
     </div>
     `;
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     document.getElementById('btn-cancel-recovery').onclick = () => {
         logoutUser();
         document.getElementById(modalId).remove();
@@ -642,13 +627,13 @@ function renderRecoveryScreen(user, deleteDate) {
 
 export function renderStoreSetupModal(passedUser, passedProfile) {
     const user = passedUser || {};
-    const userProfile = passedProfile || {}; 
-    
+    const userProfile = passedProfile || {};
+
     const defaultEmail = user.email || userProfile.email || document.getElementById('reg-email')?.value.trim() || '';
     let defaultPhone = user.phoneNumber || userProfile.phone || '';
     const defaultName = user.displayName || userProfile.name || userProfile.displayName || document.getElementById('reg-fullname')?.value.trim() || '';
     const defaultStoreName = userProfile.companyName || userProfile.storeName || document.getElementById('reg-storename')?.value.trim() || '';
-    
+
     if (defaultPhone.startsWith('+91')) {
         defaultPhone = defaultPhone.substring(3);
     } else if (defaultPhone.startsWith('+')) {
@@ -679,7 +664,7 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
     const storeNameAttrs = isStoreNameLinked ? 'disabled readonly' : 'required';
     const storeNameClass = isStoreNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
     const storeNameBadge = isStoreNameLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
-    
+
     const html = `
     <div id="${modalId}" class="fixed inset-0 z-[100] bg-gray-900 bg-opacity-90 flex items-center justify-center animate-fadeIn p-4 transition-opacity">
         <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-scaleIn">
@@ -782,7 +767,7 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
         </div>
     </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', html);
     const setupTaxInput = document.getElementById('setup-tax');
     const setupPanInput = document.getElementById('setup-store-pan');
@@ -865,10 +850,10 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
 // ============================================================================
 
 function setupSystemListeners() {
-    window.onerror = function(msg, url, line, col, error) {
+    window.onerror = function (msg, url, line, col, error) {
         if (msg.includes && msg.includes('ResizeObserver')) return false;
         console.error("Global UI Error:", error);
-        return false; 
+        return false;
     };
 
     // Auto-save hardware settings instantly when changed
@@ -901,17 +886,17 @@ function attachGlobalListeners() {
         // 1. Support & Feedback Trigger
         if (e.target.closest('#nav-support-btn') || e.target.closest('[title="Feedback & Support"]')) {
             e.preventDefault();
-            e.stopPropagation(); 
+            e.stopPropagation();
             if (typeof window.openSupportModal === 'function') window.openSupportModal();
             return;
         }
-        
+
         if (e.target.closest('#trigger-init-btn')) {
             e.preventDefault();
             window.completeStartup(e);
             return;
         }
-        
+
         // 2. Review Cheques Trigger
         if (e.target.closest('#btn-review-cheques')) {
             e.preventDefault();
@@ -941,22 +926,22 @@ function attachGlobalListeners() {
 
         // 3. Settings Click Logic
         let isSettingsClick = e.target.closest('#header-settings-btn, #nav-settings-btn, #top-settings-btn, .settings-btn, button[title="Settings"], a[title="Settings"], .header-settings-icon');
-        
+
         if (!isSettingsClick) {
             const el = e.target.closest('button, a, li, div[role="menuitem"]');
             if (el && el.textContent && el.textContent.trim().toLowerCase() === 'settings') {
                 isSettingsClick = el;
             }
         }
-        
+
         if (isSettingsClick && !isSettingsClick.classList.contains('nav-item')) {
             e.preventDefault();
-            e.stopPropagation(); 
-            
+            e.stopPropagation();
+
             const sidebarSettingsNav = document.querySelector('.nav-item[data-target="settings"], button[data-target="settings"]');
-            
+
             if (sidebarSettingsNav) {
-                sidebarSettingsNav.click(); 
+                sidebarSettingsNav.click();
             } else {
                 document.querySelectorAll('.view-section').forEach(el => {
                     el.classList.remove('active', 'block');
@@ -969,8 +954,8 @@ function attachGlobalListeners() {
                 }
             }
 
-            const dropdown1 = document.getElementById('user-menu'); 
-            const dropdown2 = document.getElementById('profile-dropdown'); 
+            const dropdown1 = document.getElementById('user-menu');
+            const dropdown2 = document.getElementById('profile-dropdown');
             if (dropdown1) dropdown1.classList.add('hidden');
             if (dropdown2) dropdown2.classList.add('hidden');
         }
@@ -985,7 +970,7 @@ function attachGlobalListeners() {
     if (DOM.inventory.sort) DOM.inventory.sort.addEventListener('change', handleInventorySortAndSearch);
     if (DOM.inventory.genBarcodeBtn) DOM.inventory.genBarcodeBtn.addEventListener('click', handleGenerateBarcode);
     if (DOM.inventory.exportBtn) DOM.inventory.exportBtn.addEventListener('click', exportInventoryToCSV);
-    
+
     if (DOM.inventory.inputs.dealer) {
         DOM.inventory.inputs.dealer.addEventListener('input', () => handleDealerInfoChange('name'));
     }
@@ -994,7 +979,7 @@ function attachGlobalListeners() {
     }
     if (DOM.inventory.inputs.dealerPhone) {
         DOM.inventory.inputs.dealerPhone.addEventListener('change', () => handleDealerInfoChange('phone'));
-        DOM.inventory.inputs.dealerPhone.addEventListener('input', () => handleDealerInfoChange('phone')); 
+        DOM.inventory.inputs.dealerPhone.addEventListener('input', () => handleDealerInfoChange('phone'));
     }
 
     if (DOM.modals.stock.form) DOM.modals.stock.form.addEventListener('submit', handleStockAdjustmentSubmit);
@@ -1003,28 +988,28 @@ function attachGlobalListeners() {
     if (DOM.pos.checkoutBtn) DOM.pos.checkoutBtn.addEventListener('click', handleCheckout);
     if (DOM.pos.clearBtn) DOM.pos.clearBtn.addEventListener('click', clearCart);
     if (DOM.pos.addBtn) DOM.pos.addBtn.addEventListener('click', handleManualAdd);
-    
+
     if (DOM.pos.customer.id) DOM.pos.customer.id.addEventListener('change', handleCustomerIdLookup);
     if (DOM.pos.customer.name) {
         DOM.pos.customer.name.addEventListener('change', handleCustomerNameLookup);
-        DOM.pos.customer.name.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleCustomerNameLookup(e); });
+        DOM.pos.customer.name.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleCustomerNameLookup(e); });
     }
-    
-    if (DOM.pos.manualInput) DOM.pos.manualInput.addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); } 
+
+    if (DOM.pos.manualInput) DOM.pos.manualInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); }
     });
-    
+
     if (DOM.pos.totals.discount) DOM.pos.totals.discount.addEventListener('input', updateCartSummary);
-    
+
     const mobileScanBtn = document.getElementById('mobile-scan-btn');
     if (mobileScanBtn) {
         mobileScanBtn.addEventListener('click', () => {
-             const activeView = document.querySelector('.view-section.active');
-             if (activeView && activeView.id === 'pos') {
-                 DOM.pos.manualInput?.focus();
-             } else if (activeView && activeView.id === 'inventory') {
-                 DOM.inventory.inputs.barcode?.focus();
-             }
+            const activeView = document.querySelector('.view-section.active');
+            if (activeView && activeView.id === 'pos') {
+                DOM.pos.manualInput?.focus();
+            } else if (activeView && activeView.id === 'inventory') {
+                DOM.inventory.inputs.barcode?.focus();
+            }
         });
     }
 
@@ -1051,10 +1036,10 @@ function attachGlobalListeners() {
 
     if (DOM.settings.store.saveBtn) DOM.settings.store.saveBtn.addEventListener('click', handleSaveProfileStore);
     if (DOM.settings.saveBtn) DOM.settings.saveBtn.addEventListener('click', handleSaveSettings);
-    
+
     const checkUpdateBtn = document.getElementById('check-updates-btn');
     if (checkUpdateBtn && typeof manualCheckForUpdates === 'function') checkUpdateBtn.addEventListener('click', manualCheckForUpdates);
-   
+
     if (DOM.staff.form) DOM.staff.form.addEventListener('submit', handleAddStaff);
     if (DOM.staff.refreshBtn) DOM.staff.refreshBtn.addEventListener('click', loadStaffList);
     if (DOM.staff.cancelBtn) DOM.staff.cancelBtn.addEventListener('click', resetStaffForm);
@@ -1067,17 +1052,17 @@ function attachGlobalListeners() {
     }
     if (DOM.modals.generic.cancelBtn) {
         DOM.modals.generic.cancelBtn.addEventListener('click', () => {
-             if (DOM.modals.generic.self) DOM.modals.generic.self.classList.add('hidden');
+            if (DOM.modals.generic.self) DOM.modals.generic.self.classList.add('hidden');
         });
     }
-    
+
     // 🚀 THE VIRTUAL KEYBOARD FIX
     let isTouchDevice = false;
     window.addEventListener('touchstart', () => { isTouchDevice = true; }, { passive: true });
 
     document.body.addEventListener('click', (e) => {
-        const clickedCatalogItem = e.target.closest('.catalog-item, .product-card'); 
-        
+        const clickedCatalogItem = e.target.closest('.catalog-item, .product-card');
+
         if (clickedCatalogItem && isTouchDevice) {
             setTimeout(() => {
                 if (document.activeElement && document.activeElement.tagName === 'INPUT') {
@@ -1087,37 +1072,37 @@ function attachGlobalListeners() {
         }
     });
     document.body.addEventListener('input', (e) => {
-    // Target the GSTIN fields in the Setup Modal and Inventory/PO forms
-    if (e.target.id === 'setup-gstin' || e.target.id === 'prod-gstin' || e.target.id === 'setting-store-tax-id') {
-        const val = e.target.value.toUpperCase().trim();
-        e.target.value = val; // Force uppercase natively
-        
-        // Match the target PAN input based on which GSTIN field triggered it
-        let panInputId;
-        if (e.target.id === 'setup-gstin') panInputId = 'setup-store-pan';
-        else if (e.target.id === 'prod-gstin') panInputId = 'prod-dealer-pan';
-        else if (e.target.id === 'setting-store-tax-id') panInputId = 'setting-store-pan';
+        // Target the GSTIN fields in the Setup Modal and Inventory/PO forms
+        if (e.target.id === 'setup-gstin' || e.target.id === 'prod-gstin' || e.target.id === 'setting-store-tax-id') {
+            const val = e.target.value.toUpperCase().trim();
+            e.target.value = val; // Force uppercase natively
 
-        const panInput = document.getElementById(panInputId);
-        
-        // Extract PAN (characters 3 to 12) once the GSTIN has at least 12 characters
-        if (val.length >= 12 && panInput && !panInput.value) {
-            panInput.value = val.substring(2, 12);
-            
-            // Visual feedback flash
-            panInput.classList.add('bg-emerald-50', 'transition-colors');
-            setTimeout(() => panInput.classList.remove('bg-emerald-50'), 800);
-            
-            // Trigger change event so any auto-save listeners pick it up
-            panInput.dispatchEvent(new Event('input', { bubbles: true }));
+            // Match the target PAN input based on which GSTIN field triggered it
+            let panInputId;
+            if (e.target.id === 'setup-gstin') panInputId = 'setup-store-pan';
+            else if (e.target.id === 'prod-gstin') panInputId = 'prod-dealer-pan';
+            else if (e.target.id === 'setting-store-tax-id') panInputId = 'setting-store-pan';
+
+            const panInput = document.getElementById(panInputId);
+
+            // Extract PAN (characters 3 to 12) once the GSTIN has at least 12 characters
+            if (val.length >= 12 && panInput && !panInput.value) {
+                panInput.value = val.substring(2, 12);
+
+                // Visual feedback flash
+                panInput.classList.add('bg-emerald-50', 'transition-colors');
+                setTimeout(() => panInput.classList.remove('bg-emerald-50'), 800);
+
+                // Trigger change event so any auto-save listeners pick it up
+                panInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
         }
-    }
-});
-    
+    });
+
     // 🚀 THE TOUCH-SCREEN KEYBOARD SHIELD
     document.body.addEventListener('touchstart', (e) => {
         const clickedCatalog = e.target.closest('.catalog-item, .product-card, #pos-catalog');
-        
+
         if (clickedCatalog) {
             const posInput = document.getElementById('manual-pos-input');
             if (posInput) {
@@ -1127,22 +1112,22 @@ function attachGlobalListeners() {
                 }, 500);
             }
         }
-    }, { capture: true, passive: true }); 
+    }, { capture: true, passive: true });
     document.body.addEventListener('submit', (e) => {
-    // Intercepts the login form submission to stop the page refresh loop
-    if (e.target.id === 'pos-login-form' || e.target.closest('#pos-login-form')) {
-        e.preventDefault();
-        if (typeof window.unlockSystem === 'function') {
-            window.unlockSystem(e);
+        // Intercepts the login form submission to stop the page refresh loop
+        if (e.target.id === 'pos-login-form' || e.target.closest('#pos-login-form')) {
+            e.preventDefault();
+            if (typeof window.unlockSystem === 'function') {
+                window.unlockSystem(e);
+            }
         }
-    }
-});
+    });
 }
 
 function updateAboutSection() {
     const missionContainer = document.querySelector('#about .grid div:first-child p');
-if (missionContainer) {
-    missionContainer.innerHTML = `
+    if (missionContainer) {
+        missionContainer.innerHTML = `
         At <strong>Mifela</strong>, our mission is to deliver a retail operating system built on <strong>Security</strong>, <strong>Accuracy</strong>, and <strong>Scalability</strong>. 
         <br><br>
             We simplify the complex reality of running a business by unifying <strong>Multi-Location Inventory</strong>, <strong>Precision Financials</strong> (powered by safe-math technology), and comprehensive <strong>Staff Payroll</strong> into a single, secure interface.
@@ -1158,11 +1143,11 @@ if (missionContainer) {
             if (termsBtn) {
                 termsBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    showTermsAndConditions(); 
+                    showTermsAndConditions();
                 });
             }
         }, 100);
-    } 
+    }
 }
 
 // ============================================================================
@@ -1173,15 +1158,15 @@ if (window.scannerAPI && typeof window.scannerAPI.onNewScan === 'function') {
     window.scannerAPI.onNewScan(async (scanData) => {
         // Safe offline limits bypass
         const usageCheck = { allowed: true, limit: 100, currentScans: 0 };
-        
+
         if (typeof window.showModal === 'function') {
             window.showModal('AI Processing', `Reading receipt...`, 'info');
         }
 
         try {
             const extractedJson = await extractReceiptData(scanData.base64);
-            if (typeof window.closeModal === 'function') window.closeModal(); 
-            
+            if (typeof window.closeModal === 'function') window.closeModal();
+
             if (extractedJson) {
                 renderReviewScreen(extractedJson);
             } else {
@@ -1203,7 +1188,7 @@ if (window.scannerAPI && typeof window.scannerAPI.onNewScan === 'function') {
 // 📜 TERMS & CONDITIONS MODAL
 // ============================================================================
 
-window.showTermsAndConditions = function() {
+window.showTermsAndConditions = function () {
     const modalId = 'mifela-terms-modal';
     if (document.getElementById(modalId)) return;
 
@@ -1255,12 +1240,12 @@ window.showTermsAndConditions = function() {
 
     document.getElementById(`${modalId}-close-top`).onclick = closeAndCleanup;
     document.getElementById(`${modalId}-accept`).onclick = closeAndCleanup;
-    
+
     document.getElementById(`${modalId}-print`).onclick = () => {
         const content = modal.querySelector('.custom-scrollbar').innerHTML;
         const printWindow = window.open('', '', 'width=800,height=900');
         const cleanContent = content.replace(/class="[^"]*"/g, '');
-        
+
         printWindow.document.write(`
             <html><head><title>Mifela POS - Terms and Conditions</title>
             <style>
@@ -1293,7 +1278,7 @@ export async function handleInventoryBarcodeLookup(code) {
         if (window.dbAPI && window.dbAPI.getProducts) {
             const products = await window.dbAPI.getProducts();
             const found = products.find(p => p.barcode === code || p.sku === code);
-            
+
             if (found) {
                 fillInventoryForm(found);
                 showToast('Found', `Restocking: ${found.name}`, 'info');
@@ -1311,13 +1296,13 @@ function fillInventoryForm(product) {
     document.getElementById('inv-form-sku').value = product.sku || '';
     document.getElementById('inv-form-mrp').value = product.price || 0;
     document.getElementById('inv-form-selling-price').value = product.sellingPrice || product.price || 0;
-    
+
     const idHidden = document.getElementById('inv-form-id-hidden');
     if (idHidden) idHidden.value = product.id;
 
     const title = document.getElementById('inventory-form-title');
     if (title) title.textContent = 'Edit / Restock Product';
-    
+
     const submitBtn = document.getElementById('inventory-submit-btn');
     if (submitBtn) submitBtn.textContent = 'Update Product';
 }
@@ -1326,7 +1311,7 @@ function fillInventoryForm(product) {
 // 🖨️ UNIVERSAL PRINTER ENGINE
 // ============================================================================
 
-window.loadPrinters = async function() {
+window.loadPrinters = async function () {
     // 🚀 THE FIX: Target the correct dropdown ID
     const printerSelect = document.getElementById('setting-receipt-printer-name');
 
@@ -1334,7 +1319,7 @@ window.loadPrinters = async function() {
         try {
             const printers = await window.electronAPI.getPrinters();
             const existingSmartConfig = localStorage.getItem('mifela_smart_printers');
-            
+
             let detected = { invoice: null, barcode: null, report: null };
 
             if (!existingSmartConfig && printers.length > 0) {
@@ -1363,14 +1348,14 @@ window.loadPrinters = async function() {
             }
 
             if (printerSelect) {
-                printerSelect.innerHTML = '<option value="">System Default</option>'; 
+                printerSelect.innerHTML = '<option value="">System Default</option>';
                 printers.forEach(printer => {
                     const option = document.createElement('option');
                     option.value = printer.name;
                     option.textContent = printer.name + (printer.isDefault ? ' (Default)' : '');
                     printerSelect.appendChild(option);
                 });
-                
+
                 const savedConfig = JSON.parse(localStorage.getItem('mifela_printer_config') || '{}');
                 if (savedConfig.printerName) {
                     printerSelect.value = savedConfig.printerName;
@@ -1378,7 +1363,7 @@ window.loadPrinters = async function() {
                     printerSelect.value = detected.invoice;
                 }
             }
-            
+
         } catch (e) {
             console.warn("Could not fetch printers from OS", e);
         }
@@ -1390,16 +1375,16 @@ window.loadPrinters = async function() {
     }
 };
 
-window.savePrinterSettings = function() {
+window.savePrinterSettings = function () {
     // 🚀 THE FIX: Pull the value from the correct ID
     const printerNameVal = document.getElementById('setting-receipt-printer-name')?.value || '';
-    
+
     const config = {
         printerName: printerNameVal,
         paperSize: document.getElementById('setting-paper-size')?.value || '58mm',
         silent: document.getElementById('setting-silent-print')?.checked ?? true
     };
-    
+
     localStorage.setItem('mifela_printer_config', JSON.stringify(config));
 
     // Instantly sync the smart config map so executePrint() can find the target
@@ -1408,7 +1393,7 @@ window.savePrinterSettings = function() {
     localStorage.setItem('mifela_smart_printers', JSON.stringify(smartConfig));
 };
 
-window.loadPrinterSettings = function() {
+window.loadPrinterSettings = function () {
     const savedConfig = JSON.parse(localStorage.getItem('mifela_printer_config') || '{}');
     if (savedConfig.paperSize) {
         const paperEl = document.getElementById('setting-paper-size');
@@ -1422,22 +1407,22 @@ window.loadPrinterSettings = function() {
 
 
 
-window.executePrint = async function(htmlContent, jobType = 'invoice') {
+window.executePrint = async function (htmlContent, jobType = 'invoice') {
     const config = JSON.parse(localStorage.getItem('mifela_printer_config') || '{"paperSize":"58mm", "silent":true}');
     const smartConfig = JSON.parse(localStorage.getItem('mifela_smart_printers')) || {};
-    
+
     let targetPrinter = config.printerName || null;
-    
+
     if (jobType === 'barcode' && smartConfig.barcode) targetPrinter = smartConfig.barcode;
     else if (jobType === 'report' && smartConfig.report) targetPrinter = smartConfig.report;
     else if (jobType === 'invoice' && smartConfig.invoice) targetPrinter = smartConfig.invoice;
 
     let targetSize = config.paperSize;
-    if (jobType === 'barcode') targetSize = 'custom'; 
+    if (jobType === 'barcode') targetSize = 'custom';
     if (jobType === 'report') targetSize = 'A4';
 
     console.log(`🖨️ Sending [${jobType.toUpperCase()}] to printer: ${targetPrinter || 'Default'}`);
-    
+
     document.body.classList.remove('printing-receipt', 'printing-80mm');
     if (targetSize === '58mm') document.body.classList.add('printing-receipt');
     if (targetSize === '80mm') document.body.classList.add('printing-80mm');
@@ -1452,7 +1437,7 @@ window.executePrint = async function(htmlContent, jobType = 'invoice') {
         });
     } else {
         const printDiv = document.getElementById('print-invoice');
-        if(printDiv) {
+        if (printDiv) {
             printDiv.innerHTML = htmlContent;
             window.print();
         }
@@ -1461,17 +1446,17 @@ window.executePrint = async function(htmlContent, jobType = 'invoice') {
     setTimeout(() => document.body.classList.remove('printing-receipt', 'printing-80mm'), 1000);
 };
 
-window.attachPrinterTestButton = function() {
+window.attachPrinterTestButton = function () {
     const testBtn = document.getElementById('btn-test-print');
     if (!testBtn) return;
-    
+
     const newBtn = testBtn.cloneNode(true);
     testBtn.parentNode.replaceChild(newBtn, testBtn);
-    
+
     newBtn.addEventListener('click', () => {
         const config = JSON.parse(localStorage.getItem('mifela_printer_config') || '{}');
         const width = config.paperSize || '58mm';
-        
+
         const testHtml = `
             <div style="text-align:center; padding-bottom: 20px; font-family: monospace;">
                 <h2 style="margin:0;">MIFELA POS</h2>
@@ -1499,14 +1484,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================
 // OFFLINE COMM HUB (STUBS)
 // =========================================================
-export function startCommHubListener() {}
-export function stopCommHubListener() {}
+export function startCommHubListener() { }
+export function stopCommHubListener() { }
 
 // ============================================================================
 // 🎫 SUPPORT ENGINE
 // ============================================================================
 
-window.openSupportModal = function() {
+window.openSupportModal = function () {
     const modalId = 'mifela-support-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -1551,10 +1536,10 @@ window.openSupportModal = function() {
     document.body.insertAdjacentHTML('beforeend', html);
 };
 
-window.submitSupportTicket = async function() {
+window.submitSupportTicket = async function () {
     const type = document.getElementById('support-issue-type').value;
     const msg = document.getElementById('support-issue-msg').value.trim();
-    
+
     if (!msg) {
         showToast('Required', 'Please enter a message.', 'warning');
         return;
@@ -1582,7 +1567,7 @@ window.submitSupportTicket = async function() {
 // 🏦 CHEQUE CLEARANCE ENGINE (OFFLINE SQLITE)
 // ============================================================================
 
-window.openChequeReviewModal = async function() {
+window.openChequeReviewModal = async function () {
     const modalId = 'mifela-cheque-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -1616,14 +1601,14 @@ window.openChequeReviewModal = async function() {
 
         if (window.dbAPI && window.dbAPI.getPendingCheques) {
             const cheques = await window.dbAPI.getPendingCheques();
-            
+
             cheques.forEach(tx => {
                 const cheque = tx.summary?.chequeDetails;
                 if (cheque && cheque.status === 'PENDING') {
                     pendingCount++;
                     const dateStr = new Date(tx.timestamp).toLocaleDateString();
                     const total = parseFloat(tx.summary.total || 0).toFixed(2);
-                    
+
                     pendingHtml += `
                         <div class="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-indigo-300 hover:bg-indigo-50/10 transition-colors">
                             <div>
@@ -1670,7 +1655,7 @@ window.openChequeReviewModal = async function() {
     }
 };
 
-window.openChequeReview = async function(type = 'INCOMING') {
+window.openChequeReview = async function (type = 'INCOMING') {
     const modal = document.getElementById('cheque-review-modal');
     const tbody = document.getElementById('cheque-table-body');
     if (!modal || !tbody) return;
@@ -1696,7 +1681,7 @@ window.openChequeReview = async function(type = 'INCOMING') {
         if (window.dbAPI && window.dbAPI.getPendingCheques) {
             pendingChequesRaw = await window.dbAPI.getPendingCheques();
         }
-        
+
         let pendingCheques = [];
         pendingChequesRaw.forEach(data => {
             const txType = (data.type || data.summary?.transactionType || '').toUpperCase();
@@ -1729,7 +1714,7 @@ window.openChequeReview = async function(type = 'INCOMING') {
             const partyName = tx.customer?.name || (type === 'INCOMING' ? 'Walk-in Customer' : 'General Supplier');
             const badgeColor = type === 'INCOMING' ? 'text-green-700 bg-green-50 border-green-200' : 'text-orange-700 bg-orange-50 border-orange-200';
             const badgeText = type === 'INCOMING' ? 'RECEIVABLE' : 'PAYABLE';
-            
+
             return `
             <tr class="hover:bg-slate-50 transition-colors group">
                 <td class="px-6 py-5 whitespace-nowrap">
@@ -1763,7 +1748,7 @@ window.openChequeReview = async function(type = 'INCOMING') {
     }
 };
 
-window.updateChequeStatus = async function(txId, newStatus, currentTab = 'INCOMING') {
+window.updateChequeStatus = async function (txId, newStatus, currentTab = 'INCOMING') {
     if (!confirm(`Are you sure you want to mark this cheque as ${newStatus}?`)) return;
 
     try {
@@ -1774,7 +1759,7 @@ window.updateChequeStatus = async function(txId, newStatus, currentTab = 'INCOMI
         if (typeof showToast === 'function') {
             showToast('Updated', `Cheque marked as ${newStatus}`, 'success');
         }
-        
+
         const bigModal = document.getElementById('cheque-review-modal');
         if (bigModal && !bigModal.classList.contains('hidden')) {
             window.openChequeReview(currentTab);
@@ -1798,11 +1783,11 @@ window.updateChequeStatus = async function(txId, newStatus, currentTab = 'INCOMI
 let currentCalendarDate = new Date();
 let currentCalendarCurrency = '₹';
 
-window.openCalendarHistory = async function(customerId, customerName, txType) {
+window.openCalendarHistory = async function (customerId, customerName, txType) {
     const modalId = 'customer-calendar-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
-    
-    const themeColor = 'indigo'; 
+
+    const themeColor = 'indigo';
 
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[260] bg-slate-900/70 flex items-center justify-center p-4 ">
@@ -1847,7 +1832,7 @@ window.openCalendarHistory = async function(customerId, customerName, txType) {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', html);
     document.body.classList.add('overflow-hidden');
 
@@ -1855,19 +1840,19 @@ window.openCalendarHistory = async function(customerId, customerName, txType) {
     await window.fetchAndRenderCalendar(customerId, themeColor);
 };
 
-window.changeCalendarMonth = async function(delta, customerId, themeColor) {
+window.changeCalendarMonth = async function (delta, customerId, themeColor) {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
     await window.fetchAndRenderCalendar(customerId, themeColor);
 };
 
-window.fetchAndRenderCalendar = async function(customerId, themeColor) {
+window.fetchAndRenderCalendar = async function (customerId, themeColor) {
     const grid = document.getElementById('cal-grid');
     const header = document.getElementById('cal-month-year');
     if (!grid || !header) return;
 
     const year = currentCalendarDate.getFullYear();
-    const month = currentCalendarDate.getMonth(); 
-    
+    const month = currentCalendarDate.getMonth();
+
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     header.textContent = `${monthNames[month]} ${year}`;
 
@@ -1875,17 +1860,17 @@ window.fetchAndRenderCalendar = async function(customerId, themeColor) {
     try {
         if (window.dbAPI && window.dbAPI.getTransactionsForCustomer) {
             const customerTx = await window.dbAPI.getTransactionsForCustomer(customerId);
-            
+
             customerTx.forEach(tx => {
                 const dateObj = new Date(tx.timestamp);
-                
+
                 if (dateObj.getFullYear() === year && dateObj.getMonth() === month) {
                     const dayStr = String(dateObj.getDate()).padStart(2, '0');
                     if (!calendarData[dayStr]) calendarData[dayStr] = { sale: 0, purchase: 0 };
-                    
+
                     const type = (tx.summary?.transactionType || tx.type || '').toUpperCase();
                     const total = Math.abs(tx.summary?.total || 0);
-                    
+
                     if (type === 'SALE') calendarData[dayStr].sale += total;
                     if (type === 'PURCHASE') calendarData[dayStr].purchase += total;
                 }
@@ -1897,7 +1882,7 @@ window.fetchAndRenderCalendar = async function(customerId, themeColor) {
 
     const firstDayIndex = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const totalSlots = 42; 
+    const totalSlots = 42;
 
     const todayObj = new Date();
     const isCurrentMonth = todayObj.getMonth() === month && todayObj.getFullYear() === year;
@@ -1913,7 +1898,7 @@ window.fetchAndRenderCalendar = async function(customerId, themeColor) {
         const dayStr = String(day).padStart(2, '0');
         const saleAmt = calendarData[dayStr]?.sale || 0;
         const purchaseAmt = calendarData[dayStr]?.purchase || 0;
-        
+
         const isToday = isCurrentMonth && day === todayDate;
         const boxClass = isToday ? `bg-indigo-50/50 border-indigo-300 shadow-sm ring-2 ring-indigo-200` : `bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md`;
         const dateClass = isToday ? `text-indigo-700` : `text-slate-500`;
@@ -1956,42 +1941,42 @@ window.fetchAndRenderCalendar = async function(customerId, themeColor) {
 
 document.addEventListener('input', async (e) => {
     const target = e.target;
-    
+
     if (target.id === 'cust-form-ifsc' || target.id === 'staff-ifsc') {
         const ifscCode = target.value.trim().toUpperCase();
-        target.value = ifscCode; 
-        
+        target.value = ifscCode;
+
         if (ifscCode.length === 11) {
             target.classList.add('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
-            
+
             try {
                 const response = await fetch(`https://ifsc.razorpay.com/${ifscCode}`);
                 if (response.ok) {
                     const data = await response.json();
-                    
+
                     if (target.id === 'cust-form-ifsc') {
                         const bankInput = document.getElementById('cust-form-bank-name');
                         const branchInput = document.getElementById('cust-form-branch');
-                        
-                        if (bankInput) { 
-                            bankInput.value = data.BANK; 
-                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+
+                        if (bankInput) {
+                            bankInput.value = data.BANK;
+                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
-                        if (branchInput) { 
-                            branchInput.value = data.BRANCH; 
-                            branchInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+                        if (branchInput) {
+                            branchInput.value = data.BRANCH;
+                            branchInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
                     } else if (target.id === 'staff-ifsc') {
                         const bankInput = document.getElementById('staff-bank-name');
-                        if (bankInput) { 
-                            bankInput.value = `${data.BANK} - ${data.BRANCH}`; 
-                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+                        if (bankInput) {
+                            bankInput.value = `${data.BANK} - ${data.BRANCH}`;
+                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
                     }
-                    
+
                     target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
                     target.classList.add('border-green-500', 'bg-green-50');
-                    
+
                     setTimeout(() => {
                         target.classList.remove('border-green-500', 'bg-green-50');
                         document.querySelectorAll('#cust-form-bank-name, #cust-form-branch, #staff-bank-name').forEach(i => {
@@ -2015,7 +2000,7 @@ document.addEventListener('input', async (e) => {
 // 🔒 SECURITY OVERLAYS
 // ============================================================================
 
-window.renderLockedScreen = function(reason) {
+window.renderLockedScreen = function (reason) {
     const modalId = 'mifela-lock-overlay';
     if (document.getElementById(modalId)) return;
 
@@ -2024,9 +2009,9 @@ window.renderLockedScreen = function(reason) {
     try {
         const sysDetails = JSON.parse(localStorage.getItem('mifela_sys_details') || '{}');
         userEmail = sysDetails.email || '';
-    } catch(e) {}
+    } catch (e) { }
 
-    const paymentLink = userEmail 
+    const paymentLink = userEmail
         ? `https://posgateway.mifela.com/checkout?email=${encodeURIComponent(userEmail)}`
         : `https://posgateway.mifela.com`;
 
@@ -2063,13 +2048,13 @@ window.renderLockedScreen = function(reason) {
     </div>
     `;
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     // Completely destroy the underlying application UI
     document.getElementById('sidebar')?.remove();
     document.getElementById('app-header')?.remove();
 };
 
-window.renderSuspendedScreen = function(reasonText) {
+window.renderSuspendedScreen = function (reasonText) {
     const modalId = 'account-suspended-screen';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -2099,7 +2084,7 @@ window.renderSuspendedScreen = function(reasonText) {
     </div>
     `;
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     document.getElementById('btn-suspend-logout').onclick = () => {
         logoutUser();
     };
@@ -2118,23 +2103,23 @@ window.triggerAppSignOut = async () => {
         // Forcefully clear all session data
         localStorage.removeItem('mifela_user_session');
         localStorage.removeItem('mifela_active_store');
-        
+
         // Hard reload routes back to the lock screen securely
-        window.location.reload(); 
+        window.location.reload();
     }
 };
 
 // ============================================================================
 // 🚀 STARTUP SEQUENCE & ONBOARDING
 // ============================================================================
-window.showAuthView = function(viewName) {
+window.showAuthView = function (viewName) {
     const layer = document.getElementById('auth-container');
     const header = document.getElementById('app-header');
     const content = document.getElementById('app-content');
     const loadingScreen = document.getElementById('loading-screen');
-    
+
     if (loadingScreen) loadingScreen.classList.add('hidden', 'opacity-0');
-    
+
     if (viewName === 'app') {
         layer?.classList.add('hidden');
         layer?.classList.remove('flex');
@@ -2146,7 +2131,7 @@ window.showAuthView = function(viewName) {
     // Hide Main App UI
     header?.classList.add('hidden');
     content?.classList.add('hidden');
-    
+
     // Show Auth Layer
     layer?.classList.remove('hidden');
     layer?.classList.add('flex');
@@ -2177,13 +2162,13 @@ window.showAuthView = function(viewName) {
 let pendingSetupDetails = null;
 
 // PHASE 1: App Initializes
-window.checkStartupSequence = async function() {
+window.checkStartupSequence = async function () {
     if (localStorage.getItem('mifela_security_quarantine')) {
         window.renderLockedScreen("Terminal Quarantined. A previous security audit failed. Please reconnect to the internet and click 'Try Reconnecting' to restore access.");
         if (navigator.onLine && typeof window.runSilentBackgroundVerification === 'function') {
             window.runSilentBackgroundVerification();
         }
-        return; 
+        return;
     }
 
     const vault = await window.electronAPI.getDoc('store_settings', 'SYS_VAULT');
@@ -2191,8 +2176,8 @@ window.checkStartupSequence = async function() {
 
     let state = null;
     let hasStoredToken = false;
-    try { state = await window.electronAPI.getSecurityState(); } catch (e) {}
-    try { hasStoredToken = !!(await window.electronAPI.getToken()); } catch (e) {}
+    try { state = await window.electronAPI.getSecurityState(); } catch (e) { }
+    try { hasStoredToken = !!(await window.electronAPI.getToken()); } catch (e) { }
 
     const isProvisioned = (state && state.status !== 'UNPROVISIONED') || hasStoredToken;
 
@@ -2200,10 +2185,10 @@ window.checkStartupSequence = async function() {
         if (isProvisioned && !vaultExists) {
             console.warn("Security Enclave intact but Local Vault missing. Forcing recovery...");
         }
-        
+
         // Trigger Setup Form and Background Fingerprint Check
         window.showAuthView('setup');
-        window.autoFillSetupForm(); 
+        window.autoFillSetupForm();
         return;
     }
 
@@ -2224,7 +2209,7 @@ window.checkStartupSequence = async function() {
 };
 
 // PHASE 2: Background Fingerprint Check & Cloud Sync
-window.autoFillSetupForm = async function() {
+window.autoFillSetupForm = async function () {
     const btn = document.getElementById('trigger-init-btn');
     if (btn) {
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Fetching Profile...';
@@ -2235,13 +2220,22 @@ window.autoFillSetupForm = async function() {
         const el = document.getElementById(id);
         if (el && val) {
             el.value = val;
-            el.dispatchEvent(new Event('input', { bubbles: true })); 
+            el.dispatchEvent(new Event('input', { bubbles: true }));
         }
     };
 
     try {
         console.log("AutoFill: Starting data fetch sequence...");
-        
+
+        // 0. Ensure Firebase is initialized before any Firestore calls
+        let firebaseAvailable = false;
+        try {
+            await ensureFirebase();
+            firebaseAvailable = true;
+        } catch (fbErr) {
+            console.warn("AutoFill: Firebase unavailable — cloud tiers will be skipped.", fbErr.message);
+        }
+
         // 1. IP Geolocation Fallback
         let detectedState = '';
         try {
@@ -2258,7 +2252,7 @@ window.autoFillSetupForm = async function() {
 
         // 2. Safely acquire Hardware Fingerprint with Polling (CRITICAL FIX)
         let fingerprint = 'UNKNOWN_NODE';
-        
+
         // Wait up to 3 seconds for the Electron API bridge to initialize
         for (let i = 0; i < 30; i++) {
             if (window.electronAPI && typeof window.electronAPI.getMachineId === 'function') {
@@ -2267,7 +2261,7 @@ window.autoFillSetupForm = async function() {
             }
             await new Promise(res => setTimeout(res, 100)); // wait 100ms
         }
-        
+
         // console.log("=========================================");
         // console.log("🔑 TERMINAL HARDWARE FINGERPRINT:", fingerprint);
         // console.log("=========================================");
@@ -2279,12 +2273,12 @@ window.autoFillSetupForm = async function() {
         let dataFound = false;
 
         // 3. TIER 1: Fetch by Hardware Fingerprint (from provisioned_nodes)
-        if (fingerprint !== 'UNKNOWN_NODE') {
+        if (firebaseAvailable && fingerprint !== 'UNKNOWN_NODE') {
             try {
                 //console.log(`AutoFill: Querying provisioned_nodes for ID: ${fingerprint}`);
-                
+
                 const { doc: firestoreDoc, getDoc } = await import("firebase/firestore");
-                
+
                 // Uses the global 'db' initialized at the top of app.js
                 const nodeDocRef = firestoreDoc(window.db, "provisioned_nodes", fingerprint);
                 const nodeSnap = await getDoc(nodeDocRef);
@@ -2292,21 +2286,21 @@ window.autoFillSetupForm = async function() {
                 if (nodeSnap.exists()) {
                     const storeData = nodeSnap.data();
                     // console.log("AutoFill: Node data successfully fetched!", storeData);
-                    
+
                     setVal('setup-store-name', storeData.storeName || '');
                     setVal('setup-owner-name', storeData.ownerName || '');
                     setVal('setup-email', storeData.email || '');
-                    
+
                     let phoneStr = storeData.contact || storeData.phone || '';
                     if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
                     else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
                     setVal('setup-contact', phoneStr);
-                    
+
                     setVal('setup-address', storeData.address || '');
                     if (storeData.state) setVal('setup-state', storeData.state);
-                    
+
                     setVal('setup-gstin', storeData.gstin || storeData.taxId || '');
-                    
+
                     if (storeData.currency) setVal('setup-currency', storeData.currency);
                     if (storeData.taxRate !== undefined) setVal('setup-tax-rate', storeData.taxRate);
 
@@ -2321,6 +2315,7 @@ window.autoFillSetupForm = async function() {
         }
 
         // 4. TIER 2: Fallback to Cloud Directory
+        if (firebaseAvailable) {
         const { getAuth } = await import("firebase/auth");
         const { collection, query, where, getDocs } = await import("firebase/firestore");
         const auth = getAuth();
@@ -2337,19 +2332,19 @@ window.autoFillSetupForm = async function() {
                 if (!storeSnap.empty) {
                     const storeData = storeSnap.docs[0].data();
                     console.log("AutoFill: Cloud store data found!", storeData);
-                    
+
                     setVal('setup-owner-name', user.displayName || 'Admin');
                     setVal('setup-email', storeData.email || user.email || '');
                     setVal('setup-store-name', storeData.storeName || '');
-                    
+
                     let phoneStr = storeData.phone || '';
                     if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
                     else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
                     setVal('setup-contact', phoneStr);
-                    
+
                     setVal('setup-address', storeData.address || '');
                     if (storeData.state) setVal('setup-state', storeData.state);
-                    
+
                     setVal('setup-gstin', storeData.taxId || storeData.gstin || '');
                     dataFound = true;
                 } else {
@@ -2362,6 +2357,7 @@ window.autoFillSetupForm = async function() {
                 setVal('setup-email', user.email || '');
             }
         }
+        } // end if (firebaseAvailable)
 
     } catch (fatalError) {
         console.error("Auto-fill Critical Error:", fatalError);
@@ -2376,7 +2372,7 @@ window.autoFillSetupForm = async function() {
 
 
 // PHASE 3: Payment Redirection Trigger
-window.completeStartup = async function(e) {
+window.completeStartup = async function (e) {
     if (e) e.preventDefault();
 
     const form = document.getElementById('setup-store-form');
@@ -2422,7 +2418,7 @@ window.completeStartup = async function(e) {
 
     // Cache details and open billing modal
     pendingSetupDetails = { fields, customAdminId: 'admin', fingerprint: window._cachedFingerprint };
-    
+
     const billingModal = document.getElementById('license-billing-modal');
     if (billingModal) {
         billingModal.classList.remove('hidden');
@@ -2431,11 +2427,11 @@ window.completeStartup = async function(e) {
 };
 
 // PHASE 4 & 5: Payment Verification & License Generation
-window.btnVerifyAutomatedClick = async function(e) {
+window.btnVerifyAutomatedClick = async function (e) {
     e.preventDefault();
     const btn = document.getElementById('btn-verify-automated');
     const errorMsg = document.getElementById('license-auto-error');
-    
+
     btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Verifying Payment...';
     btn.disabled = true;
     if (errorMsg) errorMsg.classList.add('hidden');
@@ -2453,10 +2449,10 @@ window.btnVerifyAutomatedClick = async function(e) {
 
         if (!response.ok) throw new Error("Payment not detected or incomplete.");
         const { data } = await response.json();
-        
+
         if (data.status === 'PAID' || data.status === 'ACTIVE') {
             pendingSetupDetails.paymentToken = data.paymentToken || 'AUTO_PROVISIONED';
-            
+
             btn.innerHTML = 'Payment Verified ✅';
             btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
 
@@ -2466,7 +2462,7 @@ window.btnVerifyAutomatedClick = async function(e) {
             statusDiv.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-indigo-600 rounded-full border-t-transparent inline-block"></span> Generating Hardware Cryptography...';
 
             if (!window.hashSecurely) {
-                window.hashSecurely = async function(plaintext) {
+                window.hashSecurely = async function (plaintext) {
                     const msgUint8 = new TextEncoder().encode(plaintext);
                     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
                     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2502,9 +2498,9 @@ window.btnVerifyAutomatedClick = async function(e) {
 };
 
 // PHASE 6 & 7: Consent Check & Initialize Vault
-window.executeConsentAndStart = async function(e) {
+window.executeConsentAndStart = async function (e) {
     e.preventDefault();
-    
+
     // Phase 6: Consent
     const consentCheck = document.getElementById('final-consent-check');
     if (!consentCheck || !consentCheck.checked) {
@@ -2519,9 +2515,10 @@ window.executeConsentAndStart = async function(e) {
     try {
         const { fields, fingerprint, publicKey, paymentToken, hashedAdminPass, hashedRecoveryPin, customAdminId } = pendingSetupDetails;
         const { doc, setDoc } = await import("firebase/firestore");
+        const { db: fbDb } = await ensureFirebase();
 
         // Phase 7: Start (Sync to Cloud & Save Local SQLite)
-        await setDoc(doc(window.db, "provisioned_nodes", fingerprint), {
+        await setDoc(doc(fbDb, "provisioned_nodes", fingerprint), {
             storeName: fields.storeName.value.trim().toUpperCase(),
             ownerName: fields.ownerName.value.trim().toUpperCase(),
             email: fields.email.value.trim().toUpperCase(),
@@ -2531,8 +2528,8 @@ window.executeConsentAndStart = async function(e) {
             gstin: fields.taxId.value.trim().toUpperCase(),
             publicKey: publicKey,
             hardwareFingerprint: fingerprint,
-            paymentToken: paymentToken, 
-            status: 'ACTIVE',         
+            paymentToken: paymentToken,
+            status: 'ACTIVE',
             createdAt: new Date().toISOString()
         });
 
@@ -2545,23 +2542,23 @@ window.executeConsentAndStart = async function(e) {
         let gstinVal = fields.taxId.value.trim().toUpperCase();
         let panVal = gstinVal.length >= 15 ? gstinVal.substring(2, 12) : '';
 
-        await window.electronAPI.saveStoreSettings('SYS_DETAILS', { 
-            storeName: fields.storeName.value.trim().toUpperCase(), 
-            ownerName: fields.ownerName.value.trim().toUpperCase(), 
-            email: fields.email.value.trim().toUpperCase(), 
-            contact: fields.contact.value.trim().toUpperCase(), 
-            address: fields.address.value.trim().toUpperCase(), 
-            state: fields.state.value.trim().toUpperCase(), 
-            gstin: gstinVal, 
-            pan: panVal, 
-            currency: document.getElementById('setup-currency')?.value || 'INR', 
-            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0) 
+        await window.electronAPI.saveStoreSettings('SYS_DETAILS', {
+            storeName: fields.storeName.value.trim().toUpperCase(),
+            ownerName: fields.ownerName.value.trim().toUpperCase(),
+            email: fields.email.value.trim().toUpperCase(),
+            contact: fields.contact.value.trim().toUpperCase(),
+            address: fields.address.value.trim().toUpperCase(),
+            state: fields.state.value.trim().toUpperCase(),
+            gstin: gstinVal,
+            pan: panVal,
+            currency: document.getElementById('setup-currency')?.value || 'INR',
+            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0)
         });
 
         localStorage.setItem('mifela_sys_initialized', 'true');
-        
+
         if (typeof showToast === 'function') showToast('System Ready', 'Terminal Secured & Activated.', 'success');
-        
+
         document.getElementById('license-billing-modal').classList.add('hidden');
         setTimeout(() => window.showLockScreen(), 300);
 
@@ -2611,7 +2608,7 @@ async function executeFinalEncryptionSequence(paymentTokenStr) {
 
     try {
         if (!window.hashSecurely) {
-            window.hashSecurely = async function(plaintext) {
+            window.hashSecurely = async function (plaintext) {
                 const msgUint8 = new TextEncoder().encode(plaintext);
                 const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
                 return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2631,9 +2628,9 @@ async function executeFinalEncryptionSequence(paymentTokenStr) {
         const { publicKey, fingerprint } = provisionRes.data;
 
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Syncing to Cloud...';
-        
-        const { getFirestore, doc, setDoc } = await import("firebase/firestore");
-        const fbDb = getFirestore();
+
+        const { doc, setDoc } = await import("firebase/firestore");
+        const { db: fbDb } = await ensureFirebase();
 
         await setDoc(doc(fbDb, "provisioned_nodes", fingerprint), {
             storeName: fields.storeName.value.trim().toUpperCase(),
@@ -2645,8 +2642,8 @@ async function executeFinalEncryptionSequence(paymentTokenStr) {
             gstin: fields.taxId.value.trim().toUpperCase(),
             publicKey: publicKey,
             hardwareFingerprint: fingerprint,
-            paymentToken: paymentTokenStr, 
-            status: 'ACTIVE',         
+            paymentToken: paymentTokenStr,
+            status: 'ACTIVE',
             createdAt: new Date().toISOString()
         });
 
@@ -2659,23 +2656,23 @@ async function executeFinalEncryptionSequence(paymentTokenStr) {
         const gstinVal = fields.taxId.value.trim().toUpperCase();
         let panVal = gstinVal.length >= 15 ? gstinVal.substring(2, 12) : '';
 
-        await window.electronAPI.saveStoreSettings('SYS_DETAILS', { 
-            storeName: fields.storeName.value.trim().toUpperCase(), 
-            ownerName: fields.ownerName.value.trim().toUpperCase(), 
-            email: fields.email.value.trim().toUpperCase(), 
-            contact: fields.contact.value.trim().toUpperCase(), 
-            address: fields.address.value.trim().toUpperCase(), 
-            state: fields.state.value.trim().toUpperCase(), 
-            gstin: gstinVal, 
-            pan: panVal, 
-            currency: document.getElementById('setup-currency')?.value || 'INR', 
-            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0) 
+        await window.electronAPI.saveStoreSettings('SYS_DETAILS', {
+            storeName: fields.storeName.value.trim().toUpperCase(),
+            ownerName: fields.ownerName.value.trim().toUpperCase(),
+            email: fields.email.value.trim().toUpperCase(),
+            contact: fields.contact.value.trim().toUpperCase(),
+            address: fields.address.value.trim().toUpperCase(),
+            state: fields.state.value.trim().toUpperCase(),
+            gstin: gstinVal,
+            pan: panVal,
+            currency: document.getElementById('setup-currency')?.value || 'INR',
+            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0)
         });
 
         localStorage.setItem('mifela_sys_initialized', 'true');
-        
+
         if (typeof showToast === 'function') showToast('System Ready', 'Terminal Secured & Activated.', 'success');
-        
+
         document.getElementById('license-billing-modal').classList.add('hidden');
         setTimeout(() => window.showLockScreen(), 300);
 
@@ -2691,10 +2688,10 @@ async function executeFinalEncryptionSequence(paymentTokenStr) {
 // 🛡️ ANTI-PIRACY GATEWAY: RAZORPAY TOKEN VERIFICATION
 // ============================================================================
 
-window.openSetupVerificationGate = function(setupData) {
+window.openSetupVerificationGate = function (setupData) {
     const modalId = 'rp-verification-gate';
     let modal = document.getElementById(modalId);
-    
+
     if (!modal) {
         const html = `
         <div id="${modalId}" class="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center animate-fadeIn p-4 hidden">
@@ -2747,7 +2744,7 @@ window.openSetupVerificationGate = function(setupData) {
     // Reset UI state
     document.getElementById('rp-setup-token').value = '';
     document.getElementById('rp-gate-error').classList.add('hidden');
-    
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => modal.firstElementChild.classList.remove('scale-95'), 50);
@@ -2760,7 +2757,7 @@ window.openSetupVerificationGate = function(setupData) {
 // 🚀 PHASE 3: SECURE HARDWARE PROVISIONING (POST-PAYMENT ONLY)
 // ============================================================================
 
-window.executeFinalProvisioning = async function(data) {
+window.executeFinalProvisioning = async function (data) {
     const tokenInput = document.getElementById('rp-setup-token').value.trim();
     const errorEl = document.getElementById('rp-gate-error');
     const btn = document.getElementById('rp-verify-btn');
@@ -2779,28 +2776,28 @@ window.executeFinalProvisioning = async function(data) {
 
     try {
         await new Promise(resolve => setTimeout(resolve, 1500));
-        
+
         if (tokenInput.length < 5) throw new Error("Invalid token format. Verification failed.");
-        
+
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Verifying Token...';
-        
+
         // 1. Establish the terminal's hardware fingerprint
         let fingerprint = 'UNKNOWN_NODE';
         if (window.electronAPI && window.electronAPI.getMachineId) {
             fingerprint = await window.electronAPI.getMachineId();
         }
 
-        const { getFirestore, doc, getDoc, setDoc } = await import("firebase/firestore");
-        const fbDb = getFirestore();
+        const { doc, getDoc, setDoc } = await import("firebase/firestore");
+        const { db: fbDb } = await ensureFirebase();
 
         // 2. 🛡️ RAZORPAY TOKEN VERIFIER: Query the cloud ledger for this specific node
         const nodeDoc = await getDoc(doc(fbDb, "provisioned_nodes", fingerprint));
         if (!nodeDoc.exists()) {
             throw new Error("License record not found. Please complete the Razorpay checkout first.");
         }
-        
+
         const nodeData = nodeDoc.data();
-        
+
         // Strictly compare the user's pasted token with the Cloud Function's generated verificationToken
         if (nodeData.verificationToken !== tokenInput && nodeData.paymentToken !== tokenInput) {
             throw new Error("Invalid Razorpay verification token. Cryptography aborted.");
@@ -2812,7 +2809,7 @@ window.executeFinalProvisioning = async function(data) {
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Encrypting Node...';
 
         if (!window.hashSecurely) {
-            window.hashSecurely = async function(plaintext) {
+            window.hashSecurely = async function (plaintext) {
                 const msgUint8 = new TextEncoder().encode(plaintext);
                 const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
                 return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2832,7 +2829,7 @@ window.executeFinalProvisioning = async function(data) {
         const { publicKey } = provisionRes.data;
 
         btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Syncing to Cloud...';
-        
+
         await setDoc(doc(fbDb, "provisioned_nodes", fingerprint), {
             storeName: data.storeName,
             ownerName: data.ownerName,
@@ -2844,7 +2841,7 @@ window.executeFinalProvisioning = async function(data) {
             publicKey: publicKey,
             hardwareFingerprint: fingerprint,
             verificationToken: tokenInput, // Sync the verified token
-            status: 'ACTIVE',         
+            status: 'ACTIVE',
             createdAt: new Date().toISOString()
         }, { merge: true });
 
@@ -2856,50 +2853,50 @@ window.executeFinalProvisioning = async function(data) {
         });
 
         let panVal = data.gstin.length >= 15 ? data.gstin.substring(2, 12) : '';
-        await window.electronAPI.saveStoreSettings('SYS_DETAILS', { 
-            storeName: data.storeName.toUpperCase(), 
-            ownerName: data.ownerName.toUpperCase(), 
-            email: data.email.toUpperCase(), 
-            contact: data.contact.toUpperCase(), 
-            address: data.address.toUpperCase(), 
-            state: data.state.toUpperCase(), 
-            gstin: data.gstin, 
-            pan: panVal, 
-            currency: document.getElementById('setup-currency')?.value || 'INR', 
-            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0) 
+        await window.electronAPI.saveStoreSettings('SYS_DETAILS', {
+            storeName: data.storeName.toUpperCase(),
+            ownerName: data.ownerName.toUpperCase(),
+            email: data.email.toUpperCase(),
+            contact: data.contact.toUpperCase(),
+            address: data.address.toUpperCase(),
+            state: data.state.toUpperCase(),
+            gstin: data.gstin,
+            pan: panVal,
+            currency: document.getElementById('setup-currency')?.value || 'INR',
+            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0)
         });
 
         localStorage.setItem('mifela_sys_initialized', 'true');
 
         document.getElementById('rp-verification-gate').classList.add('hidden');
         if (typeof showToast === 'function') showToast('Terminal Secured', 'Hardware node successfully encrypted and authorized.', 'success');
-        
+
         setTimeout(() => window.showLockScreen(), 300);
 
     } catch (error) {
         console.error("Setup/Verification Error:", error);
         errorEl.textContent = error.message || "An unexpected error occurred during encryption.";
         errorEl.classList.remove('hidden');
-        
+
         btn.innerHTML = originalBtnText;
         btn.disabled = false;
     }
 };
-window.unlockSystem = async function(e) {
+window.unlockSystem = async function (e) {
     if (e) e.preventDefault();
-    
+
     const authContainer = document.getElementById('auth-container');
-    if (authContainer && authContainer.classList.contains('hidden')) return; 
+    if (authContainer && authContainer.classList.contains('hidden')) return;
 
     if (localStorage.getItem('mifela_security_quarantine')) {
         console.error("Login rejected: Terminal is currently under hard quarantine.");
         window.renderLockedScreen("Terminal Quarantined. A previous security audit failed.");
-        return; 
+        return;
     }
-    
+
     if (window.isUnlocking) return;
     window.isUnlocking = true;
-    
+
     const inputId = document.getElementById('lock-email')?.value.trim().toLowerCase();
     const pass = document.getElementById('lock-password')?.value.trim();
     const btn = document.getElementById('btn-unlock-sys');
@@ -2915,16 +2912,16 @@ window.unlockSystem = async function(e) {
     try {
         let valid = false;
         let userObj = null;
-        
+
         // 🚀 SECURE READ: Fetch credentials exclusively from SQLite
         const vault = await window.electronAPI.getDoc('store_settings', 'SYS_VAULT');
         const sysDetails = await window.electronAPI.getDoc('store_settings', 'SYS_DETAILS') || {};
-        
+
         const adminEmail = (sysDetails.email || '').toLowerCase();
         const savedAdminId = (vault && vault.adminId) ? vault.adminId.toLowerCase() : 'admin';
-        
+
         if (!window.hashSecurely) {
-            window.hashSecurely = async function(plaintext) {
+            window.hashSecurely = async function (plaintext) {
                 const msgUint8 = new TextEncoder().encode(plaintext);
                 const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
                 return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2936,14 +2933,14 @@ window.unlockSystem = async function(e) {
         if ((inputId === savedAdminId || inputId === 'admin' || inputId === adminEmail) && vault && vault.adminHash === inputHash) {
             valid = true;
             userObj = { id: 'admin_sys', role: 'admin', name: sysDetails.ownerName || 'System Admin', email: inputId };
-        } 
+        }
         else if (window.dbAPI && window.dbAPI.getCustomers) {
             const allProfiles = await window.dbAPI.getCustomers();
-            const staffMembers = allProfiles.filter(p => p.role); 
+            const staffMembers = allProfiles.filter(p => p.role);
             const foundUser = staffMembers.find(p => (p.email && p.email.toLowerCase() === inputId) || (p.name && p.name.toLowerCase() === inputId));
-            
+
             // 🔒 Strict Enforce: Removed the '1234' universal backdoor vulnerability
-            if (foundUser && foundUser.password && pass === foundUser.password) { 
+            if (foundUser && foundUser.password && pass === foundUser.password) {
                 valid = true;
                 userObj = foundUser;
             }
@@ -2951,19 +2948,19 @@ window.unlockSystem = async function(e) {
 
         if (valid && userObj) {
             localStorage.setItem('mifela_user_session', JSON.stringify(userObj));
-            
+
             const uid = userObj.id || userObj.email || 'admin_sys';
             const storeId = userObj.storeId || localStorage.getItem('mifela_active_store') || 'DEFAULT_STORE';
-            
+
             if (typeof window.setStoreAndUserRefs === 'function') {
                 window.setStoreAndUserRefs(uid, storeId);
             }
-            
+
             window.showAuthView('app');
-            
+
             const passInput = document.getElementById('lock-password');
             if (passInput) passInput.value = '';
-            
+
             if (typeof showToast === 'function') showToast('Decrypted', `Welcome back, ${userObj.name || 'Admin'}`, 'success');
             if (typeof handleNavigationView === 'function') handleNavigationView();
 
@@ -3005,18 +3002,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 });
-window.openSmoothModal = function(modalId) {
+window.openSmoothModal = function (modalId) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    
+
     // Target inner container for scale
     const inner = modal.firstElementChild;
     modal.style.opacity = '0';
     modal.style.transition = 'opacity 0.2s ease-out';
-    
+
     // Hardware acceleration for the pop effect
     if (inner) {
         inner.style.transform = 'scale(0.95) translateY(10px)';
@@ -3032,34 +3029,34 @@ window.openSmoothModal = function(modalId) {
             inner.style.opacity = '1';
         }
     });
-    
+
     document.body.classList.add('overflow-hidden');
 };
 
-window.closeSmoothModal = function(modalId) {
+window.closeSmoothModal = function (modalId) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    
+
     const inner = modal.firstElementChild;
     modal.style.opacity = '0';
     if (inner) {
         inner.style.transform = 'scale(0.95) translateY(10px)';
         inner.style.opacity = '0';
     }
-    
+
     setTimeout(() => {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
-        
+
         // Clean up inline styles so they don't break native CSS later
         modal.style = '';
         if (inner) {
             inner.style = '';
             inner.style.willChange = 'auto';
         }
-        
+
         document.body.classList.remove('overflow-hidden');
-    }, 250); 
+    }, 250);
 };
 
 
@@ -3071,7 +3068,7 @@ let currentGatewayOrder = null;
 let gatewayVerificationListener = null;
 
 // Attach this to your POS checkout UI instead of direct cash processing
-window.initiateMifelaGatewayPayment = function(amount, orderId = 'ORD-' + Date.now()) {
+window.initiateMifelaGatewayPayment = function (amount, orderId = 'ORD-' + Date.now()) {
     currentGatewayOrder = { amount, orderId };
 
     const amountEl = document.getElementById('mifela-gateway-amount');
@@ -3186,7 +3183,7 @@ function handleGatewayPaymentVerification(data) {
     }
 }
 
-window.verifyGatewayPayment = function(event) {
+window.verifyGatewayPayment = function (event) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     btn.innerHTML = 'Verifying...';
@@ -3275,7 +3272,7 @@ window.verifyGatewayPayment = function(event) {
     }, 1500);
 };
 
-window.cancelGatewayPayment = function() {
+window.cancelGatewayPayment = function () {
     // Clean up listener
     if (typeof gatewayVerificationListener === 'function') {
         gatewayVerificationListener();
@@ -3324,7 +3321,7 @@ window.cancelGatewayPayment = function() {
 // 🛡️ CONTINUOUS BACKGROUND SILENT VERIFICATION
 // ============================================================================
 
-window.runSilentBackgroundVerification = async function() {
+window.runSilentBackgroundVerification = async function () {
     try {
         const state = await window.electronAPI.getSecurityState();
         if (!state || state.status === 'UNPROVISIONED') return;
@@ -3336,7 +3333,7 @@ window.runSilentBackgroundVerification = async function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: state.payload.email })
         });
-        
+
         if (!challengeRes.ok) throw new Error("Server challenge request failed");
         const { challengeHex } = await challengeRes.json();
 
@@ -3346,8 +3343,8 @@ window.runSilentBackgroundVerification = async function() {
         const verifyRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyChallenge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email: state.payload.email, 
+            body: JSON.stringify({
+                email: state.payload.email,
                 signature: signResult.signature,
                 challenge: challengeHex
             })
@@ -3358,34 +3355,34 @@ window.runSilentBackgroundVerification = async function() {
             const errData = await verifyRes.json().catch(() => ({}));
             throw new Error(`Master Controller: ${errData.error || 'Hardware identity mismatch'}`);
         }
-        
+
         // 🚀 SUCCESS: Clear the quarantine flag so the app can function offline again
         localStorage.removeItem('mifela_security_quarantine');
         console.log("✅ Background security audit passed.");
 
         // If the user was stuck on the lock screen, gracefully reboot to let them back in
         if (document.getElementById('mifela-lock-overlay')) {
-            location.reload(); 
+            location.reload();
         }
 
     } catch (err) {
         console.error("🚨 Background Security Audit Failed:", err.message);
-        
+
         // 🚀 FAILURE: Drop the persistent poison pill into local storage
         localStorage.setItem('mifela_security_quarantine', 'true');
-        
+
         // Pass the exact Firebase error directly to the lock screen UI
         window.renderLockedScreen(err.message);
     }
 };
 
-window.verifyMonthlyLicense = async function() {
+window.verifyMonthlyLicense = async function () {
     try {
         const state = await window.electronAPI.getSecurityState();
-        
+
         if (state.status === 'VERIFICATION_REQUIRED') {
             console.log("🔒 30-Day Check: Verification Required. Reaching out to Master Controller...");
-            
+
             const { getNetworkStatus } = await import('./services/network.js');
             if (getNetworkStatus() === 'offline') {
                 console.warn("🔒 Network offline. Halting verification.");
@@ -3402,7 +3399,7 @@ window.verifyMonthlyLicense = async function() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: state.payload.email })
                 });
-                
+
                 if (!challengeRes.ok) throw new Error("Could not fetch challenge");
                 const { challengeHex } = await challengeRes.json();
 
@@ -3412,8 +3409,8 @@ window.verifyMonthlyLicense = async function() {
                 const verifyRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyChallenge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        email: state.payload.email, 
+                    body: JSON.stringify({
+                        email: state.payload.email,
                         signature: signResult.signature,
                         challenge: challengeHex
                     })
@@ -3443,7 +3440,7 @@ setInterval(window.verifyMonthlyLicense, 6 * 60 * 60 * 1000);
 
 
 
-window.submitMonthlyRenewal = async function(e) {
+window.submitMonthlyRenewal = async function (e) {
     e.preventDefault();
     const keyInput = document.getElementById('renewal-key-input').value.trim();
     const btn = document.getElementById('btn-submit-renewal');
@@ -3455,10 +3452,10 @@ window.submitMonthlyRenewal = async function(e) {
 
     try {
         const { activateSoftware } = await import('./services/auth.js');
-        
+
         // 🚀 THE FIX: Pass the raw JWT token to preserve the cryptographic payload structure
         await activateSoftware(keyInput);
-        
+
         const renewalModal = document.getElementById('monthly-verification-modal');
         if (renewalModal) {
             renewalModal.classList.add('hidden');
@@ -3466,7 +3463,7 @@ window.submitMonthlyRenewal = async function(e) {
             document.body.classList.remove('overflow-hidden');
         }
         if (typeof showToast === 'function') showToast('License Renewed', 'Your monthly license has been updated.', 'success');
-        
+
     } catch (err) {
         errorMsg.textContent = err.message || "Invalid or expired license key.";
         errorMsg.classList.remove('hidden');
@@ -3489,7 +3486,7 @@ setTimeout(() => {
     if (localStorage.getItem('mifela_user_session')) {
         // 1. Run the standard 30-day verification logic
         window.verifyMonthlyLicense();
-        
+
         // 2. Also trigger a background audit if the app booted up online
         if (navigator.onLine && typeof window.runSilentBackgroundVerification === 'function') {
             window.runSilentBackgroundVerification();
@@ -3499,7 +3496,7 @@ setTimeout(() => {
 // ============================================================================
 // 🚀 ZERO-TOUCH AUTO-PROVISIONING LISTENER
 // ============================================================================
-window.listenForRemoteActivation = async function() {
+window.listenForRemoteActivation = async function () {
     if (window._isListeningForActivation) return;
     window._isListeningForActivation = true;
 
@@ -3507,17 +3504,17 @@ window.listenForRemoteActivation = async function() {
         const hwId = await window.electronAPI.getMachineId();
         console.log("📡 Listening for remote activation on fingerprint:", hwId);
 
-        const { getFirestore, doc, onSnapshot } = await import("firebase/firestore");
-        const fbDb = getFirestore();
+        const { doc, onSnapshot } = await import("firebase/firestore");
+        const { db: fbDb } = await ensureFirebase();
 
         // Listen to the exact document matching this terminal's hardware fingerprint
         const unsub = onSnapshot(doc(fbDb, "offline_licenses", hwId), async (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
-                
+
                 if (data.offlineLicenseKey) {
                     console.log("✅ Remote License Received! Auto-activating...");
-                    
+
                     // 1. Visually paste the token into the UI for the user to see
                     const tokenArea = document.getElementById('license-token-textarea');
                     if (tokenArea) {
@@ -3545,11 +3542,11 @@ window.listenForRemoteActivation = async function() {
                         if (typeof window.checkStartupSequence === 'function') {
                             window.checkStartupSequence();
                         }
-                        
+
                         // Kill the listener since we are successfully provisioned
-                        unsub(); 
+                        unsub();
                         window._isListeningForActivation = false;
-                        
+
                     } catch (err) {
                         console.error("Auto-activation failed:", err);
                         const errorBox = document.getElementById('auth-error-container');
@@ -3567,7 +3564,7 @@ window.listenForRemoteActivation = async function() {
                 }
             }
         });
-    } catch(e) {
+    } catch (e) {
         console.warn("Could not setup remote activation listener:", e);
     }
 };

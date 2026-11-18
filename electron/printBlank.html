@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mifela Print Worker</title>
+  <style>
+    body { margin: 0; padding: 0; }
+    #print-content { width: 100%; height: 100%; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div id="print-content"></div>
+  <script>
+    // This script runs in the print worker's isolated context (sandbox, contextIsolation).
+    // It receives sanitized HTML from the main process via the printBridge preload,
+    // renders it, then triggers printing through the same bridge.
+
+    const contentEl = document.getElementById('print-content');
+
+    // Listen for HTML to render (sent from main process via preload bridge)
+    window.printBridge.onRenderHtml((html, printOptions) => {
+      (async () => {
+        try {
+          // Inject sanitized HTML into the page
+          contentEl.innerHTML = html;
+
+          // Trigger actual printing via the preload bridge -> main process 'print:render'
+          const result = await window.printBridge.print(html, printOptions);
+
+          // Acknowledge back to main
+          window.printBridge.onRenderResult(result);
+        } catch (err) {
+          window.printBridge.onRenderResult({ success: false, error: err.message });
+        }
+      })();
+    });
+  </script>
+</body>
+</html>

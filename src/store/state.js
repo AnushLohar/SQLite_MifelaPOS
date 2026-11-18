@@ -1,18 +1,20 @@
 // --- App Constants ---
-export const appId = typeof window !== 'undefined' && window.__app_id 
-    ? window.__app_id 
-    : 'electron-mifela-inventory'; 
+export const appId = typeof window !== 'undefined' && window.__app_id
+    ? window.__app_id
+    : 'electron-mifela-inventory';
 
 // --- Global State Variables (Private) ---
 let _storeId = null;
 let _userId = null;
 let _userRole = null;
-let _currentUserPlan = 'unlocked'; // Force Unlocked
+let _currentUserPlan = null; // Set from session; falls back to null (uninitialized)
 
 // --- Multi-Location State ---
-let _currentLocationId = 'main'; 
+let _currentLocationId = 'main';
 let _userAssignedLocationId = 'main';
 let _availableLocations = [{ id: 'main', name: 'Main Store' }];
+
+
 
 // --- UI/App State ---
 let _dashboardWidgets = [];
@@ -23,7 +25,7 @@ let _editingCustomerId = null;
 let _salesChartInstance = null;
 
 // --- Settings / Defaults ---
-let _convenienceFee = 0; 
+let _convenienceFee = 0;
 let _currencyCode = 'INR';
 let _currencySymbol = '₹';
 export const AppState = {
@@ -45,9 +47,9 @@ export const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', J
 export const PLAN_LIMITS = {};
 export const PLAN_PRICING = {};
 export const getLoyaltyRatio = async () => 1;
-export const hasFeatureAccess = () => true; 
+export const hasFeatureAccess = () => true;
 export const checkQuota = () => ({ allowed: true, limit: Infinity, remaining: Infinity });
-export const setPlan = () => {};
+export const setPlan = () => { };
 export const normalizePlan = () => 'unlocked';
 export const safePlan = () => 'unlocked';
 
@@ -82,10 +84,26 @@ export let userSettingsRef = true;
 export let userDocRef = true;
 export const getStoreId = () => storeId || localStorage.getItem('mifela_active_store') || 'DEFAULT_STORE';
 export const getUserId = () => userId || localStorage.getItem('mifela_active_user') || 'admin_sys';
-export const getUserRole = () => 'admin'; // 🚀 FORCE ADMIN GLOBALLY
-export const getCurrentUserPlan = () => 'unlocked'; // 🚀 FORCE ENTERPRISE
-export const getCurrentLocationId = () => 'main'; // 🚀 FORCE MAIN LOCATION
-export const getUserAssignedLocationId = () => 'main';
+export const getUserRole = () => {
+    if (userRole) return userRole;
+    try {
+        const session = JSON.parse(localStorage.getItem('mifela_user_session') || '{}');
+        return session.role || 'staff'; // Default to restricted role
+    } catch {
+        return 'staff';
+    }
+};
+export const getCurrentUserPlan = () => {
+    if (currentUserPlan !== 'unlocked') return currentUserPlan;
+    try {
+        const session = JSON.parse(localStorage.getItem('mifela_user_session') || '{}');
+        return session.plan || 'trial';
+    } catch {
+        return 'trial';
+    }
+};
+export const getCurrentLocationId = () => currentLocationId || 'main';
+export const getUserAssignedLocationId = () => userAssignedLocationId || 'main';
 export const getAvailableLocations = () => [{ id: 'main', name: 'Main Store' }];
 
 export const getProductsRef = () => true;
@@ -96,14 +114,14 @@ export const getUserSettingsRef = () => true;
 export const getUserDocRef = () => true;
 
 export const getDashboardWidgets = () => dashboardWidgets;
-export const getCurrentCart = () => [...currentCart]; 
+export const getCurrentCart = () => [...currentCart];
 
 export async function getCurrentProductCount() {
     if (window.dbAPI && window.dbAPI.getProducts) {
         const prods = await window.dbAPI.getProducts();
         return prods.length;
     }
-    return 0; 
+    return 0;
 }
 
 export const getEditingProductId = () => editingProductId;
@@ -124,7 +142,7 @@ export function registerListener(unsub) {
 export function setStoreAndUserRefs(uid, sid, role, assignedLoc = 'main') {
     // 🚀 THE FIX: Instantly map all state to the offline bypasses and sync to localStorage
     _userId = uid || 'admin_sys';
-    _storeId = sid || 'DEFAULT_STORE'; 
+    _storeId = sid || 'DEFAULT_STORE';
     _userRole = 'admin';
     _userAssignedLocationId = 'main';
     _currentLocationId = 'main';
@@ -149,7 +167,7 @@ export function clearUserSessionState() {
     activeListeners.forEach(unsub => {
         try { unsub(); } catch (e) { console.error(e); }
     });
-    activeListeners.length = 0; 
+    activeListeners.length = 0;
 
     // Reset to bypass defaults instead of null
     _storeId = 'DEFAULT_STORE';
@@ -159,7 +177,7 @@ export function clearUserSessionState() {
     _currentCart = [];
     _dashboardWidgets = [];
     _salesChartInstance = null;
-    
+
     cachedProducts = null;
     isFetchingProducts = false;
     productFetchPromise = null;
@@ -168,7 +186,7 @@ export function clearUserSessionState() {
     userId = 'admin_sys';
     userRole = 'admin';
     currentLocationId = 'main';
-    
+
     currentCart = [];
     dashboardWidgets = [];
     editingProductId = null;
@@ -189,31 +207,31 @@ export function setUserSettingsListener(unsub) {
     window.userSettingsListenerUnsubscribe = unsub;
 }
 
-export function setCurrentCart(data) { 
-    _currentCart = [...data]; 
-    currentCart = _currentCart; 
+export function setCurrentCart(data) {
+    _currentCart = [...data];
+    currentCart = _currentCart;
 }
 
-export function addToCart(item) { 
+export function addToCart(item) {
     _currentCart = [..._currentCart, item];
-    currentCart = _currentCart; 
+    currentCart = _currentCart;
 }
 
-export function removeFromCart(index) { 
+export function removeFromCart(index) {
     const newCart = [..._currentCart];
     newCart.splice(index, 1);
     _currentCart = newCart;
-    currentCart = _currentCart; 
+    currentCart = _currentCart;
 }
 
-export function clearCart() { 
+export function clearCart() {
     _currentCart = [];
-    currentCart = []; 
+    currentCart = [];
 }
 
-export function setConvenienceFee(amount) { 
-    _convenienceFee = parseFloat(amount) || 0; 
-    convenienceFee = _convenienceFee; 
+export function setConvenienceFee(amount) {
+    _convenienceFee = parseFloat(amount) || 0;
+    convenienceFee = _convenienceFee;
 }
 
 export function setCurrency(code) {
@@ -223,39 +241,39 @@ export function setCurrency(code) {
     CURRENT_CURRENCY_SYMBOL = _currencySymbol;
 }
 
-export function setCurrentProductCount(count) { 
+export function setCurrentProductCount(count) {
     _currentProductCount = count;
-    currentProductCount = count; 
+    currentProductCount = count;
 }
 
-export function setEditingProductId(id) { 
-    _editingProductId = id; 
-    editingProductId = id; 
+export function setEditingProductId(id) {
+    _editingProductId = id;
+    editingProductId = id;
 }
 
-export function setEditingCustomerId(id) { 
-    _editingCustomerId = id; 
-    editingCustomerId = id; 
+export function setEditingCustomerId(id) {
+    _editingCustomerId = id;
+    editingCustomerId = id;
 }
 
-export function setSalesChartInstance(chart) { 
-    _salesChartInstance = chart; 
-    salesChartInstance = chart; 
+export function setSalesChartInstance(chart) {
+    _salesChartInstance = chart;
+    salesChartInstance = chart;
 }
 
-export function setDashboardWidgets(widgets) { 
-    _dashboardWidgets = widgets; 
-    dashboardWidgets = widgets; 
+export function setDashboardWidgets(widgets) {
+    _dashboardWidgets = widgets;
+    dashboardWidgets = widgets;
 }
 
-export function setAvailableLocations(locations) { 
-    _availableLocations = [{ id: 'main', name: 'Main Store' }]; 
-    availableLocations = _availableLocations; 
+export function setAvailableLocations(locations) {
+    _availableLocations = [{ id: 'main', name: 'Main Store' }];
+    availableLocations = _availableLocations;
 }
 
-export function setCurrentLocation(locId) { 
+export function setCurrentLocation(locId) {
     _currentLocationId = 'main';
-    currentLocationId = 'main'; 
+    currentLocationId = 'main';
     cachedProducts = null;
 }
 
@@ -270,13 +288,13 @@ export async function fetchAllProducts(forceRefresh = false) {
     if (cachedProducts && !forceRefresh) {
         return cachedProducts;
     }
-    
+
     if (isFetchingProducts) {
         return productFetchPromise;
     }
 
     isFetchingProducts = true;
-    
+
     productFetchPromise = (async () => {
         try {
             if (window.dbAPI && window.dbAPI.getProducts) {
@@ -288,7 +306,7 @@ export async function fetchAllProducts(forceRefresh = false) {
             }
         } catch (error) {
             console.warn("Global product cache fetch failed:", error);
-            return []; 
+            return [];
         } finally {
             isFetchingProducts = false;
         }
@@ -317,6 +335,16 @@ export function deductLocalProductStock(productId, qtySold) {
 
 
 export function hasPermission(role, viewName) {
-    // 🚀 THE FIX: Always return true to bypass the Reports and Staff permission walls
-    return true; 
+    // Admin has full access to all views
+    if (role === 'admin' || role === 'owner') return true;
+
+    // View-specific permission matrix
+    const rolePermissions = {
+        staff: ['pos', 'inventory', 'customers', 'dashboard'],
+        cashier: ['pos', 'dashboard'],
+        manager: ['pos', 'inventory', 'customers', 'reports', 'dashboard'],
+    };
+
+    const allowedViews = rolePermissions[role] || rolePermissions.staff;
+    return allowedViews.includes(viewName);
 }

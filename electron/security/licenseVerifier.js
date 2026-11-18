@@ -1,22 +1,22 @@
 // security/licenseVerifier.js
 import crypto from 'crypto';
 import { getHardwareFingerprint } from './fingerprint.js';
-import { getDB } from '../database/connection.js';
+import { getKnex } from '../database/knex.js';
 
 export class LicenseManager {
     static generateAndStoreKeys(email, storeName) {
         const fingerprint = getHardwareFingerprint();
-        
+
         const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
             modulusLength: 2048,
             publicKeyEncoding: { type: 'spki', format: 'pem' },
             privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
         });
 
-        const aesKey = Buffer.from(fingerprint.substring(0, 64), 'hex'); 
+        const aesKey = Buffer.from(fingerprint.substring(0, 64), 'hex');
         const iv = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, iv);
-        
+
         let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'base64');
         encryptedPrivateKey += cipher.final('base64');
         const authTag = cipher.getAuthTag().toString('base64');
@@ -29,19 +29,30 @@ export class LicenseManager {
 
         const nextDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const db = getDB();
-        db.prepare(`INSERT OR REPLACE INTO security_config (id, email, storeName, encryptedPrivateKey, publicKey, nextVerificationDate) VALUES (?, ?, ?, ?, ?, ?)`).run(
-            'SYSTEM_LICENSE', email, storeName, secureStorageString, publicKey, nextDate
-        );
+        const knex = getKnex();
+        knex('security_config')
+            .insert({
+                id: 'SYSTEM_LICENSE',
+                email,
+                storeName,
+                encryptedPrivateKey: secureStorageString,
+                publicKey,
+                nextVerificationDate: nextDate
+            })
+            .onConflict('id')
+            .merge();
 
         return { publicKey, email, storeName, fingerprint };
     }
 
-    static verifyLocalState() {
+    static async verifyLocalState() {
         try {
-            const db = getDB();
-            const record = db.prepare(`SELECT * FROM security_config WHERE id = 'SYSTEM_LICENSE'`).get();
-            
+            const knex = getKnex();
+            const record = await knex('security_config')
+                .select('*')
+                .where({ id: 'SYSTEM_LICENSE' })
+                .first();
+
             if (!record) return { status: 'UNPROVISIONED' };
 
             const now = new Date();
@@ -58,21 +69,24 @@ export class LicenseManager {
     }
 
     // 🚀 FIX: Accept passed hardware fingerprint from main process
-    static executeChallenge(challengeHex, currentHardwareFingerprint) {
-        const db = getDB();
-        const record = db.prepare(`SELECT encryptedPrivateKey FROM security_config WHERE id = 'SYSTEM_LICENSE'`).get();
-        
+    static async executeChallenge(challengeHex, currentHardwareFingerprint) {
+        const knex = getKnex();
+        const record = await knex('security_config')
+            .select('encryptedPrivateKey')
+            .where({ id: 'SYSTEM_LICENSE' })
+            .first();
+
         if (!record) throw new Error("No secure keys found in enclave.");
 
         // 1. Decrypt Private Key using the exact fingerprint passed from main process
         const aesKey = Buffer.from(currentHardwareFingerprint.substring(0, 64), 'hex');
         const parsed = JSON.parse(record.encryptedPrivateKey);
-        
+
         let privateKeyPem;
         try {
             const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, Buffer.from(parsed.iv, 'base64'));
             decipher.setAuthTag(Buffer.from(parsed.tag, 'base64'));
-            
+
             privateKeyPem = decipher.update(parsed.data, 'base64', 'utf8');
             privateKeyPem += decipher.final('utf8');
         } catch (e) {
@@ -83,14 +97,16 @@ export class LicenseManager {
         const sign = crypto.createSign('SHA256');
         sign.update(challengeHex);
         sign.end();
-        
+
         return sign.sign(privateKeyPem, 'base64');
     }
 
-    static updateVerificationDate() {
+    static async updateVerificationDate() {
         const nextDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        const db = getDB();
-        db.prepare(`UPDATE security_config SET nextVerificationDate = ? WHERE id = 'SYSTEM_LICENSE'`).run(nextDate);
+        const knex = getKnex();
+        await knex('security_config')
+            .where({ id: 'SYSTEM_LICENSE' })
+            .update({ nextVerificationDate: nextDate });
         return true;
     }
 }
