@@ -94,16 +94,6 @@ and loads renderer-controlled HTML via `data:text/html;charset=utf-8,${encodeURI
 
 **Issue:** `src/app.js` embeds the full Firebase config (API key, authDomain, projectId, storageBucket, messagingSenderId, appId) directly in the shipped JavaScript bundle:
 
-```js
-const firebaseConfig = {
-  apiKey: "AIzaSyB2n1fa2T7gYwWRmoqr674YW1rXlujCOXM",
-  authDomain: "mifela-pos-sqlite.firebaseapp.com",
-  projectId: "mifela-pos-sqlite",
-  storageBucket: "mifela-pos-sqlite.firebasestorage.app",
-  messagingSenderId: "19471193085",
-  appId: "1:19471193085:web:2da2bd605292e4aad5bf94"
-};
-```
 
 This key is extracted by anyone who inspects the app (asar archive) and can be abused against the Firebase project.
 
