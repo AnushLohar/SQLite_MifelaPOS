@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 // This key is safe to ship in the client. The private key remains on your server.
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAX...[INSERT_YOUR_ED25519_PUBLIC_KEY_HERE]...
+MCowBQYDK2VwAyEAdYAQDfnQeIuKh23WLVFvvdpZZDqQWqfOQktq5K4lEtk=
 -----END PUBLIC KEY-----`;
 
 export class LicenseManager {
