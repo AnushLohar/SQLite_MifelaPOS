@@ -56,14 +56,7 @@ async function fetchUserDetailsFromFirestore(fingerprint) {
         } else {
             // Initialize with the app's firebaseConfig (same as app.js)
             const { initializeApp } = await import("firebase/app");
-            const firebaseConfig = {
-                apiKey: "AIzaSyB2n1fa2T7gYwWRmoqr674YW1rXlujCOXM",
-                authDomain: "mifela-pos-sqlite.firebaseapp.com",
-                projectId: "mifela-pos-sqlite",
-                storageBucket: "mifela-pos-sqlite.firebasestorage.app",
-                messagingSenderId: "19471193085",
-                appId: "1:19471193085:web:2da2bd605292e4aad5bf94"
-            };
+
             fbApp = initializeApp(firebaseConfig);
             // Make globally available for app context consistency
             window.fbApp = fbApp;
