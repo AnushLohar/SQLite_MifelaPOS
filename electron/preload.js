@@ -8,28 +8,28 @@ contextBridge.exposeInMainWorld('__initial_auth_token', null);
 
 // 2. Local SQLite Database Bridge
 contextBridge.exposeInMainWorld('dbAPI', {
-    getProducts: () => ipcRenderer.invoke('db:getProducts'),
-    getCustomers: () => ipcRenderer.invoke('db:getCustomers'),
-    getTransactionsSince: (isoDate) => ipcRenderer.invoke('db:getTransactionsSince', isoDate),
-    getPendingCheques: () => ipcRenderer.invoke('db:getPendingCheques'),
-    processSale: (payload) => ipcRenderer.invoke('db:processSale', payload),
-    updateChequeStatus: (txId, status, date) => ipcRenderer.invoke('db:updateChequeStatus', txId, status, date),
-    getTransactionsForCustomer: (customerId) => ipcRenderer.invoke('db:getTransactionsForCustomer', customerId),
-    executeLedgerMerge: (payload) => ipcRenderer.invoke('db:executeLedgerMerge', payload),
-    undoLedgerMerge: (txId) => ipcRenderer.invoke('db:undoLedgerMerge', txId),
-    // 🚀 NEW: The Offline Customer/Ledger Routes
-    savePartnerWithOpeningBalance: (payload) => ipcRenderer.invoke('db:savePartner', payload),
-    processFinancialTransaction: (payload) => ipcRenderer.invoke('db:processFinancialTransaction', payload),
-    updateLoyaltyTokens: (id, tokens) => ipcRenderer.invoke('db:updateLoyaltyTokens', id, tokens),
-    deleteCustomer: (id) => ipcRenderer.invoke('db:deleteCustomer', id),
-    resetPartnerAccount: (id) => ipcRenderer.invoke('db:resetPartnerAccount', id),
-    runDirectoryCleanup: (type) => ipcRenderer.invoke('db:runDirectoryCleanup', type),
-    logTelemetry: (eventName, data) => ipcRenderer.invoke('db:logTelemetry', eventName, data),
-    getSupplierByPhone: (phone) => ipcRenderer.invoke('db:getSupplierByPhone', phone),
-    getSupplierByGSTIN: (gstin) => ipcRenderer.invoke('db:getSupplierByGSTIN', gstin),
-    executeBatch: (ops) => ipcRenderer.invoke('db:executeBatch', ops),
-    getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
-    deleteDoc: (col, id) => ipcRenderer.invoke('db:deleteDoc', col, id)
+  getProducts: () => ipcRenderer.invoke('db:getProducts'),
+  getCustomers: () => ipcRenderer.invoke('db:getCustomers'),
+  getTransactionsSince: (isoDate) => ipcRenderer.invoke('db:getTransactionsSince', isoDate),
+  getPendingCheques: () => ipcRenderer.invoke('db:getPendingCheques'),
+  processSale: (payload) => ipcRenderer.invoke('db:processSale', payload),
+  updateChequeStatus: (txId, status, date) => ipcRenderer.invoke('db:updateChequeStatus', txId, status, date),
+  getTransactionsForCustomer: (customerId) => ipcRenderer.invoke('db:getTransactionsForCustomer', customerId),
+  executeLedgerMerge: (payload) => ipcRenderer.invoke('db:executeLedgerMerge', payload),
+  undoLedgerMerge: (txId) => ipcRenderer.invoke('db:undoLedgerMerge', txId),
+  // 🚀 NEW: The Offline Customer/Ledger Routes
+  savePartnerWithOpeningBalance: (payload) => ipcRenderer.invoke('db:savePartner', payload),
+  processFinancialTransaction: (payload) => ipcRenderer.invoke('db:processFinancialTransaction', payload),
+  updateLoyaltyTokens: (id, tokens) => ipcRenderer.invoke('db:updateLoyaltyTokens', id, tokens),
+  deleteCustomer: (id) => ipcRenderer.invoke('db:deleteCustomer', id),
+  resetPartnerAccount: (id) => ipcRenderer.invoke('db:resetPartnerAccount', id),
+  runDirectoryCleanup: (type) => ipcRenderer.invoke('db:runDirectoryCleanup', type),
+  logTelemetry: (eventName, data) => ipcRenderer.invoke('db:logTelemetry', eventName, data),
+  getSupplierByPhone: (phone) => ipcRenderer.invoke('db:getSupplierByPhone', phone),
+  getSupplierByGSTIN: (gstin) => ipcRenderer.invoke('db:getSupplierByGSTIN', gstin),
+  executeBatch: (ops) => ipcRenderer.invoke('db:executeBatch', ops),
+  getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
+  deleteDoc: (col, id) => ipcRenderer.invoke('db:deleteDoc', col, id)
 });
 
 // 3. Core System & Application API
@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   signChallenge: (challengeHex) => ipcRenderer.invoke('security:sign-challenge', challengeHex),
   extendLicense: () => ipcRenderer.invoke('security:extend-license'),
   getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
-saveStoreSettings: (storeId, settings) => ipcRenderer.invoke('db:save-store-settings', { storeId, settings }),
+  saveStoreSettings: (storeId, settings) => ipcRenderer.invoke('db:save-store-settings', { storeId, settings }),
   // --- Local Auth Token Management ---
   saveToken: (token) => ipcRenderer.invoke('auth:save-token', token),
   getToken: () => ipcRenderer.invoke('auth:get-token'),
@@ -90,7 +90,9 @@ saveStoreSettings: (storeId, settings) => ipcRenderer.invoke('db:save-store-sett
       ipcRenderer.on('updater-event', subscription);
       return () => ipcRenderer.removeListener('updater-event', subscription);
     }
-  }
+  },
+  login: (username, password) => ipcRenderer.invoke('auth:login', username, password),
+  getLicenceState: () => ipcRenderer.invoke('licence:getState')
 });
 
 // 4. Dedicated Printing API

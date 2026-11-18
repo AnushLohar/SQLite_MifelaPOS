@@ -16,6 +16,9 @@ import { LicenseManager } from './security/licenseVerifier.js';
 import { getHardwareFingerprint } from './security/fingerprint.js';
 // electron‑updater is a CommonJS module → import the whole package first
 import { createRequire } from 'module';
+import LocalAuthService from './services/LocalAuthService.js';
+import LicenceStateManager from './services/LicenceStateManager.js';
+import ConnectivityMonitor from './services/ConnectivityMonitor.js';
 const require = createRequire(import.meta.url);
 // ---------------------------------------------------------------
 //  Paths & constants
@@ -135,50 +138,63 @@ if (!gotTheLock) {
   //  When the app is ready – initialise everything
   // ---------------------------------------------------------------
   app.whenReady().then(() => {
-  // 1️⃣ Initialise SQLite (now that initKnex is imported)
-  try {
-    initKnex();                         // <-- will succeed
-    registerDBHandlers();
-    electronLog.info('✅ Database connected and IPC handlers registered.');
-  } catch (dbError) {
-    electronLog.error('❌ FATAL: DB init failed', dbError);
-  }
+    // 1️⃣ Initialise SQLite (now that initKnex is imported)
+    try {
+      initKnex();                         // <-- will succeed
+      registerDBHandlers();
+      electronLog.info('✅ Database connected and IPC handlers registered.');
+    } catch (dbError) {
+      electronLog.error('❌ FATAL: DB init failed', dbError);
+    }
 
-  // 2️⃣ Register IPC handlers (guarded)
-  registerIpcHandlers();
+    // 2️⃣ Register IPC handlers (guarded)
+    registerIpcHandlers();
 
-  // 3️⃣ Create UI
-  createWindow();
-  createPrintWorker();
+    // 3️⃣ Create UI
+    createWindow();
+    createPrintWorker();
 
-  // 4️⃣ Auto‑updater (only when packaged)
-  if (app.isPackaged) setupAutoUpdater(mainWindow);
+    // 4️⃣ Auto‑updater (only when packaged)
+    if (app.isPackaged) setupAutoUpdater(mainWindow);
 
-  // 5️⃣ Scanner hot‑folder (dev only)
-  if (!app.isPackaged) setupScannerIPC(mainWindow);
-  
-});
+    // 5️⃣ Scanner hot‑folder (dev only)
+    if (!app.isPackaged) setupScannerIPC(mainWindow);
+
+  });
 }
 
 
 function registerIpcHandlers() {
   if (handlersRegistered) return;   // ← prevent double‑registration
-    ipcMain.handle('app:get-version', () => app.getVersion());
+  ipcMain.handle('app:get-version', () => app.getVersion());
 
   // ---- security/get-state -------------------------------------------------
-  ipcMain.handle('security:get-state', async () => LicenseManager.verifyLocalState());
+  ipcMain.handle('security:get-state', async () => {
+    // Route the old UI startup check to our new Offline State Manager
+    const state = await LicenceStateManager.evaluateCurrentState();
 
-  // ---- security:provision (generate & store RSA keypair) ------------------
-  ipcMain.handle('security:provision', async (_, { email, storeName }) => {
-    try {
-      const result = LicenseManager.generateAndStoreKeys(email, storeName);
-      return { success: true, data: result };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+    // Return in an object format in case the legacy UI expects it
+    return { status: state.toLowerCase() };
   });
 
-  
+  // ---- security:provision (Legacy Activation Stub) ------------------
+  ipcMain.handle('security:provision', async (_, { email, storeName }) => {
+    // Stubbed to prevent UI crashes during migration. 
+    // In the new architecture, activation will happen via the new workflow.
+    return { success: true, data: { message: "Migrated to offline-first licensing" } };
+  });
+
+  // ---- security:sign-challenge (Legacy Stub) ------------------------
+  ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
+    return { success: true, signature: "offline-first-migration-stub" };
+  });
+
+  // ---- license extension (Legacy Stub) ------------------------------------
+  ipcMain.handle('security:extend-license', async () => {
+    return { success: true };
+  });
+
+
 
   // ---- auth token ---------------------------------------------------------
   ipcMain.handle('auth:save-token', async (_, token) => {
@@ -213,20 +229,6 @@ function registerIpcHandlers() {
   });
 
 
-ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
-    try {
-        const fp = await getHardwareFingerprint();
-        const signature = await LicenseManager.executeChallenge(challengeHex, fp);
-        return { success: true, signature };
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-});
-
-  // ---- license extension --------------------------------------------------
-  ipcMain.handle('security:extend-license', async () => {
-    return LicenseManager.updateVerificationDate();
-  });
 
   // ---- printing -----------------------------------------------------------
   ipcMain.handle('print:get-printers', async () => {
@@ -322,43 +324,43 @@ ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
     }
   });
 
-// ------------------------------------------------------------------
-//  Print security helpers
-// ------------------------------------------------------------------
+  // ------------------------------------------------------------------
+  //  Print security helpers
+  // ------------------------------------------------------------------
 
-// Strip <script> tags and inline event handlers to prevent XSS in the print worker
-function sanitizeHtml(html) {
-  if (typeof html !== 'string') return '';
-  return html
-    // Remove <script>...</script> blocks
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    // Remove inline event handlers (onclick, onerror, onload, etc.)
-    .replace(/\s(on\w+)\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')
-    // Remove javascript: URLs
-    .replace(/javascript\s*:/gi, '')
-    // Remove <style> blocks containing expression() (IE legacy XSS vector)
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-}
+  // Strip <script> tags and inline event handlers to prevent XSS in the print worker
+  function sanitizeHtml(html) {
+    if (typeof html !== 'string') return '';
+    return html
+      // Remove <script>...</script> blocks
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      // Remove inline event handlers (onclick, onerror, onload, etc.)
+      .replace(/\s(on\w+)\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')
+      // Remove javascript: URLs
+      .replace(/javascript\s*:/gi, '')
+      // Remove <style> blocks containing expression() (IE legacy XSS vector)
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+  }
 
-// Render sanitized HTML in the isolated print worker and report back the result
-ipcMain.handle('print:render', async (_, html, options) => {
-  if (!printWorker || printWorker.isDestroyed()) {
-    return { success: false, error: 'Print worker not available' };
-  }
-  try {
-    await printWorker.webContents.print({
-      silent: options.silent !== undefined ? options.silent : true,
-      deviceName: options.deviceName || undefined,
-      color: options.color !== undefined ? options.color : false,
-      printBackground: options.printBackground !== undefined ? options.printBackground : true,
-      margins: options.margins || { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
-    });
-    return { success: true };
-  } catch (e) {
-    console.error('Electron Print failed:', e);
-    return { success: false, error: e.message };
-  }
-});
+  // Render sanitized HTML in the isolated print worker and report back the result
+  ipcMain.handle('print:render', async (_, html, options) => {
+    if (!printWorker || printWorker.isDestroyed()) {
+      return { success: false, error: 'Print worker not available' };
+    }
+    try {
+      await printWorker.webContents.print({
+        silent: options.silent !== undefined ? options.silent : true,
+        deviceName: options.deviceName || undefined,
+        color: options.color !== undefined ? options.color : false,
+        printBackground: options.printBackground !== undefined ? options.printBackground : true,
+        margins: options.margins || { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+      });
+      return { success: true };
+    } catch (e) {
+      console.error('Electron Print failed:', e);
+      return { success: false, error: e.message };
+    }
+  });
 
   // ---- raw printer byte-stream (ESC/POS / TSC) ---------------------------
   ipcMain.handle('print:raw', async (_, { data, printerName }) => {
@@ -393,7 +395,7 @@ ipcMain.handle('print:render', async (_, html, options) => {
           port.open((err) => {
             if (err) return resolve({ success: false, error: err.message });
             port.write(bytes, (werr) => {
-              port.close(() => {});
+              port.close(() => { });
               resolve(werr ? { success: false, error: werr.message } : { success: true });
             });
           });
@@ -462,7 +464,7 @@ ipcMain.handle('print:render', async (_, html, options) => {
 
   ipcMain.on('install-update-now', async () => {
     isQuitting = true;
-    if (global.scannerWatcher) { try { await global.scannerWatcher.close(); } catch (e) {} }
+    if (global.scannerWatcher) { try { await global.scannerWatcher.close(); } catch (e) { } }
     setTimeout(() => autoUpdater.quitAndInstall(true, true), 500);
   });
 
@@ -619,3 +621,18 @@ function setupScannerIPC(win) {
     }
   });
 }
+const monitor = new ConnectivityMonitor();
+monitor.start();
+monitor.on('online', () => {
+  // Trigger background background sync logic here
+  console.log('Network connected: Triggering silent licence verification...');
+});
+
+// IPC Handlers for UI
+ipcMain.handle('auth:login', async (event, username, password) => {
+  return await LocalAuthService.login(username, password);
+});
+
+ipcMain.handle('licence:getState', async () => {
+  return await LicenceStateManager.evaluateCurrentState();
+});

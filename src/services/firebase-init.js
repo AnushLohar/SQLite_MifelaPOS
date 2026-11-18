@@ -8,7 +8,7 @@ let _db = null;
 let _initPromise = null;
 
 const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", // ← REPLACE with your real key
+    apiKey: "AIzaSyB2n1fa2T7gYwWRmoqr674YW1rXlujCOXM", // ← REPLACE with your real key
     authDomain: "mifela-pos-sqlite.firebaseapp.com",
     projectId: "mifela-pos-sqlite",
     storageBucket: "mifela-pos-sqlite.firebasestorage.app",
