@@ -1,35 +1,42 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-11-18
-**Focus:** tech
+**Analysis Date:** 2026-11-21
 
 ## Test Framework
 
-**Runner:** Not detected. No test framework installed (no Jest, Vitest, Mocha, etc. in `package.json`).
+**Runner:** Vitest (v4.1.12), configured in `vitest.config.js`:
+- `environment: 'node'`
+- `include: ['tests/**/*.test.js']`
 
 ## Test File Organization
 
-No test directories or files (`.test.js`, `.spec.js`, `__tests__/`) detected in the codebase.
+Test files live in `tests/` at the project root:
+
+| File | Purpose |
+|------|---------|
+| `tests/license.test.js` | License-related unit tests |
+| `tests/licence-state.test.js` | `LicenceStateManager.evaluateCurrentState` coverage |
+| `tests/interop.test.js` | Interop / integration checks |
 
 ## Test Structure
 
-Not applicable.
+Node environment, standard Vitest `test()`/`expect()` style. No React/component rendering tests (frontend is vanilla DOM). No Electron E2E (no Playwright/Spectron).
 
 ## Mocking
 
-Not applicable.
+Tests mock `electron`/`knex` modules where needed (see `tests/licence-state.test.js` which mocks `../database/knex.js` and `../security/licenseVerifier.js`).
 
 ## Coverage
 
-None.
+Partial — only the 3 files above. Large parts of `src/` and `electron/` remain untested (controllers, components, services).
 
 ## Gaps / Recommendations
 
-- No unit tests for `electron/database/controllers.js` (Knex query logic, transactions, ledger merge).
+- No unit tests for `electron/database/controllers.js` (Knex query logic, transactions, ledger merge, `executeBatch`).
 - No unit tests for renderer components (`src/components/pos.js`, `inventory.js`, etc.).
 - No end-to-end tests for the Electron app (no playwright/spectron).
-- Suggested fix: Add Vitest (matches the Vite build toolchain) for unit/integration tests; consider Spectron/Playwright for Electron E2E.
+- Authorization (`authorize()` in `controllers.js`) is untested.
 
 ---
 
-*Testing analysis: 2026-11-18*
+*Testing analysis: 2026-11-21 (focus: tech)*

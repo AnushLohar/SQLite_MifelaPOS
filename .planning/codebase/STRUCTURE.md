@@ -1,13 +1,13 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-11-18
+**Analysis Date:** 2026-11-21  
 **Focus:** tech
 
 ## Directory Layout
 
 ```
 [project-root]/
-├── electron/         # Main process, SQLite controllers, license verification
+├── electron/         # Main process, SQLite controllers, license verification, services, security
 ├── src/              # Frontend UI components, state management, printing logic
 ├── public/           # Static public assets
 ├── build/            # Application icons and build assets
@@ -16,19 +16,34 @@
 ├── release/          # Built application binaries
 ├── functions/        # Firebase Cloud Functions
 ├── compliance/       # Compliance/GDPR artifacts
+├── scripts/          # Build/util scripts
+├── tests/            # Vitest test files
 ├── .planning/        # Planning and codebase analysis documents
 └── package.json, vite.config.js, index.html
 ```
 
 ## Directory Purposes
 
-**`electron/`:** Electron main process, secure IPC bridge, database controllers, and security verification.
-- Contains: `main.js`, `preload.js`, `database/` (knex.js, controllers.js, connection.js), `security/` (licenseVerifier.js, fingerprint.js), `telemetry/logger.js`, `UniversalPrintEngine.js`.
-- Key files: `electron/main.js`, `electron/preload.js`, `electron/database/controllers.js`, `electron/database/knex.js`.
+**`electron/`:** Electron main process, secure IPC bridge, database controllers, security, services, telemetry.
+- `main.js` — app lifecycle, single-instance lock, protocol handling (mifela://), window creation, print worker, IPC handler registration, auto-updater, scanner hot-folder, integrity check.
+- `preload.js` — `contextBridge` APIs: `dbAPI`, `electronAPI`, `printAPI`, `scannerAPI`.
+- `printPreload.js` — isolated preload for the print worker window (`printBridge` only).
+- `printBlank.html` — blank page loaded by the print worker (not renderer-controlled `data:` URL).
+- `database/knex.js` — Knex instance factory + `initSchema()`.
+- `database/schema.js` — Knex schema migrations (`products`, `customers`, `transactions`, `security_config`, `store_settings`, `local_users`, `licence_data`).
+- `database/controllers.js` — All `db:*` IPC handlers; `authorize()` guard on writes.
+- `security/licenseVerifier.js` — `LicenseManager.verifySignature` (Ed25519).
+- `security/fingerprint.js` — `getHardwareFingerprint`.
+- `security/integrity.js` — `verifyAppIntegrity` (startup tamper detection).
+- `services/LicenceStateManager.js` — offline licence state evaluation.
+- `services/LocalAuthService.js` — bcrypt local user login.
+- `services/ConnectivityMonitor.js` — WAN connectivity polling.
+- `services/BackgroundVerificationScheduler.js` — background online licence verification.
+- `telemetry/logger.js` — electron-log based file logging.
+- `UniversalPrintEngine.js` — print engine.
 
 **`src/`:** Frontend single-page POS and inventory management application (vanilla JS + Tailwind).
-- Contains: UI components, utility modules, printing adapters, state stores, services, legal docs.
-- Key files: `src/app.js`, `src/components/pos.js`, `src/components/inventory.js`, `src/store/state.js`, `src/store/listeners.js`, `src/utils/dom.js`.
+- UI components, utility modules, printing adapters, state stores, services, legal docs.
 
 **`public/`:** Static public assets (favicon, etc.).
 
@@ -44,6 +59,10 @@
 
 **`compliance/`:** Compliance/GDPR-related artifacts.
 
+**`scripts/`:** Build and utility scripts.
+
+**`tests/`:** Vitest test files (`license.test.js`, `licence-state.test.js`, `interop.test.js`).
+
 **`.planning/codebase/`:** Structured codebase analysis documents (this directory).
 
 ## Key File Locations
@@ -57,14 +76,17 @@
 - `vite.config.js`: Vite build configuration (externals, obfuscator plugin, Tailwind via PostCSS).
 - `package.json`: Project manifest, scripts, and electron-builder build definitions.
 - `tailwind.config.cjs`, `postcss.config.cjs`: Styling configuration.
+- `vitest.config.js`: Vitest configuration.
 
 **Core Logic:**
-- `electron/database/controllers.js`: Database queries and data access layer (Knex).
-- `electron/database/knex.js`: Knex connection factory.
-- `electron/database/connection.js`: Legacy better-sqlite3 schema bootstrap.
+- `electron/database/knex.js`: Knex connection factory (`initKnex`/`getKnex`).
+- `electron/database/schema.js`: Schema migrations.
+- `electron/database/controllers.js`: IPC DB handlers (Knex).
 - `src/store/state.js`: Global state management + event bus (`AppState`).
+- `src/store/listeners.js`: Firebase real-time listeners.
+- `src/store/widgetConfig.js`: `MASTER_WIDGET_LIST`.
 
-**Testing:** Not applicable (no tests present).
+**Testing:** Vitest, `tests/**/*.test.js`.
 
 ## Naming Conventions
 
@@ -75,11 +97,13 @@
 **Directories:**
 - lowercase descriptive naming (`components`, `services`, `utils`, `store`, `printing`, `database`, `security`, `telemetry`, `adapters`, `legal`).
 
+**IPC channel names:** kebab-case or `domain:action` (`db:getProducts`, `security:get-state`, `print:job`, `system:save-file`, `auth:login`, `licence:getState`).
+
 ## Where to Add New Code
 
 **New Feature:**
 - Primary code: `src/components/` for UI, `electron/database/controllers.js` for data access.
-- Tests: None.
+- Tests: `tests/`.
 
 **New Component/Module:**
 - Implementation: `src/components/`
@@ -89,6 +113,9 @@
 
 **Printing:**
 - Print engine/adapters: `src/printing/` and `electron/UniversalPrintEngine.js`.
+
+**Main-process service:**
+- `electron/services/` (e.g., auth, connectivity, licensing).
 
 ## Special Directories
 
@@ -102,4 +129,4 @@
 
 ---
 
-*Structure analysis: 2026-11-18*
+*Structure analysis: 2026-11-21*

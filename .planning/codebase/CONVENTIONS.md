@@ -1,7 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-11-18
-**Focus:** tech
+**Analysis Date:** 2026-11-21
 
 ## Language & Module System
 
@@ -12,14 +11,14 @@
 
 **Files:**
 - PascalCase for classes/main components (`PrinterManager.js`, `LicenseManager`).
-- camelCase or kebab-case for utilities (`gdpr-compliance.js`, `imageDB.js`, `knex.js`).
+- camelCase or kebab-case for utilities (`gdpr-compliance.js`, `imageDB.js`, `knex.js`, `schema.js`).
 - Directories: lowercase descriptive (`components`, `services`, `utils`, `store`, `printing`, `database`, `security`, `telemetry`, `adapters`, `legal`).
 
-**Functions/Methods:** camelCase (`registerDBHandlers`, `initKnex`, `executePrint`).
+**Functions/Methods:** camelCase (`registerDBHandlers`, `initKnex`, `executePrint`, `evaluateCurrentState`).
 
 **Variables:** camelCase consistently.
 
-**IPC channel names:** kebab-case or `domain:action` (`db:getProducts`, `security:sign-challenge`, `print:job`, `system:save-file`).
+**IPC channel names:** kebab-case or `domain:action` (`db:getProducts`, `security:get-state`, `print:job`, `system:save-file`, `auth:login`, `licence:getState`).
 
 ## Code Style
 
@@ -34,7 +33,7 @@
 
 ## Error Handling
 
-**Patterns:** Try/catch blocks used in `electron/database/controllers.js` and async operations. IPC handlers return `{ success: false, error: ... }` or throw; renderer side wraps calls in try/catch with toast/modal feedback.
+**Patterns:** Try/catch blocks used in `electron/database/controllers.js` and async operations. IPC handlers return `{ success: false, error: ... }` or throw; renderer side wraps calls in try/catch with toast/modal feedback. DB read handlers return `[]`/`null` on error (masking — see CONCERNS.md M3).
 
 **Process-level:** `uncaughtException` and `unhandledRejection` logged via `electron-log` in `electron/main.js`.
 
@@ -45,7 +44,7 @@
 
 ## Comments
 
-**When to comment:** Minimal JSDoc usage. Inline "🚀 THE FIX:" markers used to denote recent patches throughout the codebase.
+**When to comment:** Minimal JSDoc usage. Inline "🚀 THE FIX:" / "🚀 NEW:" markers used to denote recent patches throughout the codebase.
 
 ## Function Design
 
@@ -55,4 +54,4 @@
 
 ---
 
-*Convention analysis: 2026-11-18*
+*Convention analysis: 2026-11-21*

@@ -1,4 +1,4 @@
-// const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 console.log("🔌 Preload script initializing...");
 
