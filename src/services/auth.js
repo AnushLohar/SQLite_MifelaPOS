@@ -121,40 +121,22 @@ export async function initializeAuth() {
 
 async function executeSilentVerification(localPayload) {
     try {
-        const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/requestChallenge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: localPayload.email })
+        // Re-provision through the live cloud-signed license path (verifyNodeLicense),
+        // which enforces payment/activation status and extends the 90-day deadline.
+        const result = await window.electronAPI.provisionSecurity({
+            email: localPayload.email,
+            storeName: ''
         });
-        
-        if (!response.ok) return false;
-        const { challengeHex } = await response.json();
 
-        const signResult = await window.electronAPI.signChallenge(challengeHex);
-        if (!signResult || !signResult.success) {
-            console.error("Challenge signing failed:", signResult?.error);
+        if (!result.success) {
+            console.error("Silent verification rejected:", result.error);
             return false;
         }
 
-        const verifyRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyChallenge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email: localPayload.email, 
-                signature: signResult.signature,
-                challenge: challengeHex
-            })
-        });
-
-        if (verifyRes.ok) {
-            await window.electronAPI.extendLicense();
-            return true;
-        }
-
-        return false;
+        return true;
     } catch (e) {
         console.error("Silent Sync Failed:", e);
-        return false; 
+        return false;
     }
 }
 
@@ -162,47 +144,47 @@ export async function activateSoftware(inputString) {
     if (!inputString || typeof inputString !== 'string') {
         throw new Error("Invalid license string.");
     }
-    
-    let finalJwt = inputString.trim();
 
-    if (finalJwt.length < 50 && !finalJwt.includes('.')) {
-        const hwId = await window.electronAPI.getMachineId();
-        const sysDetailsRaw = localStorage.getItem('mifela_sys_details');
-        const sysEmail = sysDetailsRaw ? JSON.parse(sysDetailsRaw).email : '';
+    const finalJwt = inputString.trim();
 
-        try {
-            const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/redeemTerminalToken', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    token: finalJwt, 
-                    hardwareId: hwId, 
-                    email: sysEmail 
-                })
-            });
+    // Verify payment/activation status via the live cloud function. Only
+    // payment-verified, ACTIVE nodes can proceed to license generation.
+    const fingerprint = await window.electronAPI.getMachineId();
+    const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyNodeActivation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            token: finalJwt,
+            hardwareId: fingerprint,
+            email: ''
+        })
+    });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || "Gateway rejected the token. Ensure payment is complete.");
-            }
-
-            const data = await response.json();
-            finalJwt = data.licenseKey; 
-
-        } catch (netError) {
-            throw new Error(`Network verification failed: ${netError.message}`);
-        }
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Gateway rejected the token. Ensure payment is complete.");
     }
-    
-    const saved = await window.electronAPI.saveToken(finalJwt);
-    if (!saved) throw new Error("Could not save license to secure storage.");
-    
+
+    const data = await response.json();
+    if (!data.data || (data.data.status !== 'PAID' && data.data.status !== 'ACTIVE')) {
+        throw new Error("Payment is pending. Please complete checkout.");
+    }
+
+    // Provision the local license (cloud-signed, enforces payment status)
+    const provisionRes = await window.electronAPI.provisionSecurity({
+        email: data.data.email,
+        storeName: ''
+    });
+    if (!provisionRes.success) {
+        throw new Error(provisionRes.error || "License provisioning failed.");
+    }
+
     const status = await verifyLocalLicense();
     if (!status.valid) {
         await window.electronAPI.deleteToken();
         throw new Error(`Activation failed: ${status.reason}`);
     }
-    
+
     return true;
 }
 

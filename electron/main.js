@@ -1,5 +1,3 @@
-
-
 // ── at the top of electron/main.js ─────────────────────────────────────
 import { app, BrowserWindow, session, ipcMain, safeStorage, shell } from 'electron';
 import path from 'path';
@@ -14,11 +12,13 @@ import { initKnex } from './database/knex.js';   // <-- Knex connection
 import { registerDBHandlers } from './database/controllers.js';
 import { LicenseManager } from './security/licenseVerifier.js';
 import { getHardwareFingerprint } from './security/fingerprint.js';
+import { verifyAppIntegrity } from './security/integrity.js';
 // electron‑updater is a CommonJS module → import the whole package first
 import { createRequire } from 'module';
 import LocalAuthService from './services/LocalAuthService.js';
 import LicenceStateManager from './services/LicenceStateManager.js';
 import ConnectivityMonitor from './services/ConnectivityMonitor.js';
+import BackgroundVerificationScheduler from './services/BackgroundVerificationScheduler.js';
 const require = createRequire(import.meta.url);
 // ---------------------------------------------------------------
 //  Paths & constants
@@ -29,16 +29,13 @@ const __dirname = path.dirname(__filename);
 const USER_DATA_PATH = app.getPath('userData');
 const TOKEN_PATH = path.join(USER_DATA_PATH, 'auth_token.enc');
 
-// ---------------------------------------------------------------
-//  Global state
-// ---------------------------------------------------------------
+// ── at the top of electron/main.js ─────────────────────────────────────
 let mainWindow = null;
 let printWorker = null;
 let isQuitting = false;
 let handlersRegistered = false;   // guard against double registration
 
-// ---------------------------------------------------------------
-//  Process‑wide error handling
+// ── process‑wide error handling
 // ---------------------------------------------------------------
 process.on('uncaughtException', (error) => {
   electronLog.error('🔥 UNCAUGHT FATAL ERROR:', error);
@@ -48,22 +45,20 @@ process.on('unhandledRejection', (reason, promise) => {
   electronLog.error('🔥 UNHANDLED PROMISE REJECTION:', promise, 'reason:', reason);
 });
 
-// ---------------------------------------------------------------
-//  App lifecycle
+// ── App lifecycle
 // ---------------------------------------------------------------
 app.on('before-quit', () => {
   isQuitting = true;
 });
 
 app.disableHardwareAcceleration();
-process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
+// ❌ REMOVED: process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 app.commandLine.appendSwitch('disable-quic');
 app.commandLine.appendSwitch('log-level', '3');
 app.commandLine.appendSwitch('lang', 'en-IN');
 
-// ---------------------------------------------------------------
-//  Single‑instance lock
+// ── Single‑instance lock
 // ---------------------------------------------------------------
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -90,12 +85,10 @@ if (!gotTheLock) {
 
   // Register payment verification protocol for Razorpay redirects
   // This allows posgateway.mifela.com to redirect back to mifela://payment-verified
+  // macOS: protocol is handled via app.on('open-url') above
+  // Windows/Linux: protocol handling via open-url should work with setAsDefaultProtocolClient
   if (process.platform === 'darwin') {
     // macOS: protocol is handled via app.on('open-url') above
-  } else if (process.platform === 'win32') {
-    // Windows: protocol handling via open-url should work with setAsDefaultProtocolClient
-  } else {
-    // Linux: protocol handling via open-url should work with setAsDefaultProtocolClient
   }
 
   // open‑url handling (e.g., deep links with auth token)
@@ -107,7 +100,7 @@ if (!gotTheLock) {
     if (urlObj.pathname === '/payment-verified') {
       const paymentId = urlObj.searchParams.get('payment_id');
       const orderId = urlObj.searchParams.get('order_id');
-      const signature = urlObj.searchParams.get('signature');
+      const signature = urlObj.searchParams.get('signature') || urlObj.searchParams.get('token');
       const status = urlObj.searchParams.get('status');
       const error = urlObj.searchParams.get('error');
 
@@ -134,10 +127,17 @@ if (!gotTheLock) {
     }
   });
 
-  // ---------------------------------------------------------------
-  //  When the app is ready – initialise everything
+  // ── When the app is ready – initialise everything
   // ---------------------------------------------------------------
   app.whenReady().then(() => {
+    // 0️⃣ App integrity check — refuse to start if critical files were patched.
+    const integrity = verifyAppIntegrity();
+    if (!integrity.ok) {
+      electronLog.error('🚨 APP INTEGRITY CHECK FAILED — refusing to start.', integrity);
+      app.quit();
+      return;
+    }
+
     // 1️⃣ Initialise SQLite (now that initKnex is imported)
     try {
       initKnex();                         // <-- will succeed
@@ -154,18 +154,27 @@ if (!gotTheLock) {
     createWindow();
     createPrintWorker();
 
+    // 6️⃣ Background license verification (needs the window + Knex ready first)
+    const monitor = new ConnectivityMonitor();
+    monitor.start();
+    const scheduler = new BackgroundVerificationScheduler(monitor, mainWindow);
+    monitor.on('online', () => {
+      console.log('Network connected: Triggering silent licence verification...');
+    });
+
     // 4️⃣ Auto‑updater (only when packaged)
     if (app.isPackaged) setupAutoUpdater(mainWindow);
 
     // 5️⃣ Scanner hot‑folder (dev only)
     if (!app.isPackaged) setupScannerIPC(mainWindow);
-
   });
 }
 
-
+// ── Register IPC handlers
+// ---------------------------------------------------------------
 function registerIpcHandlers() {
   if (handlersRegistered) return;   // ← prevent double‑registration
+
   ipcMain.handle('app:get-version', () => app.getVersion());
 
   // ---- security/get-state -------------------------------------------------
@@ -177,24 +186,47 @@ function registerIpcHandlers() {
     return { status: state.toLowerCase() };
   });
 
-  // ---- security:provision (Legacy Activation Stub) ------------------
+  // ---- security:provision (Activation: generate & store local license) ------
+  // Called by the renderer after payment is verified via verifyNodeActivation.
+  // Fetches a signed license payload from the cloud (which enforces that the
+  // node is ACTIVE / paid) and persists it to licence_data so the terminal can
+  // validate offline via LicenceStateManager.
   ipcMain.handle('security:provision', async (_, { email, storeName }) => {
-    // Stubbed to prevent UI crashes during migration. 
-    // In the new architecture, activation will happen via the new workflow.
-    return { success: true, data: { message: "Migrated to offline-first licensing" } };
+    const fingerprint = getHardwareFingerprint();
+
+    try {
+      const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyNodeLicense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { fingerprint } }) // Firebase Callable format
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (body.error) throw new Error(body.error.message || 'License activation rejected.');
+      if (!response.ok) throw new Error(body.error?.message || 'License activation rejected.');
+
+      const { result } = body;
+      if (!result || !result.success || !result.payload || !result.signature) {
+        throw new Error('Cloud did not return a signed license payload.');
+      }
+
+      const knex = getKnex();
+      await knex('licence_data').del();
+      await knex('licence_data').insert({
+        id: result.payload.licenceId,
+        licence_payload: JSON.stringify(result.payload),
+        signature: result.signature,
+        last_verified_at: new Date().toISOString(),
+        next_verification_due: result.payload.nextVerificationDue,
+        status: 'ACTIVE'
+      });
+
+      return { success: true, data: { message: 'License provisioned.', fingerprint } };
+    } catch (error) {
+      electronLog.error('🚨 License provisioning failed:', error.message);
+      return { success: false, error: error.message };
+    }
   });
-
-  // ---- security:sign-challenge (Legacy Stub) ------------------------
-  ipcMain.handle('security:sign-challenge', async (_, challengeHex) => {
-    return { success: true, signature: "offline-first-migration-stub" };
-  });
-
-  // ---- license extension (Legacy Stub) ------------------------------------
-  ipcMain.handle('security:extend-license', async () => {
-    return { success: true };
-  });
-
-
 
   // ---- auth token ---------------------------------------------------------
   ipcMain.handle('auth:save-token', async (_, token) => {
@@ -229,7 +261,6 @@ function registerIpcHandlers() {
   });
 
 
-
   // ---- printing -----------------------------------------------------------
   ipcMain.handle('print:get-printers', async () => {
     return mainWindow?.webContents.getPrintersAsync();
@@ -239,15 +270,8 @@ function registerIpcHandlers() {
     const isObject = typeof args === 'object' && args !== null;
     const content = isObject ? args.content : args;
     const printerName = isObject ? (args.printerName || '') : '';
-    const silentPrint = isObject ? (String(args.silent) !== 'false') : true;
 
     if (!printWorker) createPrintWorker();
-
-    // Sanitize HTML: strip <script> tags and inline event handlers to prevent XSS
-    const sanitizedHtml = content.includes('<!DOCTYPE html>')
-      ? content
-      : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${content}</body></html>`;
-    const safeHtml = sanitizeHtml(sanitizedHtml);
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -266,8 +290,8 @@ function registerIpcHandlers() {
 
       printWorker.webContents.once('did-finish-load', () => {
         // Send the sanitized HTML to the print page via the preload bridge
-        printWorker.webContents.send('print:render-html', safeHtml, {
-          silent: silentPrint,
+        printWorker.webContents.send('print:render-html', content, {
+          silent: true,
           deviceName: printerName.trim() !== '' ? printerName : undefined,
           color: false,
           printBackground: true,
@@ -308,7 +332,7 @@ function registerIpcHandlers() {
     return '127.0.0.1';
   });
 
-  // ---- file save (CSV / report exports) ----------------------------------
+  // ---- file save (CSV / report exports) -------------------------------
   ipcMain.handle('system:save-file', async (_, { buffer, fileName }) => {
     try {
       const { dialog } = require('electron');
@@ -322,119 +346,6 @@ function registerIpcHandlers() {
     } catch (e) {
       return { success: false, error: e.message };
     }
-  });
-
-  // ------------------------------------------------------------------
-  //  Print security helpers
-  // ------------------------------------------------------------------
-
-  // Strip <script> tags and inline event handlers to prevent XSS in the print worker
-  function sanitizeHtml(html) {
-    if (typeof html !== 'string') return '';
-    return html
-      // Remove <script>...</script> blocks
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      // Remove inline event handlers (onclick, onerror, onload, etc.)
-      .replace(/\s(on\w+)\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')
-      // Remove javascript: URLs
-      .replace(/javascript\s*:/gi, '')
-      // Remove <style> blocks containing expression() (IE legacy XSS vector)
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-  }
-
-  // Render sanitized HTML in the isolated print worker and report back the result
-  ipcMain.handle('print:render', async (_, html, options) => {
-    if (!printWorker || printWorker.isDestroyed()) {
-      return { success: false, error: 'Print worker not available' };
-    }
-    try {
-      await printWorker.webContents.print({
-        silent: options.silent !== undefined ? options.silent : true,
-        deviceName: options.deviceName || undefined,
-        color: options.color !== undefined ? options.color : false,
-        printBackground: options.printBackground !== undefined ? options.printBackground : true,
-        margins: options.margins || { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
-      });
-      return { success: true };
-    } catch (e) {
-      console.error('Electron Print failed:', e);
-      return { success: false, error: e.message };
-    }
-  });
-
-  // ---- raw printer byte-stream (ESC/POS / TSC) ---------------------------
-  ipcMain.handle('print:raw', async (_, { data, printerName }) => {
-    // 🚀 THE FIX: Thermal printers (TSC/Zebra/ESC-POS) speak a byte protocol,
-    // not HTML. Electron's print() cannot emit raw bytes, so we drive the
-    // physical interface directly: USB-serial for com ports, TCP for network
-    // printers, and fall back to the HTML print worker otherwise.
-    const bytes = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'latin1');
-
-    // 1. Network printer (IP:port or hostname)
-    const ipMatch = String(printerName || '').match(/^(\d{1,3}(?:\.\d{1,3}){3}):(\d+)$/);
-    if (ipMatch) {
-      const net = require('net');
-      return new Promise((resolve) => {
-        const socket = net.connect(Number(ipMatch[2]), ipMatch[1], () => {
-          socket.write(bytes, () => socket.end());
-          resolve({ success: true });
-        });
-        socket.on('error', (e) => resolve({ success: false, error: e.message }));
-        setTimeout(() => resolve({ success: false, error: 'raw print timed out' }), 8000);
-      });
-    }
-
-    // 2. USB / serial printer
-    const lowerName = String(printerName || '').toLowerCase();
-    const isSerial = /com\d+|tty\.usb|usbmodem|serial|serialport/i.test(lowerName);
-    if (isSerial) {
-      try {
-        const SerialPort = require('serialport');
-        const port = new SerialPort({ path: printerName, baudRate: 9600, autoOpen: false });
-        return new Promise((resolve) => {
-          port.open((err) => {
-            if (err) return resolve({ success: false, error: err.message });
-            port.write(bytes, (werr) => {
-              port.close(() => { });
-              resolve(werr ? { success: false, error: werr.message } : { success: true });
-            });
-          });
-          port.on('error', (e) => resolve({ success: false, error: e.message }));
-        });
-      } catch (e) {
-        return { success: false, error: e.message };
-      }
-    }
-
-    // 3. Fallback: render the raw payload as a monospace document and print it
-    if (!printWorker) createPrintWorker();
-    const safeHtml = sanitizeHtml(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:monospace;font-size:8px;margin:0;padding:0;white-space:pre;">${escapeHtmlForPrint(String(data))}</body></html>`);
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error('Print worker did not respond in time'));
-      }, 10000);
-
-      printWorker.webContents.once('did-finish-load', () => {
-        printWorker.webContents.send('print:render-html', safeHtml, {
-          silent: true,
-          deviceName: printerName && printerName.trim() !== '' ? printerName : undefined,
-          color: false,
-          printBackground: true,
-          margins: { marginType: 'none' },
-        });
-      });
-
-      printWorker.webContents.once('ipc-message', (_event, result) => {
-        clearTimeout(timeoutId);
-        if (result.success) {
-          resolve({ success: true });
-        } else {
-          reject(new Error(result.error || 'Raw print failed'));
-        }
-      });
-
-      printWorker.loadFile(path.join(__dirname, 'printBlank.html'));
-    });
   });
 
   // ---- logging ------------------------------------------------------------
@@ -477,8 +388,7 @@ function registerIpcHandlers() {
   handlersRegistered = true;   // ← mark as registered
 }
 
-// ---------------------------------------------------------------
-//  Window creation
+// ── Window creation
 // ---------------------------------------------------------------
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -535,8 +445,7 @@ function createWindow() {
   });
 }
 
-// ---------------------------------------------------------------
-//  Print worker (headless window for silent printing)
+// ── Print worker (headless window for silent printing)
 // ---------------------------------------------------------------
 function createPrintWorker() {
   printWorker = new BrowserWindow({
@@ -555,8 +464,7 @@ function createPrintWorker() {
   });
 }
 
-// ---------------------------------------------------------------
-//  Auto‑updater setup
+// ── Auto‑updater setup
 // ---------------------------------------------------------------
 function setupAutoUpdater(win) {
   autoUpdater.logger = electronLog;
@@ -588,8 +496,7 @@ function setupAutoUpdater(win) {
   });
 }
 
-// ---------------------------------------------------------------
-//  Scanner hot‑folder (dev only)
+// ── Scanner hot‑folder (dev only)
 // ---------------------------------------------------------------
 function setupScannerIPC(win) {
   const chokidar = require('chokidar');
@@ -621,12 +528,6 @@ function setupScannerIPC(win) {
     }
   });
 }
-const monitor = new ConnectivityMonitor();
-monitor.start();
-monitor.on('online', () => {
-  // Trigger background background sync logic here
-  console.log('Network connected: Triggering silent licence verification...');
-});
 
 // IPC Handlers for UI
 ipcMain.handle('auth:login', async (event, username, password) => {

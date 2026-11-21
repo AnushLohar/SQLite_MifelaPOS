@@ -5,10 +5,12 @@ import { app } from 'electron';
 
 let knexInstance = null;
 
-export function initKnex() {
+export function initKnex(dbPath) {
     if (knexInstance) return knexInstance;
 
-    const dbPath = path.join(app.getPath('userData'), 'mifela_pos_v1.db');
+    if (!dbPath) {
+        dbPath = path.join(app.getPath('userData'), 'mifela_pos_v1.db');
+    }
 
     knexInstance = knex({
         client: 'sqlite3',

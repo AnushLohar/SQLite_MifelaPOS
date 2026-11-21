@@ -2,8 +2,36 @@
 import { ipcMain } from 'electron';
 import { getKnex } from './knex.js';
 
+import LicenceStateManager from '../services/LicenceStateManager.js';
+
+// Allowed table names for renderer-driven operations. Table names cannot be
+// parameterized in SQL, so they MUST be whitelisted here to prevent injection.
+const ALLOWED_TABLES = new Set([
+  'products',
+  'customers',
+  'transactions',
+  'security_config',
+  'store_settings',
+  'local_users',
+  'licence_data',
+]);
+
+function resolveTable(col) {
+  const tableName = col === 'directory_merchants' ? 'customers' : col;
+  if (!ALLOWED_TABLES.has(tableName)) {
+    throw new Error(`Table access denied: ${col}`);
+  }
+  return tableName;
+}
+
 export function registerDBHandlers() {
     const knex = getKnex();
+
+    // Helper for authorization
+    const authorize = async () => {
+        const state = await LicenceStateManager.evaluateCurrentState();
+        if (state !== 'ACTIVE') throw new Error("Terminal access denied: License " + state);
+    };
 
     // =========================================================================
     // --- CORE FETCH HANDLERS ---
@@ -72,6 +100,7 @@ export function registerDBHandlers() {
     });
 
     ipcMain.handle('db:processSale', async (event, { transaction, customerUpdate }) => {
+        await authorize();
         try {
             await knex.transaction(async (trx) => {
                 await trx('transactions').insert({
@@ -416,33 +445,10 @@ export function registerDBHandlers() {
 
     ipcMain.handle('db:getDoc', async (event, col, id) => {
         try {
-            const tableName = col === 'directory_merchants' ? 'customers' : col;
+            const tableName = resolveTable(col);
             const row = await knex(tableName).select('data').where({ id }).first();
             return row ? JSON.parse(row.data) : null;
         } catch (e) { return null; }
-    });
-
-    // ---- store settings ------------------------------------------------------
-    ipcMain.handle('db:saveStoreSettings', async (_, { storeId, settings }) => {
-        try {
-            await knex.schema.hasTable('store_settings').then(async (exists) => {
-                if (!exists) {
-                    await knex.schema.createTable('store_settings', table => {
-                        table.text('id').primary();
-                        table.text('data');
-                    });
-                }
-            });
-
-            await knex('store_settings')
-                .insert({ id: storeId, data: JSON.stringify(settings) })
-                .onConflict('id')
-                .merge();
-            return { success: true };
-        } catch (error) {
-            console.error('Save store settings error:', error);
-            return { success: false, error: error.message };
-        }
     });
 
     ipcMain.handle('db:save-store-settings', async (_, { storeId, settings }) => {
@@ -469,17 +475,43 @@ export function registerDBHandlers() {
 
     ipcMain.handle('db:deleteDoc', async (event, col, id) => {
         try {
-            const tableName = col === 'directory_merchants' ? 'customers' : col;
+            const tableName = resolveTable(col);
             await knex(tableName).where({ id }).delete();
             return { success: true };
         } catch (e) { throw e; }
+    });
+
+    // Attendance persistence (renderer-driven; table name is fixed, not user input)
+    ipcMain.handle('db:saveAttendance', async (_, payload) => {
+        try {
+            const { staffId, date, status, ...rest } = payload;
+            const docId = `att_${date}`;
+            await knex('customers')
+                .insert({ id: docId, data: JSON.stringify({ date, records: { [staffId]: { status, ...rest } }, updatedAt: new Date().toISOString(), locationId: 'main' }) })
+                .onConflict('id')
+                .merge();
+            return { success: true };
+        } catch (e) { throw e; }
+    });
+
+    ipcMain.handle('db:getMonthlyAttendance', async (_, monthStr) => {
+        try {
+            const rows = await knex('customers')
+                .select('data')
+                .whereRaw("json_extract(data, '$.date') LIKE ?", [`${monthStr}%`]);
+            const result = {};
+            rows.forEach(r => {
+                try { Object.assign(result, JSON.parse(r.data).records || {}); } catch { /* ignore malformed rows */ }
+            });
+            return result;
+        } catch (e) { return {}; }
     });
 
     ipcMain.handle('db:executeBatch', async (event, ops) => {
         try {
             await knex.transaction(async (trx) => {
                 for (const op of ops) {
-                    const tableName = op.col === 'directory_merchants' ? 'customers' : op.col;
+                    const tableName = resolveTable(op.col);
 
                     if (op.type === 'set' || op.type === 'update') {
                         const safeData = { ...op.data };

@@ -140,12 +140,12 @@ export function registerListener(unsub) {
 }
 
 export function setStoreAndUserRefs(uid, sid, role, assignedLoc = 'main') {
-    // 🚀 THE FIX: Instantly map all state to the offline bypasses and sync to localStorage
+    // Map state to offline bypasses and sync to localStorage
     _userId = uid || 'admin_sys';
     _storeId = sid || 'DEFAULT_STORE';
-    _userRole = 'admin';
-    _userAssignedLocationId = 'main';
-    _currentLocationId = 'main';
+    _userRole = role || 'staff';
+    _userAssignedLocationId = assignedLoc;
+    _currentLocationId = assignedLoc;
 
     userId = _userId;
     storeId = _storeId;
@@ -156,7 +156,7 @@ export function setStoreAndUserRefs(uid, sid, role, assignedLoc = 'main') {
     localStorage.setItem('mifela_active_user', userId);
     localStorage.setItem('mifela_active_store', storeId);
 
-    console.log(`✅ Offline State Initialized: Role=admin, Location=main`);
+    console.log(`✅ Offline State Initialized: Role=${_userRole}, Location=${assignedLoc}`);
 }
 
 export function getUserProfilePath(uid) {
@@ -172,7 +172,7 @@ export function clearUserSessionState() {
     // Reset to bypass defaults instead of null
     _storeId = 'DEFAULT_STORE';
     _userId = 'admin_sys';
-    _userRole = 'admin';
+    _userRole = 'staff';
     _currentLocationId = 'main';
     _currentCart = [];
     _dashboardWidgets = [];
@@ -184,7 +184,7 @@ export function clearUserSessionState() {
 
     storeId = 'DEFAULT_STORE';
     userId = 'admin_sys';
-    userRole = 'admin';
+    userRole = 'staff';
     currentLocationId = 'main';
 
     currentCart = [];

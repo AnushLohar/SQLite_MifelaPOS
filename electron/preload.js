@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+// const { contextBridge, ipcRenderer } = require('electron');
 
 console.log("🔌 Preload script initializing...");
 
@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('dbAPI', {
   getSupplierByGSTIN: (gstin) => ipcRenderer.invoke('db:getSupplierByGSTIN', gstin),
   executeBatch: (ops) => ipcRenderer.invoke('db:executeBatch', ops),
   getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
-  deleteDoc: (col, id) => ipcRenderer.invoke('db:deleteDoc', col, id)
+  deleteDoc: (col, id) => ipcRenderer.invoke('db:deleteDoc', col, id),
 });
 
 // 3. Core System & Application API
@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 🚀 NEW: Asymmetric Security Enclave
   getSecurityState: () => ipcRenderer.invoke('security:get-state'),
   provisionTerminal: (data) => ipcRenderer.invoke('security:provision', data),
-  signChallenge: (challengeHex) => ipcRenderer.invoke('security:sign-challenge', challengeHex),
+  signChallenge: () => ipcRenderer.invoke('security:sign-challenge'),
   extendLicense: () => ipcRenderer.invoke('security:extend-license'),
   getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
   saveStoreSettings: (storeId, settings) => ipcRenderer.invoke('db:save-store-settings', { storeId, settings }),
@@ -53,8 +53,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveToken: (token) => ipcRenderer.invoke('auth:save-token', token),
   getToken: () => ipcRenderer.invoke('auth:get-token'),
   deleteToken: () => ipcRenderer.invoke('auth:delete-token'),
-  // 🚀 THE FIX: Save store settings (used by renderStoreSetupModal)
-  saveStoreSettings: (settings) => ipcRenderer.invoke('db:save-store-settings', { storeId: 'main', settings }),
   onAuthToken: (callback) => {
     const subscription = (_event, token) => callback(token);
     ipcRenderer.on('mifela-auth-token', subscription);

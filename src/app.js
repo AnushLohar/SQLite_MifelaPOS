@@ -68,19 +68,17 @@ window.ensureDatabaseReady = async function (maxRetries = 15, delay = 300) {
 (function injectOfflineBypasses() {
     localStorage.setItem('mifela_active_store', 'DEFAULT_STORE');
     try {
-        // Only upgrade role if a valid session with user identity already exists
-        // Don't create a session from an empty object — that breaks logout/reload flow
         const sessionRaw = localStorage.getItem('mifela_user_session');
         if (sessionRaw) {
-            let session = JSON.parse(sessionRaw);
-            // A valid session must have an identifier (id, email, or uid)
-            const hasIdentity = session.id || session.email || session.uid;
-            if (hasIdentity && session.role !== 'admin') {
-                session.role = 'admin';
-                localStorage.setItem('mifela_user_session', JSON.stringify(session));
+            const session = JSON.parse(sessionRaw);
+            // Preserve the authenticated role; do not force-administrate existing sessions.
+            if (!session.id && !session.email && !session.uid) {
+                localStorage.removeItem('mifela_user_session');
             }
         }
-    } catch (e) { }
+    } catch (e) {
+        localStorage.removeItem('mifela_user_session');
+    }
 })();
 
 // ============================================================================
@@ -810,15 +808,20 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
         };
 
         try {
-            await window.electronAPI.saveStoreSettings(details);
+            await window.electronAPI.saveStoreSettings('mifela_store_setup', details);
             document.getElementById('setup-store-modal').remove();
 
             // 🚀 NEW: Open payment gateway modal and redirect to payment page
+            // Capture the hardware fingerprint BEFORE overwriting the global
+            // pendingSetupDetails (completeStartup already set it with the real
+            // machine ID). Without this, the gateway receives UNKNOWN_NODE.
+            const capturedFingerprint = window.pendingSetupDetails?.fingerprint || 'UNKNOWN_NODE';
             const pendingSetupDetails = {
                 fields: {
                     email: { value: details.email },
                     storeName: { value: details.storeName }
-                }
+                },
+                fingerprint: capturedFingerprint
             };
             window.pendingSetupDetails = pendingSetupDetails;
             window.initiateMifelaGatewayPayment(0, 'ORD-' + Date.now());
@@ -888,12 +891,6 @@ function attachGlobalListeners() {
             e.preventDefault();
             e.stopPropagation();
             if (typeof window.openSupportModal === 'function') window.openSupportModal();
-            return;
-        }
-
-        if (e.target.closest('#trigger-init-btn')) {
-            e.preventDefault();
-            window.completeStartup(e);
             return;
         }
 
@@ -2186,6 +2183,17 @@ window.checkStartupSequence = async function () {
             console.warn("Security Enclave intact but Local Vault missing. Forcing recovery...");
         }
 
+        // 🚀 DEVICE RECOGNITION: resolve the canonical customer via the gateway
+        // before showing the setup form. If the device is already registered,
+        // auto-populate the form from the cloud customer document.
+        if (navigator.onLine && typeof window.resolveCustomerByDevice === 'function') {
+            try {
+                await window.resolveCustomerByDevice();
+            } catch (e) {
+                console.warn("Device resolution failed, falling back to manual setup:", e.message);
+            }
+        }
+
         // Trigger Setup Form and Background Fingerprint Check
         window.showAuthView('setup');
         window.autoFillSetupForm();
@@ -2316,47 +2324,47 @@ window.autoFillSetupForm = async function () {
 
         // 4. TIER 2: Fallback to Cloud Directory
         if (firebaseAvailable) {
-        const { getAuth } = await import("firebase/auth");
-        const { collection, query, where, getDocs } = await import("firebase/firestore");
-        const auth = getAuth();
-        const user = auth.currentUser;
+            const { getAuth } = await import("firebase/auth");
+            const { collection, query, where, getDocs } = await import("firebase/firestore");
+            const auth = getAuth();
+            const user = auth.currentUser;
 
-        if (!dataFound && user) {
-            console.log("AutoFill: Checking cloud stores fallback for user:", user.uid);
-            try {
-                const targetAppId = "1:19471193085:web:2da2bd605292e4aad5bf94";
-                const storesRef = collection(window.db, `artifacts/${targetAppId}/stores`);
-                const q = query(storesRef, where("ownerId", "==", user.uid));
-                const storeSnap = await getDocs(q);
+            if (!dataFound && user) {
+                console.log("AutoFill: Checking cloud stores fallback for user:", user.uid);
+                try {
+                    const targetAppId = "1:19471193085:web:2da2bd605292e4aad5bf94";
+                    const storesRef = collection(window.db, `artifacts/${targetAppId}/stores`);
+                    const q = query(storesRef, where("ownerId", "==", user.uid));
+                    const storeSnap = await getDocs(q);
 
-                if (!storeSnap.empty) {
-                    const storeData = storeSnap.docs[0].data();
-                    console.log("AutoFill: Cloud store data found!", storeData);
+                    if (!storeSnap.empty) {
+                        const storeData = storeSnap.docs[0].data();
+                        console.log("AutoFill: Cloud store data found!", storeData);
 
-                    setVal('setup-owner-name', user.displayName || 'Admin');
-                    setVal('setup-email', storeData.email || user.email || '');
-                    setVal('setup-store-name', storeData.storeName || '');
+                        setVal('setup-owner-name', user.displayName || 'Admin');
+                        setVal('setup-email', storeData.email || user.email || '');
+                        setVal('setup-store-name', storeData.storeName || '');
 
-                    let phoneStr = storeData.phone || '';
-                    if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
-                    else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
-                    setVal('setup-contact', phoneStr);
+                        let phoneStr = storeData.phone || '';
+                        if (phoneStr.startsWith('+91')) phoneStr = phoneStr.substring(3);
+                        else if (phoneStr.startsWith('+')) phoneStr = phoneStr.substring(1);
+                        setVal('setup-contact', phoneStr);
 
-                    setVal('setup-address', storeData.address || '');
-                    if (storeData.state) setVal('setup-state', storeData.state);
+                        setVal('setup-address', storeData.address || '');
+                        if (storeData.state) setVal('setup-state', storeData.state);
 
-                    setVal('setup-gstin', storeData.taxId || storeData.gstin || '');
-                    dataFound = true;
-                } else {
+                        setVal('setup-gstin', storeData.taxId || storeData.gstin || '');
+                        dataFound = true;
+                    } else {
+                        setVal('setup-owner-name', user.displayName || '');
+                        setVal('setup-email', user.email || '');
+                    }
+                } catch (err) {
+                    console.error("AutoFill: Tier 2 Cloud Store Fetch Failed:", err);
                     setVal('setup-owner-name', user.displayName || '');
                     setVal('setup-email', user.email || '');
                 }
-            } catch (err) {
-                console.error("AutoFill: Tier 2 Cloud Store Fetch Failed:", err);
-                setVal('setup-owner-name', user.displayName || '');
-                setVal('setup-email', user.email || '');
             }
-        }
         } // end if (firebaseAvailable)
 
     } catch (fatalError) {
@@ -2416,13 +2424,30 @@ window.completeStartup = async function (e) {
         return;
     }
 
-    // Cache details and open billing modal
-    pendingSetupDetails = { fields, customAdminId: 'admin', fingerprint: window._cachedFingerprint };
+    // Capture the hardware fingerprint securely for the payment linkage
+    let hardwareFingerprint = 'UNKNOWN_NODE';
+    if (window.electronAPI && typeof window.electronAPI.getMachineId === 'function') {
+        hardwareFingerprint = await window.electronAPI.getMachineId();
+    }
+
+    // Cache details globally for the payment gateway to consume
+    pendingSetupDetails = {
+        fields,
+        customAdminId: 'admin',
+        fingerprint: hardwareFingerprint
+    };
+
+    // 🚀 THE FIX: Hide the setup view and force the billing modal to the front
+    const setupView = document.getElementById('auth-view-setup');
+    if (setupView) {
+        setupView.classList.add('hidden');
+        setupView.classList.remove('flex');
+    }
 
     const billingModal = document.getElementById('license-billing-modal');
     if (billingModal) {
         billingModal.classList.remove('hidden');
-        billingModal.classList.add('flex');
+        billingModal.classList.add('flex', 'z-[1000]'); // Ensure it sits above the auth container
     }
 };
 
@@ -2441,7 +2466,7 @@ window.btnVerifyAutomatedClick = async function (e) {
         const fingerprint = pendingSetupDetails.fingerprint;
 
         // Phase 4: Verify Payment via Cloud Function
-        const response = await fetch('https://asia-south1-mifela-inve.cloudfunctions.net/verifyNodeActivation', {
+        const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyNodeActivation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, node: fingerprint })
@@ -2953,7 +2978,7 @@ window.unlockSystem = async function (e) {
             const storeId = userObj.storeId || localStorage.getItem('mifela_active_store') || 'DEFAULT_STORE';
 
             if (typeof window.setStoreAndUserRefs === 'function') {
-                window.setStoreAndUserRefs(uid, storeId);
+                window.setStoreAndUserRefs(uid, storeId, userObj.role || 'admin');
             }
 
             window.showAuthView('app');
@@ -2992,13 +3017,23 @@ let activeStoreId = 'DEFAULT_STORE';
 let activeUserId = 'admin_sys';
 
 
-// Ensure the form submission is directly bound on DOM load
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('pos-login-form');
     if (loginForm) {
         loginForm.onsubmit = (e) => {
             e.preventDefault();
             window.unlockSystem(e);
+        };
+    }
+
+    // 🚀 THE FIX: Directly bind the onsubmit handler to the static setup form
+    const setupForm = document.getElementById('setup-store-form');
+    if (setupForm) {
+        setupForm.onsubmit = (e) => {
+            e.preventDefault();
+            if (typeof window.completeStartup === 'function') {
+                window.completeStartup(e);
+            }
         };
     }
 });
@@ -3061,13 +3096,17 @@ window.closeSmoothModal = function (modalId) {
 
 
 // ============================================================================
-// 💳 MIFELA REDIRECTED PAYMENT GATEWAY
+// 💳 MIFELA SECURE PAYMENT GATEWAY (WITH TIMEOUT & AUTO-VERIFY)
 // ============================================================================
 
 let currentGatewayOrder = null;
 let gatewayVerificationListener = null;
+let paymentPollingInterval = null;
+let paymentTimeoutTimer = null;
 
-// Attach this to your POS checkout UI instead of direct cash processing
+const PAYMENT_TIMEOUT_MS = 5 * 60 * 1000; // 5 Minutes
+const POLLING_INTERVAL_MS = 10 * 1000;    // 10 Seconds
+
 window.initiateMifelaGatewayPayment = function (amount, orderId = 'ORD-' + Date.now()) {
     currentGatewayOrder = { amount, orderId };
 
@@ -3080,30 +3119,82 @@ window.initiateMifelaGatewayPayment = function (amount, orderId = 'ORD-' + Date.
         modal.classList.add('flex');
     }
 
-    // Setup listener for payment verification redirect from posgateway.mifela.com
-    // The gateway will redirect to mifela://payment-verified?payment_id=...&order_id=...&signature=...&status=...
-    if (gatewayVerificationListener) {
-        // The cleanup function returned by onPaymentVerified
-        gatewayVerificationListener();
-    }
-
+    // 1. Setup Electron IPC Listener for deep-link redirects
+    if (gatewayVerificationListener) gatewayVerificationListener();
     gatewayVerificationListener = window.electronAPI?.onPaymentVerified?.(handleGatewayPaymentVerification);
 
-    // Redirect logic: Open Gateway in a NEW TAB to protect current POS cart state
-    // Include redirect_uri to send user back to app after payment
+    // 2. Start strict timeout countdown
+    startPaymentTimeoutCountdown();
+
+    // 3. Start background polling (in case webhook/redirect fails)
+    startPaymentPolling(orderId);
+
+    // 4. Open Gateway in a NEW TAB
     const redirectUri = encodeURIComponent('mifela://payment-verified');
-    const gatewayUrl = `https://posgateway.mifela.com/checkout?order=${orderId}&amt=${amount}&redirect_uri=${redirectUri}`;
+    const gatewayFingerprint = pendingSetupDetails?.fingerprint || 'UNKNOWN_NODE';
+    const gatewayUrl = `https://posgateway.mifela.com/checkout?order=${orderId}&amt=${amount}&redirect_uri=${redirectUri}&node=${encodeURIComponent(gatewayFingerprint)}`;
     window.open(gatewayUrl, '_blank');
 };
 
-function handleGatewayPaymentVerification(data) {
-    const { paymentId, orderId, signature, status, error } = data;
+function startPaymentTimeoutCountdown() {
+    clearTimeout(paymentTimeoutTimer);
 
-    // Clean up listener
+    // Optional: Update UI with a countdown timer if you have an element for it
+    // const timerEl = document.getElementById('payment-countdown');
+
+    paymentTimeoutTimer = setTimeout(() => {
+        console.warn("Payment window expired.");
+        handleGatewayPaymentVerification({
+            status: 'failed',
+            error: 'Payment window timed out (5 minutes). Please try again.'
+        });
+    }, PAYMENT_TIMEOUT_MS);
+}
+
+function startPaymentPolling(orderId) {
+    clearInterval(paymentPollingInterval);
+
+    paymentPollingInterval = setInterval(async () => {
+        try {
+            // Poll your Firebase backend for the order status
+            const response = await fetch(`https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/checkOrderStatus?orderId=${orderId}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'PAID' || data.status === 'SUCCESS') {
+                    // Payment succeeded in the background!
+                    handleGatewayPaymentVerification({
+                        status: 'success',
+                        paymentId: data.paymentId,
+                        orderId: orderId,
+                        signature: data.paymentId || 'auto-verified'
+                    });
+                } else if (data.status === 'FAILED') {
+                    handleGatewayPaymentVerification({
+                        status: 'failed',
+                        error: 'Payment failed at the gateway.'
+                    });
+                }
+            }
+        } catch (error) {
+            console.warn("Silent payment poll failed:", error);
+        }
+    }, POLLING_INTERVAL_MS);
+}
+
+function stopPaymentMonitors() {
+    clearTimeout(paymentTimeoutTimer);
+    clearInterval(paymentPollingInterval);
     if (typeof gatewayVerificationListener === 'function') {
         gatewayVerificationListener();
         gatewayVerificationListener = null;
     }
+}
+
+function handleGatewayPaymentVerification(data) {
+    const { paymentId, orderId, signature, status, error } = data;
+
+    // Halt all timers immediately
+    stopPaymentMonitors();
 
     const modal = document.getElementById('mifela-gateway-modal');
     const statusIcon = document.getElementById('gateway-status-icon');
@@ -3114,25 +3205,21 @@ function handleGatewayPaymentVerification(data) {
     currentGatewayOrder = null;
 
     if (status === 'success' && paymentId && orderId && signature) {
-        // Store payment verification details for backend verification
         const verificationData = {
             razorpayPaymentId: paymentId,
             razorpayOrderId: orderId,
             razorpaySignature: signature,
             verifiedAt: new Date().toISOString()
         };
-
-        // Store in localStorage for the checkout process to use
         localStorage.setItem('mifela_gateway_verification', JSON.stringify(verificationData));
 
-        // Update modal UI to show success
         if (statusIcon) {
             statusIcon.innerHTML = `
                 <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
                 </svg>
             `;
-            statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+            statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100', 'bg-red-50', 'text-red-600', 'border-red-100');
             statusIcon.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-100');
         }
         if (statusTitle) statusTitle.textContent = 'Payment Verified';
@@ -3141,19 +3228,37 @@ function handleGatewayPaymentVerification(data) {
 
         if (typeof showToast === 'function') showToast('Payment Verified', 'Gateway payment verified successfully.', 'success');
 
-        // Give a moment for the user to see the success state, then close and process
-        setTimeout(() => {
+        setTimeout(async () => {
             if (modal) {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
             }
-            // 🚀 THE FIX: Integrate directly with the existing POS cart logic
-            if (typeof handleCheckout === 'function') {
-                handleCheckout('ONLINE_GATEWAY');
+
+            // 🚀 LICENSE ACTIVATION FLOW (not a POS checkout):
+            // 1. Confirm the payment was verified server-side (verifyNodeActivation)
+            // 2. Provision the local license (provisionSecurity signs & stores it)
+            // 3. Grant access by reloading the app into the authenticated view
+            try {
+                const { activateSoftware } = await import('./services/auth.js');
+                const token = signature || paymentId;
+                await activateSoftware(token);
+
+                if (typeof window.showAuthView === 'function') {
+                    window.showAuthView('app');
+                }
+                if (typeof showToast === 'function') {
+                    showToast('Terminal Authorized', 'License activated successfully.', 'success');
+                }
+                window.location.reload();
+            } catch (err) {
+                console.error('License activation after payment failed:', err);
+                if (typeof showToast === 'function') {
+                    showToast('Activation Failed', err.message || 'Could not activate license.', 'error');
+                }
             }
         }, 1500);
+
     } else if (status === 'failed') {
-        // Update modal UI to show failure
         if (statusIcon) {
             statusIcon.innerHTML = `
                 <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3164,120 +3269,64 @@ function handleGatewayPaymentVerification(data) {
             statusIcon.classList.add('bg-red-50', 'text-red-600', 'border-red-100');
         }
         if (statusTitle) statusTitle.textContent = 'Payment Failed';
-        if (statusText) statusText.textContent = error || 'Payment was not completed. Please try again.';
+        if (statusText) statusText.textContent = error || 'Payment was not completed or timed out.';
         if (verificationStatus) {
-            verificationStatus.classList.remove('hidden');
-            verificationStatus.classList.remove('bg-emerald-50', 'border-emerald-200');
+            verificationStatus.classList.remove('hidden', 'bg-emerald-50', 'border-emerald-200');
             verificationStatus.classList.add('bg-red-50', 'border-red-200');
             verificationStatus.innerHTML = `
                 <p class="text-xs font-bold text-red-700 flex items-center justify-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    Payment failed: ${error || 'Unknown error'}
+                    Payment failed: ${error || 'Timeout'}
                 </p>
             `;
         }
 
-        if (typeof showToast === 'function') showToast('Payment Failed', error || 'Payment was not completed.', 'error');
-    } else {
-        if (typeof showToast === 'function') showToast('Verification Pending', 'Could not verify payment automatically. Please try manual verification.', 'warning');
+        if (typeof showToast === 'function') showToast('Payment Failed', error || 'Transaction aborted.', 'error');
+
+        // Auto-close after failure
+        setTimeout(() => {
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }, 4000);
     }
 }
 
-window.verifyGatewayPayment = function (event) {
+window.verifyGatewayPayment = async function (event) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     btn.innerHTML = 'Verifying...';
     btn.disabled = true;
 
-    const statusIcon = document.getElementById('gateway-status-icon');
-    const statusTitle = document.getElementById('gateway-status-title');
-    const statusText = document.getElementById('gateway-status-text');
-    const verificationStatus = document.getElementById('gateway-verification-status');
-
-    // Check if we have verification data from redirect
-    const storedVerification = localStorage.getItem('mifela_gateway_verification');
-    if (storedVerification) {
+    // Immediately trigger a background poll to check the current status
+    if (currentGatewayOrder && currentGatewayOrder.orderId) {
         try {
-            const verification = JSON.parse(storedVerification);
-            if (verification.razorpayPaymentId && verification.razorpayOrderId && verification.razorpaySignature) {
-                // Already verified via redirect
-                localStorage.removeItem('mifela_gateway_verification');
-
-                // Update UI to show success
-                if (statusIcon) {
-                    statusIcon.innerHTML = `
-                        <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    `;
-                    statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
-                    statusIcon.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-100');
+            const response = await fetch(`https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/checkOrderStatus?orderId=${currentGatewayOrder.orderId}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'PAID' || data.status === 'SUCCESS') {
+                    handleGatewayPaymentVerification({
+                        status: 'success',
+                        paymentId: data.paymentId,
+                        orderId: currentGatewayOrder.orderId,
+                        signature: data.signature || 'manual-verify'
+                    });
+                    return;
                 }
-                if (statusTitle) statusTitle.textContent = 'Payment Verified';
-                if (statusText) statusText.textContent = 'Razorpay payment verified successfully. Processing transaction...';
-                if (verificationStatus) verificationStatus.classList.remove('hidden');
-
-                if (typeof showToast === 'function') showToast('Payment Received', 'Gateway payment verified successfully.', 'success');
-
-                setTimeout(() => {
-                    const modal = document.getElementById('mifela-gateway-modal');
-                    if (modal) {
-                        modal.classList.add('hidden');
-                        modal.classList.remove('flex');
-                    }
-                    if (typeof handleCheckout === 'function') {
-                        handleCheckout('ONLINE_GATEWAY');
-                    }
-                }, 1500);
-                return;
             }
         } catch (e) {
-            console.error('Failed to parse stored verification', e);
+            console.warn("Manual poll failed", e);
         }
     }
 
-    // Fallback: Simulate pinging posgateway.mifela.com/api/verify for status
-    // This is for offline capability when redirect doesn't work
-    setTimeout(() => {
-        // For offline/demo, assume success
-        const paymentSuccessful = true;
-
-        if (paymentSuccessful) {
-            // Update UI to show success
-            if (statusIcon) {
-                statusIcon.innerHTML = `
-                    <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                `;
-                statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
-                statusIcon.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-100');
-            }
-            if (statusTitle) statusTitle.textContent = 'Payment Verified';
-            if (statusText) statusText.textContent = 'Payment verified successfully. Processing transaction...';
-            if (verificationStatus) verificationStatus.classList.remove('hidden');
-
-            if (typeof showToast === 'function') showToast('Payment Received', 'Gateway payment verified successfully.', 'success');
-            window.cancelGatewayPayment();
-
-            // 🚀 THE FIX: Integrate directly with the existing POS cart logic
-            if (typeof handleCheckout === 'function') {
-                handleCheckout('ONLINE_GATEWAY');
-            }
-        } else {
-            if (typeof showToast === 'function') showToast('Pending', 'Payment not received yet. Try again.', 'warning');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    }, 1500);
+    if (typeof showToast === 'function') showToast('Pending', 'Payment not received yet. Waiting for confirmation...', 'warning');
+    btn.innerHTML = originalText;
+    btn.disabled = false;
 };
 
 window.cancelGatewayPayment = function () {
-    // Clean up listener
-    if (typeof gatewayVerificationListener === 'function') {
-        gatewayVerificationListener();
-        gatewayVerificationListener = null;
-    }
+    stopPaymentMonitors();
 
     // Reset modal UI to initial state
     const statusIcon = document.getElementById('gateway-status-icon');
@@ -3289,25 +3338,18 @@ window.cancelGatewayPayment = function () {
         statusIcon.innerHTML = `
             <div class="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
-                </path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
             </svg>
         `;
         statusIcon.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-100', 'bg-red-50', 'text-red-600', 'border-red-100');
         statusIcon.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
     }
+
     if (statusTitle) statusTitle.textContent = 'Awaiting Payment';
     if (statusText) statusText.innerHTML = 'Please complete the transaction on the new tab at <br><span class="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">posgateway.mifela.com</span>';
+
     if (verificationStatus) {
         verificationStatus.classList.add('hidden');
-        verificationStatus.classList.remove('bg-red-50', 'border-red-200');
-        verificationStatus.classList.add('bg-emerald-50', 'border-emerald-200');
-        verificationStatus.innerHTML = `
-            <p class="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                Payment verified successfully! Processing transaction...
-            </p>
-        `;
     }
 
     currentGatewayOrder = null;
@@ -3326,39 +3368,20 @@ window.runSilentBackgroundVerification = async function () {
         const state = await window.electronAPI.getSecurityState();
         if (!state || state.status === 'UNPROVISIONED') return;
 
-        console.log("📡 Network detected. Running silent security audit...");
+        console.log("📡 Network detected. Running silent license verification...");
 
-        const challengeRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/requestChallenge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: state.payload.email })
+        const result = await window.electronAPI.provisionSecurity({
+            email: (state.payload && state.payload.email) || '',
+            storeName: ''
         });
 
-        if (!challengeRes.ok) throw new Error("Server challenge request failed");
-        const { challengeHex } = await challengeRes.json();
-
-        const signResult = await window.electronAPI.signChallenge(challengeHex);
-        if (!signResult.success) throw new Error("Local hardware signature failed. Possible clone.");
-
-        const verifyRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyChallenge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: state.payload.email,
-                signature: signResult.signature,
-                challenge: challengeHex
-            })
-        });
-
-        if (!verifyRes.ok) {
-            // 🚀 THE FIX: Parse the exact error sent from Firebase (e.g. "Node not registered")
-            const errData = await verifyRes.json().catch(() => ({}));
-            throw new Error(`Master Controller: ${errData.error || 'Hardware identity mismatch'}`);
+        if (!result.success) {
+            throw new Error(result.error || 'License verification rejected.');
         }
 
-        // 🚀 SUCCESS: Clear the quarantine flag so the app can function offline again
+        // Clear the quarantine flag so the app can function offline again
         localStorage.removeItem('mifela_security_quarantine');
-        console.log("✅ Background security audit passed.");
+        console.log("✅ Background license verification passed.");
 
         // If the user was stuck on the lock screen, gracefully reboot to let them back in
         if (document.getElementById('mifela-lock-overlay')) {
@@ -3394,36 +3417,16 @@ window.verifyMonthlyLicense = async function () {
             }
 
             try {
-                const challengeRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/requestChallenge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: state.payload.email })
+                const result = await window.electronAPI.provisionSecurity({
+                    email: (state.payload && state.payload.email) || '',
+                    storeName: ''
                 });
 
-                if (!challengeRes.ok) throw new Error("Could not fetch challenge");
-                const { challengeHex } = await challengeRes.json();
-
-                const signResult = await window.electronAPI.signChallenge(challengeHex);
-                if (!signResult.success) throw new Error("Hardware cloned or private key missing");
-
-                const verifyRes = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyChallenge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: state.payload.email,
-                        signature: signResult.signature,
-                        challenge: challengeHex
-                    })
-                });
-
-                if (verifyRes.ok) {
-                    await window.electronAPI.extendLicense();
-                    console.log("✅ 30-Day License successfully renewed automatically.");
-                } else {
-                    // 🚀 THE FIX: Parse exact backend error
-                    const errData = await verifyRes.json().catch(() => ({}));
-                    throw new Error(errData.error || "Master Controller rejected signature");
+                if (!result.success) {
+                    throw new Error(result.error || 'License verification rejected.');
                 }
+
+                console.log("✅ 30-Day License successfully renewed automatically.");
 
             } catch (err) {
                 console.error("🔒 Silent Verification Failed:", err);
@@ -3494,8 +3497,37 @@ setTimeout(() => {
     }
 }, 5000);
 // ============================================================================
-// 🚀 ZERO-TOUCH AUTO-PROVISIONING LISTENER
+// 🚀 POSGATEWAY BRIDGE — canonical customer resolution + payment
 // ============================================================================
+
+window.resolveCustomerByDevice = async function () {
+    if (!window.electronAPI || !window.electronAPI.getMachineId) return null;
+
+    const fingerprint = await window.electronAPI.getMachineId();
+    if (!fingerprint) return null;
+
+    try {
+        const { httpsCallable } = await import("firebase/functions");
+        const { ensureFirebase } = await import('./services/firebase-init.js');
+        await ensureFirebase();
+
+        const resolve = httpsCallable(window.functions, 'resolveCustomerByDevice');
+        const result = await resolve({ fingerprint });
+
+        const data = result.data;
+        if (data.found && data.identity) {
+            localStorage.setItem('mifela_customer', JSON.stringify(data.identity));
+            localStorage.setItem('mifela_store', JSON.stringify(data.store || {}));
+            localStorage.setItem('mifela_subscription', JSON.stringify(data.subscription || {}));
+            localStorage.setItem('mifela_license', JSON.stringify(data.license || {}));
+            console.log("✅ Device recognized:", data.customerId);
+        }
+        return data;
+    } catch (e) {
+        console.warn("resolveCustomerByDevice failed:", e.message);
+        return null;
+    }
+};
 window.listenForRemoteActivation = async function () {
     if (window._isListeningForActivation) return;
     window._isListeningForActivation = true;
@@ -3569,3 +3601,20 @@ window.listenForRemoteActivation = async function () {
     }
 };
 
+document.body.addEventListener('submit', (e) => {
+    // Intercepts the login form submission to stop the page refresh loop
+    if (e.target.id === 'pos-login-form' || e.target.closest('#pos-login-form')) {
+        e.preventDefault();
+        if (typeof window.unlockSystem === 'function') {
+            window.unlockSystem(e);
+        }
+    }
+
+    // 🚀 THE FIX: Intercept Setup Form submission to prevent page reload
+    if (e.target.id === 'setup-store-form' || e.target.closest('#setup-store-form')) {
+        e.preventDefault();
+        if (typeof window.completeStartup === 'function') {
+            window.completeStartup(e);
+        }
+    }
+});

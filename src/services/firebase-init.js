@@ -29,6 +29,7 @@ export async function ensureFirebase() {
         try {
             const { initializeApp, getApps, getApp } = await import("firebase/app");
             const { getFirestore } = await import("firebase/firestore");
+            const { getFunctions } = await import("firebase/functions");
 
             // Re-use existing app if already initialized by another module
             _app = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
@@ -37,6 +38,7 @@ export async function ensureFirebase() {
             // Expose globally for legacy code that uses window.db
             window.fbApp = _app;
             window.db = _db;
+            window.functions = getFunctions(_app, "asia-south1");
 
             console.log("✅ Firebase initialized successfully.");
             return { app: _app, db: _db };

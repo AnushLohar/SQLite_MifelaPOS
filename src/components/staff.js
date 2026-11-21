@@ -971,6 +971,7 @@ export async function handleAddStaff(e) {
             dob: document.getElementById('staff-dob')?.value || '',
             phone: formattedPhone, 
             address: document.getElementById('staff-address')?.value || '',
+            passwordHash: document.getElementById('staff-password') ? await window.hashSecurely(document.getElementById('staff-password').value) : '',
             
             // 🚀 THE FIX: Save the new Increment Frequency, Value, and Last Increment Tracker to the database
             jobDetails: {
@@ -2023,12 +2024,12 @@ async function batchMarkToday(status) {
         const updateMap = {};
         
         // 1. Prepare SQLite Data
-        staffList.forEach(s => {
+        for (const s of staffList) {
             updateMap[s.docId] = { status: status, in: '', out: '', hours: 0, overtime: 0, date: today, staffId: s.docId };
             if (window.dbAPI && typeof window.dbAPI.saveAttendance === 'function') {
-                window.dbAPI.saveAttendance(updateMap[s.docId]);
+                await window.dbAPI.saveAttendance(updateMap[s.docId]);
             }
-        });
+        }
         
         if (window.dbAPI && window.dbAPI.executeBatch) {
             const docId = `${activeStoreId}_att_${today}`;
@@ -2323,7 +2324,7 @@ window.removeSalaryIncrement = function() {
     }
     
     if (typeof showToast === 'function') showToast('Removed', 'Auto-increment schedule cleared. Click Update to save.', 'info');
-};
+}
 
 function ensureIncrementFrequencyUI() {
     const valInput = document.getElementById('increment-val');
