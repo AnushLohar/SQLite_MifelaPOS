@@ -21,7 +21,7 @@ const dbFile = path.join(os.tmpdir(), `mifela-test-${Date.now()}.db`);
 
 describe('LicenceStateManager (real SQLite)', () => {
   beforeEach(async () => {
-    initKnex(dbFile);
+    await initKnex(dbFile);
     const knex = getKnex();
     if (!(await knex.schema.hasTable('licence_data'))) {
       await knex.schema.createTable('licence_data', (table) => {

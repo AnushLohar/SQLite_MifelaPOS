@@ -813,9 +813,11 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
 
             // 🚀 NEW: Open payment gateway modal and redirect to payment page
             // Capture the hardware fingerprint BEFORE overwriting the global
-            // pendingSetupDetails (completeStartup already set it with the real
-            // machine ID). Without this, the gateway receives UNKNOWN_NODE.
-            const capturedFingerprint = window.pendingSetupDetails?.fingerprint || 'UNKNOWN_NODE';
+            // pendingSetupDetails. Fall back to the globally cached fingerprint
+            // resolved by autoFillSetupForm so we never send UNKNOWN_NODE.
+            const capturedFingerprint = window.pendingSetupDetails?.fingerprint
+                || window._cachedFingerprint
+                || 'UNKNOWN_NODE';
             const pendingSetupDetails = {
                 fields: {
                     email: { value: details.email },
@@ -2270,6 +2272,10 @@ window.autoFillSetupForm = async function () {
             await new Promise(res => setTimeout(res, 100)); // wait 100ms
         }
 
+        // Cache globally so the payment gateway receives the real hardware ID,
+        // not UNKNOWN_NODE, regardless of which setup path triggered it.
+        window._cachedFingerprint = fingerprint;
+
         // console.log("=========================================");
         // console.log("🔑 TERMINAL HARDWARE FINGERPRINT:", fingerprint);
         // console.log("=========================================");
@@ -3131,7 +3137,7 @@ window.initiateMifelaGatewayPayment = function (amount, orderId = 'ORD-' + Date.
 
     // 4. Open Gateway in a NEW TAB
     const redirectUri = encodeURIComponent('mifela://payment-verified');
-    const gatewayFingerprint = pendingSetupDetails?.fingerprint || 'UNKNOWN_NODE';
+    const gatewayFingerprint = pendingSetupDetails?.fingerprint || window._cachedFingerprint || 'UNKNOWN_NODE';
     const gatewayUrl = `https://posgateway.mifela.com/checkout?order=${orderId}&amt=${amount}&redirect_uri=${redirectUri}&node=${encodeURIComponent(gatewayFingerprint)}`;
     window.open(gatewayUrl, '_blank');
 };

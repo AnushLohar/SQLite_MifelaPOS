@@ -1,5 +1,7 @@
 // electron/database/controllers.js
-import { ipcMain } from 'electron';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { ipcMain } = require('electron');
 import { getKnex } from './knex.js';
 
 import LicenceStateManager from '../services/LicenceStateManager.js';

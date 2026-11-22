@@ -6,7 +6,10 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { app } = require('electron');
 
 // Canonical set of files whose modification would disable licensing.
 const CRITICAL_FILES = [

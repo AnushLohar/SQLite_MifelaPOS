@@ -1,5 +1,7 @@
 // ── at the top of electron/main.js ─────────────────────────────────────
-import { app, BrowserWindow, session, ipcMain, safeStorage, shell } from 'electron';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { app, BrowserWindow, session, ipcMain, safeStorage, shell } = require('electron');
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -13,13 +15,10 @@ import { registerDBHandlers } from './database/controllers.js';
 import { LicenseManager } from './security/licenseVerifier.js';
 import { getHardwareFingerprint } from './security/fingerprint.js';
 import { verifyAppIntegrity } from './security/integrity.js';
-// electron‑updater is a CommonJS module → import the whole package first
-import { createRequire } from 'module';
 import LocalAuthService from './services/LocalAuthService.js';
 import LicenceStateManager from './services/LicenceStateManager.js';
 import ConnectivityMonitor from './services/ConnectivityMonitor.js';
 import BackgroundVerificationScheduler from './services/BackgroundVerificationScheduler.js';
-const require = createRequire(import.meta.url);
 // ---------------------------------------------------------------
 //  Paths & constants
 // ---------------------------------------------------------------
@@ -129,7 +128,7 @@ if (!gotTheLock) {
 
   // ── When the app is ready – initialise everything
   // ---------------------------------------------------------------
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     // 0️⃣ App integrity check — refuse to start if critical files were patched.
     const integrity = verifyAppIntegrity();
     if (!integrity.ok) {
@@ -140,7 +139,7 @@ if (!gotTheLock) {
 
     // 1️⃣ Initialise SQLite (now that initKnex is imported)
     try {
-      initKnex();                         // <-- will succeed
+      await initKnex();                         // <-- will succeed
       registerDBHandlers();
       electronLog.info('✅ Database connected and IPC handlers registered.');
     } catch (dbError) {

@@ -1,26 +1,97 @@
 // electron/database/knex.js
-import knex from 'knex';
+// Knex backed by `better-sqlite3-multiple-ciphers` for encryption at rest.
+// The database key is stored via Electron `safeStorage` (OS keychain/DPAPI)
+// and an injectable key provider so Vitest can test without Electron.
+// An existing unencrypted database is migrated to encrypted storage on open
+// (temp file -> PRAGMA integrity_check -> atomic swap -> backup removed).
+
 import path from 'path';
-import { app } from 'electron';
+import { fileURLToPath } from 'url';
+import { migrateIfNeeded, getOrCreateDatabaseKey } from './connection.js';
+import { runMigrations } from './migrate.js';
 
 let knexInstance = null;
+let knexLoaded = false;
 
-export function initKnex(dbPath) {
+// Route knex's better-sqlite3 driver to the encrypted drop-in so every
+// connection opens the database file with SQLCipher encryption.
+async function getKnexDriver() {
+    if (knexLoaded) {
+        const { default: knex } = await import('knex');
+        return knex;
+    }
+    let knexModule;
+    try {
+        const { createRequire } = await import('module');
+        const req = createRequire(import.meta.url);
+        const Module = req('module');
+        const SHIM_PATH = fileURLToPath(new URL('../../shims/better-sqlite3/index.js', import.meta.url));
+        const origResolve = Module._resolveFilename.bind(Module);
+        Module._resolveFilename = function (request, ...args) {
+            if (request === 'better-sqlite3') return SHIM_PATH;
+            return origResolve(request, ...args);
+        };
+        knexModule = await import('knex');
+        knexLoaded = true;
+    } catch (err) {
+        console.error('🔥 Failed to load the encrypted sqlite driver (check native module build for Electron ABI):', err);
+        throw err;
+    }
+    return knexModule.default;
+}
+
+export async function initKnex(dbPath) {
     if (knexInstance) return knexInstance;
 
     if (!dbPath) {
-        dbPath = path.join(app.getPath('userData'), 'mifela_pos_v1.db');
+        const { app } = await import('electron');
+        const dir = path.join(app.getPath('userData'), 'mifela_pos_v1.db');
+        dbPath = dir;
     }
 
-    knexInstance = knex({
-        client: 'sqlite3',
-        connection: {
-            filename: dbPath
-        },
-        useNullAsDefault: true
+    const keyPath = dbPath + '.key';
+    const key = getOrCreateDatabaseKey(keyPath);
+
+    // Migrate any existing unencrypted database to encrypted storage before
+    // knex opens it, so knex never sees an unencrypted file.
+    migrateIfNeeded(dbPath, key);
+
+    const knex = await getKnexDriver();
+    const instance = knex({
+        client: 'better-sqlite3',
+        connection: { filename: dbPath },
+        useNullAsDefault: true,
+        // The key MUST be applied to every pooled connection. Knex opens
+        // several (pool min 2); applying it once via knexInstance.raw() leaves
+        // the rest keyless, so they fail to read the SQLCipher file and tarn
+        // surfaces "Unable to acquire a connection".
+        pool: {
+            afterCreate: (conn, done) => {
+                try {
+                    conn.pragma(`key = '${key}'`);
+                    conn.pragma(`cipher = 'sqlcipher'`);
+                    done(null, conn);
+                } catch (err) {
+                    console.error('🔥 PRAGMA key failed on pooled connection:', err);
+                    done(err, conn);
+                }
+            }
+        }
     });
 
-    initSchema(knexInstance);
+    // Fail fast with the real SQLite error instead of a pool timeout.
+    try {
+        await instance.raw('SELECT 1');
+        await initSchema(instance);
+        knexInstance = instance;
+        // Run versioned schema migrations
+        await runMigrations();
+    } catch (err) {
+        knexInstance = null;
+        try { await instance.destroy(); } catch (_) {}
+        console.error('🔥 Encrypted DB init failed:', err);
+        throw err;
+    }
 
     return knexInstance;
 }

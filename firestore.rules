@@ -1,14 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Allow new offline terminals to register their hardware keys and profile
+
     match /provisioned_nodes/{nodeId} {
-      allow create: if true; 
-      
-      // Lock down reads and modifications for security
-      allow read, update, delete: if false; 
+      // SEC-VAL-03 fix: Lock down provisioning/node mutations to Cloud Functions (Admin SDK) only.
+      // Clients must perform all provisioning and node updates via Cloud Functions (`verifyNodeActivation`, `verifyNodeLicense`).
+      allow read, write: if false;
     }
-    
+
+    match /payments/{paymentId} {
+      // SEC-VAL-03 fix: Payments ledger is strictly managed by Cloud Functions webhook (Admin SDK).
+      allow read, write: if false;
+    }
+
+    match /paymentsByPaymentId/{id} {
+      // SEC-VAL-03 fix: Payment ID lookup mapping managed strictly by Cloud Functions.
+      allow read, write: if false;
+    }
+
+    match /razorpayWebhookEvents/{eventId} {
+      // SEC-VAL-03 fix: Webhook event idempotency tracking restricted to Admin SDK.
+      allow read, write: if false;
+    }
+
+    match /offline_licenses/{fingerprint} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
