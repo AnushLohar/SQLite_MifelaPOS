@@ -1,12 +1,12 @@
 // src/components/widgetRenderer.js
 
-import { 
+import {
     appId,
     EXPIRATION_WARNING_DAYS,
     getSalesChartInstance,
     setSalesChartInstance,
-    getCurrentUserPlan, 
-    getCurrentLocationId, 
+    getCurrentUserPlan,
+    getCurrentLocationId,
     getUserRole,
     getStoreId,
     getCurrencySymbol
@@ -30,7 +30,7 @@ async function safeGetDocs(queryRef) {
         return await getDocs(queryRef);
     } catch (error) {
         console.warn("Widget query fallback triggered:", error.message);
-        return { empty: true, docs: [], forEach: () => {} }; 
+        return { empty: true, docs: [], forEach: () => { } };
     }
 }
 
@@ -38,7 +38,7 @@ export async function calculateAllMetrics() {
     const plan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
     const currentLoc = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
     const storeId = typeof getStoreId === 'function' ? getStoreId() : null;
-    
+
     if (!storeId) return null;
 
     // A. Time Boundaries
@@ -73,20 +73,20 @@ export async function calculateAllMetrics() {
 
             if (typeof window.dbAPI.getTransactionsSince === 'function') {
                 const weekTxs = await window.dbAPI.getTransactionsSince(sevenDaysAgo.toISOString());
-                
+
                 // Group by day string
                 const grouped = {};
                 weekTxs.forEach(tx => {
                     if (currentLoc !== 'all' && tx.locationId !== currentLoc) return;
                     // Skip bounced cheques
                     if (tx.summary?.paymentMethod === 'CHEQUE' && tx.summary?.chequeDetails?.status === 'BOUNCED') return;
-                    
+
                     const type = (tx.type || tx.summary?.transactionType || 'SALE').toUpperCase();
                     if (type !== 'SALE' && type !== 'REFUND') return;
 
                     const dateObj = new Date(tx.timestamp);
                     const dStr = getLocalDateString(dateObj);
-                    
+
                     const txTotal = Math.abs(tx.summary?.revenue || tx.summary?.total || tx.total || 0);
                     const amount = type === 'REFUND' ? -txTotal : txTotal;
 
@@ -99,10 +99,10 @@ export async function calculateAllMetrics() {
                     d.setDate(d.getDate() - i);
                     const dStr = getLocalDateString(d);
                     const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-                    chartDaysData.push({ 
-                        dateStr: dStr, 
-                        dayName: dayName, 
-                        revenue: grouped[dStr] || 0 
+                    chartDaysData.push({
+                        dateStr: dStr,
+                        dayName: dayName,
+                        revenue: grouped[dStr] || 0
                     });
                 }
             }
@@ -121,11 +121,11 @@ export async function calculateAllMetrics() {
     }
 
     // --- 4. Process Live Data ---
-    
+
     let revenueToday = 0;
-    let salesCountToday = 0; 
+    let salesCountToday = 0;
     let profitToday = 0;
-    let purchasesToday = 0; 
+    let purchasesToday = 0;
     const productSalesMap = {};
 
     rawTransactions.forEach(tx => {
@@ -138,7 +138,7 @@ export async function calculateAllMetrics() {
 
         if (tx.type === 'PURCHASE') {
             purchasesToday = safeMath.add(purchasesToday, txTotal);
-            return; 
+            return;
         }
         if (tx.type === 'ADJUSTMENT' || tx.type === 'LOSS') return;
 
@@ -149,14 +149,14 @@ export async function calculateAllMetrics() {
         } else {
             revenueToday = safeMath.add(revenueToday, txRevenue);
             profitToday = safeMath.add(profitToday, txProfit);
-            
+
             if (type === 'SALE') {
                 salesCountToday++;
                 tx.items?.forEach(item => {
                     const name = item.name || 'Unknown';
                     const qty = Math.abs(item.quantity || 0);
                     const rev = safeMath.multiply(parseFloat(item.price || item.cost || 0), qty);
-                    
+
                     if (qty > 0) {
                         if (!productSalesMap[name]) productSalesMap[name] = { qty: 0, revenue: 0 };
                         productSalesMap[name].qty += qty;
@@ -184,16 +184,16 @@ export async function calculateAllMetrics() {
     const expiredList = [];
     let outOfStockCount = 0;
     const lowStockList = [];
-    
+
     let totalProductsCount = 0;
     let totalInventoryValue = 0;
 
     const warningDate = new Date();
-    warningDate.setDate(new Date().getDate() + EXPIRATION_WARNING_DAYS); 
+    warningDate.setDate(new Date().getDate() + EXPIRATION_WARNING_DAYS);
 
     rawProducts.forEach(p => {
         if (currentLoc !== 'all' && (p.locationId || 'main') !== currentLoc) return;
-        
+
         totalProductsCount++;
         const cost = Number(p.cost || 0);
         const stock = Number(p.stockLevel || 0);
@@ -203,7 +203,7 @@ export async function calculateAllMetrics() {
         if (p.expirationDate) {
             const expDate = new Date(p.expirationDate);
             if (expDate <= warningDate) {
-                if(expiredList.length < 10) expiredList.push({ name: p.name, value: p.expirationDate, type: expDate < today ? 'expired' : 'nearing' });
+                if (expiredList.length < 10) expiredList.push({ name: p.name, value: p.expirationDate, type: expDate < today ? 'expired' : 'nearing' });
                 stockValueAtRisk = safeMath.add(stockValueAtRisk, safeMath.multiply(cost, stock));
             }
         }
@@ -211,9 +211,9 @@ export async function calculateAllMetrics() {
         // Check Low Stock
         if (stock <= 0) {
             outOfStockCount++;
-            if(lowStockList.length < 10) lowStockList.push({ name: p.name, value: 0, type: 'out' });
+            if (lowStockList.length < 10) lowStockList.push({ name: p.name, value: 0, type: 'out' });
         } else if (stock <= (p.lowStockThreshold || 5)) {
-             if(lowStockList.length < 10) lowStockList.push({ name: p.name, value: stock, type: 'low' });
+            if (lowStockList.length < 10) lowStockList.push({ name: p.name, value: stock, type: 'low' });
         }
     });
 
@@ -223,7 +223,7 @@ export async function calculateAllMetrics() {
             const custs = await window.dbAPI.getCustomers();
             customerCount = custs.length;
         }
-    } catch(e) {}
+    } catch (e) { }
 
     // In offline mode, skip global "fast movers" and "forecast" as they require cloud CRON jobs
     const fastMovingItems = [];
@@ -234,18 +234,18 @@ export async function calculateAllMetrics() {
         totalProducts: totalProductsCount,
         customerCount: customerCount,
         inventoryValue: totalInventoryValue,
-        outOfStockCount, 
-        stockValueAtRisk, 
-        expiredList, 
+        outOfStockCount,
+        stockValueAtRisk,
+        expiredList,
         lowStockList,
         revenueToday,
-        purchasesToday, 
-        profitToday, 
+        purchasesToday,
+        profitToday,
         totalTransactionsToday: salesCountToday,
-        avgSaleValueToday: salesCountToday > 0 ? safeMath.divide(revenueToday, salesCountToday) : 0, 
+        avgSaleValueToday: salesCountToday > 0 ? safeMath.divide(revenueToday, salesCountToday) : 0,
         availableStaff: 0, // Injected downstream by dashboard.js
-        nextBigSale: "Spring Sale", 
-        topProductsToday, 
+        nextBigSale: "Spring Sale",
+        topProductsToday,
         fastMovingItems,
         inventoryForecast: forecastData,
         salesChartData: { labels, data: chartData }
@@ -255,19 +255,19 @@ export async function calculateAllMetrics() {
 
 export function renderWidgetById(widgetId, data) {
     let widget = MASTER_WIDGET_LIST.find(w => w.id === widgetId);
-    
+
     if (!widget) {
         if (widgetId === 'purchasesToday') {
             widget = { id: 'purchasesToday', title: 'Purchases (Today)', icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>', bg: 'bg-red-50', color: 'text-red-600' };
         } else if (widgetId === 'fastMovingItems') {
-            widget = { id: 'fastMovingItems', title: 'Fast-Moving (30D)', icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>', bg: 'bg-white', color: 'text-indigo-600' };
+            widget = { id: 'fastMovingItems', title: 'Fast-Moving (30D)', icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>', bg: 'bg-white', color: 'text-SLATE-600' };
         } else if (widgetId === 'inventoryForecast') {
             widget = { id: 'inventoryForecast', title: 'Stock-Up Suggestions', icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>', bg: 'bg-amber-50', color: 'text-amber-700' };
         }
     }
-    
+
     if (!widget) return '';
-    
+
     // --- SMART TITLE INJECTION ---
     let displayTitle = widget.title;
     if (displayTitle.includes('(Today)')) {
@@ -276,28 +276,28 @@ export function renderWidgetById(widgetId, data) {
     }
 
     // 🚀 THE FIX: Strip out cloud subscription checks. Offline mode gets everything unlocked.
-    const hasAdvancedReports = true; 
-    
+    const hasAdvancedReports = true;
+
     // --- ROLE SECURITY ---
     const role = typeof getUserRole === 'function' ? getUserRole() : 'cashier';
     const isMgmt = role === 'admin' || role === 'store_manager';
     const canViewProfit = hasAdvancedReports && isMgmt;
-    
+
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
-    const bgClass = widget.bg || 'bg-indigo-50'; 
-const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>';    
+    const bgClass = widget.bg || 'bg-SLATE-50';
+    const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>';
     // Chart Restriction
     if (widgetId === 'salesChart' && data.salesChartData === null) {
-         return `<div class="text-center p-8 text-gray-400 bg-gray-50 rounded-xl h-full flex flex-col justify-center items-center border border-dashed border-gray-300">
-                    <svg class="w-8 h-8 mb-2 opacity-50 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+        return `<div class="text-center p-8 text-gray-400 bg-gray-50 rounded-xl h-full flex flex-col justify-center items-center border border-dashed border-gray-300">
+                    <svg class="w-8 h-8 mb-2 opacity-50 text-SLATE-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                     <p class="text-sm font-bold text-gray-500">Upgrade to view sales trends</p>
                  </div>`;
     }
-    
+
     // Profit Hiding (Only prompt Management to upgrade. Staff just see standard revenue without the lock prompt)
     if (widgetId === 'revenueToday' && !hasAdvancedReports && isMgmt) {
-         const val = Number(data.revenueToday) || 0;
-         return `
+        const val = Number(data.revenueToday) || 0;
+        return `
             <div class="relative h-full flex flex-col justify-center group">
                 <div class="flex items-center justify-between">
                     <div>
@@ -306,10 +306,10 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
                             <p class="text-3xl font-extrabold text-gray-800 tracking-tight">
                                 <span class="text-lg opacity-50 mr-0.5">${currencySymbol}</span>${val.toFixed(2)}
                             </p>
-                            <div class="text-xs font-bold text-indigo-400 mt-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Unlock Profit Stats</div>
+                            <div class="text-xs font-bold text-SLATE-400 mt-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Unlock Profit Stats</div>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-2xl ${bgClass} text-opacity-80 ${widget.color || 'text-indigo-600'} shadow-sm">
+                    <div class="p-3.5 rounded-2xl ${bgClass} text-opacity-80 ${widget.color || 'text-SLATE-600'} shadow-sm">
                         ${iconHtml}
                     </div>
                 </div>
@@ -321,7 +321,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
     const currencyWidgets = ['inventoryValue', 'revenueToday', 'avgSaleValueToday', 'stockValueAtRisk', 'purchasesToday']; // <-- Added it here!
 
     if (widgetId === 'nextBigSale') {
-         return `
+        return `
             <div class="relative h-full flex flex-col justify-center">
                 <div class="flex items-center justify-between">
                     <div>
@@ -356,7 +356,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
     if (currencyWidgets.includes(widgetId)) {
         let val = Number(data[widgetId]) || 0;
         let profit = Number(data.profitToday) || 0;
-        
+
         return `
             <div class="relative h-full flex flex-col justify-center group cursor-default">
                 <div class="flex items-center justify-between">
@@ -364,7 +364,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">${displayTitle}</p>
                         <div class="flex flex-col mt-1">
                             <p class="text-3xl font-extrabold tracking-tight ${val < 0 ? 'text-red-600' : (widget.color || 'text-gray-800')}">
-                                <span class="text-lg opacity-50 mr-0.5">${currencySymbol}</span>${val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                <span class="text-lg opacity-50 mr-0.5">${currencySymbol}</span>${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                             ${(widgetId === 'revenueToday' && canViewProfit) ? `<div class="text-xs ${profit >= 0 ? 'text-green-600' : 'text-red-600'} font-bold mt-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="${profit >= 0 ? 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' : 'M13 17h8m0 0v-8m0 8l-8-8-4 4-6-6'}"></path></svg> Net: ${currencySymbol}${Math.abs(profit).toFixed(2)}</div>` : ''}
                         </div>
@@ -384,10 +384,10 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
         const listHtml = items.length > 0 ? items.map((item, i) => `
             <li class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors px-2 rounded-lg">
                 <div class="flex items-center overflow-hidden">
-                    <span class="text-[10px] font-extrabold text-gray-400 w-6 flex-shrink-0 bg-gray-100 rounded-full h-5 flex items-center justify-center mr-2">#${i+1}</span>
+                    <span class="text-[10px] font-extrabold text-gray-400 w-6 flex-shrink-0 bg-gray-100 rounded-full h-5 flex items-center justify-center mr-2">#${i + 1}</span>
                     <span class="text-sm font-semibold text-gray-700 truncate w-32" title="${item.name}">${item.name}</span>
                 </div>
-                <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full flex-shrink-0 ml-2 shadow-sm">${item.qty} sold</span>
+                <span class="text-xs font-bold text-SLATE-700 bg-SLATE-50 border border-SLATE-100 px-2.5 py-1 rounded-full flex-shrink-0 ml-2 shadow-sm">${item.qty} sold</span>
             </li>
         `).join('') : '<li class="text-sm text-gray-400 italic py-6 text-center border border-dashed border-gray-200 rounded-lg bg-gray-50 mt-2">No sales yet today.</li>';
 
@@ -397,7 +397,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
                     <h3 class="font-bold text-gray-800 flex items-center gap-2">
                         <span class="text-yellow-500 bg-yellow-50 p-1.5 rounded-lg border border-yellow-100">${widget.icon || '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>'}</span> ${displayTitle}
                     </h3>
-                    <span class="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded uppercase tracking-wide">Live</span>
+                    <span class="text-[10px] font-bold bg-SLATE-50 text-SLATE-600 px-2 py-1 rounded uppercase tracking-wide">Live</span>
                 </div>
                 <ul class="space-y-0.5 flex-1 overflow-y-auto scrollbar-hide">
                     ${listHtml}
@@ -412,7 +412,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
         return `
             <div class="relative h-full flex flex-col">
                 <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-3 pr-2">
-                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><span class="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg border border-indigo-100">${widget.icon || '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>'}</span> ${widget.title}</h3>
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><span class="bg-SLATE-50 text-SLATE-600 p-1.5 rounded-lg border border-SLATE-100">${widget.icon || '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>'}</span> ${widget.title}</h3>
                     <span class="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded uppercase tracking-wide">Revenue (7 Days)</span>
                 </div>
                 <div class="flex-1 w-full relative min-h-[160px]">
@@ -428,11 +428,11 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
         const listHtml = items.length > 0 ? items.map((item, i) => `
             <div class="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
                 <div class="flex items-center gap-3">
-                    <span class="text-[10px] font-black text-gray-300">0${i+1}</span>
+                    <span class="text-[10px] font-black text-gray-300">0${i + 1}</span>
                     <span class="text-sm font-bold text-gray-700 truncate w-28">${item.name}</span>
                 </div>
                 <div class="text-right">
-                    <span class="text-xs font-black text-indigo-600">${item.qty}</span>
+                    <span class="text-xs font-black text-SLATE-600">${item.qty}</span>
                     <span class="text-[9px] text-gray-400 font-bold uppercase ml-1">Sold</span>
                 </div>
             </div>
@@ -445,7 +445,7 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
                         <h3 class="font-bold text-gray-800 text-sm tracking-tight">Fast-Moving (30D)</h3>
                         <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Monthly Trailing</p>
                     </div>
-                    <span class="bg-indigo-50 p-2 rounded-lg border border-indigo-100 text-indigo-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></span>
+                    <span class="bg-SLATE-50 p-2 rounded-lg border border-SLATE-100 text-SLATE-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></span>
                 </div>
                 <div class="flex-1 overflow-y-auto scrollbar-hide">
                     ${listHtml}
@@ -455,17 +455,17 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
     }
 
     // Inside renderWidgetById (src/components/widgetRenderer.js)
-    
+
     // Add to the bypass list at the top
     // And immediately after the bypass check, make sure the fallback object also uses the SVG:
     if (!widget && widgetId === 'inventoryForecast') {
         widget = { id: 'inventoryForecast', title: 'Stock-Up Suggestions', icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>', bg: 'bg-amber-50', color: 'text-amber-700' };
     }
-// Add the HTML block
+    // Add the HTML block
     if (widgetId === 'inventoryForecast') {
         const items = data.inventoryForecast || [];
         const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-        
+
         const listHtml = items.length > 0 ? items.map(item => `
             <div class="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
                 <div class="flex flex-col">
@@ -500,20 +500,20 @@ const iconHtml = widget.icon || '<svg class="w-6 h-6" fill="none" stroke="curren
 export function renderChartToCanvas(canvasElement, chartData) {
     const chartInstance = typeof getSalesChartInstance === 'function' ? getSalesChartInstance() : null;
     if (chartInstance) chartInstance.destroy();
-    
+
     if (!canvasElement || !chartData) return;
 
     const ctx = canvasElement.getContext('2d');
-    if (!ctx) return; 
+    if (!ctx) return;
 
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.4)'); 
-    gradient.addColorStop(1, 'rgba(79, 70, 229, 0.01)'); 
+    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.4)');
+    gradient.addColorStop(1, 'rgba(79, 70, 229, 0.01)');
 
     const newChartInstance = new Chart(ctx, {
-        type: 'line', 
+        type: 'line',
         data: {
             labels: chartData.labels,
             datasets: [{
@@ -534,7 +534,7 @@ export function renderChartToCanvas(canvasElement, chartData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { 
+            plugins: {
                 legend: { display: false },
                 tooltip: {
                     backgroundColor: 'rgba(17, 24, 39, 0.9)',
@@ -548,18 +548,18 @@ export function renderChartToCanvas(canvasElement, chartData) {
                 }
             },
             scales: {
-                y: { 
-                    beginAtZero: true, 
-                    grid: { color: 'rgba(243, 244, 246, 0.8)', drawBorder: false }, 
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(243, 244, 246, 0.8)', drawBorder: false },
                     border: { display: false },
-                    ticks: { 
-                        font: { size: 10, family: "'Inter', sans-serif", weight: '500' }, 
+                    ticks: {
+                        font: { size: 10, family: "'Inter', sans-serif", weight: '500' },
                         color: '#9CA3AF',
                         padding: 8,
                         callback: (val) => `${currencySymbol}${val}`
                     }
                 },
-                x: { 
+                x: {
                     grid: { display: false },
                     border: { display: false },
                     ticks: { font: { size: 10, family: "'Inter', sans-serif", weight: '500' }, color: '#6B7280', padding: 8 }
@@ -571,7 +571,7 @@ export function renderChartToCanvas(canvasElement, chartData) {
             },
         }
     });
-    
+
     if (typeof setSalesChartInstance === 'function') {
         setSalesChartInstance(newChartInstance);
     }
@@ -679,7 +679,7 @@ export async function handleWidgetInteraction(widgetId) {
             // but we leave it here for safety.
             if (typeof window.showView === 'function') window.showView('staff');
             break;
-        case 'topProductsToday': 
+        case 'topProductsToday':
             await showTopProductsHistory();
             break;
         default:
@@ -690,7 +690,7 @@ export async function handleWidgetInteraction(widgetId) {
 async function showRevenueHistory() {
     injectDialog('Revenue History', `
         <div class="flex justify-center items-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
         </div>
     `);
 
@@ -698,46 +698,46 @@ async function showRevenueHistory() {
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
 
     let html = `<div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wider font-bold"><tr><th class="px-5 py-3">Date</th><th class="px-5 py-3 text-right">Revenue</th></tr></thead><tbody class="divide-y divide-gray-100">`;
-    
+
     let totalRev = 0;
-    
+
     for (let i = 0; i < 7; i++) {
         const d = new Date(); d.setDate(d.getDate() - i);
         const dateStr = getLocalDateString(d);
         const displayDate = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        
+
         try {
             const snap = await getDoc(doc(db, `artifacts/${appId}/stores/${storeId}/summaries_daily/${dateStr}`));
-            
+
             // 🚀 THE FIX: Extract actual revenue, fallback to legacy 'sales' for older records
             let val = 0;
             if (snap.exists()) {
                 const rawData = snap.data();
                 val = rawData.revenue !== undefined ? rawData.revenue : (rawData.sales || 0);
             }
-            
-            html += `<tr class="hover:bg-gray-50 transition-colors"><td class="px-5 py-3 font-medium text-gray-800">${displayDate}</td><td class="px-5 py-3 text-right font-extrabold text-indigo-600">${currencySymbol}${(val||0).toFixed(2)}</td></tr>`;
+
+            html += `<tr class="hover:bg-gray-50 transition-colors"><td class="px-5 py-3 font-medium text-gray-800">${displayDate}</td><td class="px-5 py-3 text-right font-extrabold text-SLATE-600">${currencySymbol}${(val || 0).toFixed(2)}</td></tr>`;
             totalRev += (val || 0);
-        } catch(e){}
+        } catch (e) { }
     }
-    
+
     html += `</tbody><tfoot class="bg-gray-50 text-gray-800 font-bold border-t-2 border-gray-200"><tr><td class="px-5 py-3 uppercase text-xs tracking-wider text-gray-500">Total (7 Days)</td><td class="px-5 py-3 text-right text-lg text-gray-900">${currencySymbol}${totalRev.toFixed(2)}</td></tr></tfoot></table></div>`;
-    
+
     const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-    if(contentContainer) contentContainer.innerHTML = html;
+    if (contentContainer) contentContainer.innerHTML = html;
 }
 
 async function showSalesCountHistory() {
     injectDialog('Sales Count History', `
         <div class="flex justify-center items-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
         </div>
     `);
 
     const storeId = typeof getStoreId === 'function' ? getStoreId() : null;
 
     let html = `<div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wider font-bold"><tr><th class="px-5 py-3">Date</th><th class="px-5 py-3 text-center">Transactions</th></tr></thead><tbody class="divide-y divide-gray-100">`;
-    
+
     let totalCount = 0;
 
     for (let i = 0; i < 7; i++) {
@@ -748,20 +748,20 @@ async function showSalesCountHistory() {
         try {
             const snap = await getDoc(doc(db, `artifacts/${appId}/stores/${storeId}/summaries_daily/${dateStr}`));
             const val = snap.exists() ? snap.data().sales : 0;
-            html += `<tr class="hover:bg-gray-50 transition-colors"><td class="px-5 py-3 font-medium text-gray-800">${displayDate}</td><td class="px-5 py-3 text-center font-extrabold text-indigo-600 bg-indigo-50/30">${val||0}</td></tr>`;
+            html += `<tr class="hover:bg-gray-50 transition-colors"><td class="px-5 py-3 font-medium text-gray-800">${displayDate}</td><td class="px-5 py-3 text-center font-extrabold text-SLATE-600 bg-SLATE-50/30">${val || 0}</td></tr>`;
             totalCount += (val || 0);
-        } catch(e){}
+        } catch (e) { }
     }
     html += `</tbody><tfoot class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-200"><tr><td class="px-5 py-3 uppercase text-xs tracking-wider text-gray-500">Total (7 Days)</td><td class="px-5 py-3 text-center text-lg text-gray-900">${totalCount}</td></tr></tfoot></table></div>`;
-    
+
     const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-    if(contentContainer) contentContainer.innerHTML = html;
+    if (contentContainer) contentContainer.innerHTML = html;
 }
 
 async function showRiskList() {
     injectDialog('Stock at Risk', `
         <div class="flex justify-center items-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
         </div>
     `);
 
@@ -770,13 +770,13 @@ async function showRiskList() {
 
     const q = query(productsRef, where("stockLevel", "<=", 5), limit(50));
     const snap = await getDocs(q);
-    
-   if(snap.empty) { 
+
+    if (snap.empty) {
         const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-        if(contentContainer) contentContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200"><div class="text-emerald-500 mb-3 flex justify-center"><svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><p class="text-gray-800 font-bold">No low stock items found.</p><p class="text-sm text-gray-500 mt-1">Your inventory looks healthy!</p></div>`;
-        return; 
+        if (contentContainer) contentContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200"><div class="text-emerald-500 mb-3 flex justify-center"><svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><p class="text-gray-800 font-bold">No low stock items found.</p><p class="text-sm text-gray-500 mt-1">Your inventory looks healthy!</p></div>`;
+        return;
     }
-    
+
     let html = `<div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-red-50 text-red-700 uppercase text-[10px] tracking-wider font-bold"><tr><th class="px-5 py-3">Product</th><th class="px-5 py-3 text-right">Value at Risk</th></tr></thead><tbody class="divide-y divide-gray-100">`;
     snap.forEach(d => {
         const p = d.data();
@@ -784,15 +784,15 @@ async function showRiskList() {
         html += `<tr class="hover:bg-red-50/30 transition-colors"><td class="px-5 py-3 font-semibold text-gray-800">${p.name} <span class="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full ml-2 shadow-sm border border-red-200">Qty: ${p.stockLevel}</span></td><td class="px-5 py-3 text-right text-gray-600 font-mono">${currencySymbol}${val.toFixed(2)}</td></tr>`;
     });
     html += `</tbody></table></div>`;
-    
+
     const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-    if(contentContainer) contentContainer.innerHTML = html;
+    if (contentContainer) contentContainer.innerHTML = html;
 }
 
 async function showStaffOnDuty() {
     injectDialog('Staff On Duty', `
         <div class="flex justify-center items-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
         </div>
     `);
 
@@ -804,29 +804,29 @@ async function showStaffOnDuty() {
 
     const todayStr = getLocalDateString(new Date());
     const snap = await getDoc(doc(db, `artifacts/${appId}/stores/${targetLocation}/attendance/${todayStr}`));
-    
+
     let content = '';
 
-    if(!snap.exists() || !snap.data().records) { 
+    if (!snap.exists() || !snap.data().records) {
         content = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500 font-medium">No attendance records found for today.</div>`;
     } else {
         const records = snap.data().records;
         const presentIds = Object.keys(records).filter(id => records[id] === 'P' || records[id] === 'HD');
-        
-        if(presentIds.length === 0) { 
+
+        if (presentIds.length === 0) {
             content = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500 font-medium">No staff marked present today.</div>`;
         } else {
             let listItems = '';
-            for(const uid of presentIds) {
+            for (const uid of presentIds) {
                 const userDoc = await getDoc(doc(db, 'userProfiles', uid));
                 const name = userDoc.exists() ? userDoc.data().name : 'Unknown Staff';
                 const status = records[uid] === 'P' ? 'Present' : 'Half Day';
                 const statusColor = status === 'Present' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200';
-                
+
                 listItems += `
                     <li class="flex justify-between items-center p-4 bg-gray-50 border border-gray-100 rounded-xl hover:bg-white hover:shadow-md hover:border-gray-200 transition-all">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm shadow-sm border border-indigo-200">
+                            <div class="w-10 h-10 rounded-full bg-SLATE-100 flex items-center justify-center text-SLATE-700 font-bold text-sm shadow-sm border border-SLATE-200">
                                 ${name.charAt(0).toUpperCase()}
                             </div>
                             <span class="font-bold text-gray-800">${name}</span>
@@ -838,34 +838,34 @@ async function showStaffOnDuty() {
             content = `<ul class="space-y-3">${listItems}</ul>`;
         }
     }
-    
+
     const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-    if(contentContainer) contentContainer.innerHTML = content;
+    if (contentContainer) contentContainer.innerHTML = content;
 }
 
 async function showTopProductsHistory() {
     injectDialog('Top Products (Expanded)', `
         <div class="flex justify-center items-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
         </div>
     `);
 
     const startOfDay = new Date();
-    startOfDay.setHours(0,0,0,0);
-    
+    startOfDay.setHours(0, 0, 0, 0);
+
     const transactionsRef = getTransactionsRef();
 
     const q = query(
-        transactionsRef, 
+        transactionsRef,
         where("timestamp", ">=", startOfDay),
         orderBy("timestamp", "desc"),
-        limit(200) 
+        limit(200)
     );
-    
+
     try {
         const snap = await getDocs(q);
         const productSalesMap = {};
-        
+
         snap.forEach(doc => {
             const tx = doc.data();
             if (tx.items && Array.isArray(tx.items)) {
@@ -881,17 +881,17 @@ async function showTopProductsHistory() {
 
         const topProducts = Object.entries(productSalesMap)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 20) 
+            .slice(0, 20)
             .map(([name, qty]) => ({ name, qty }));
 
         if (topProducts.length === 0) {
             const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-            if(contentContainer) contentContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500 font-medium">No sales recorded today yet.</div>`;
+            if (contentContainer) contentContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500 font-medium">No sales recorded today yet.</div>`;
             return;
         }
 
-        let html = `<div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-indigo-50 text-indigo-800 uppercase text-[10px] tracking-wider font-bold"><tr><th class="px-5 py-3">Rank</th><th class="px-5 py-3">Product Name</th><th class="px-5 py-3 text-right">Qty Sold</th></tr></thead><tbody class="divide-y divide-gray-100">`;
-        
+        let html = `<div class="overflow-hidden rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-sm text-left"><thead class="bg-SLATE-50 text-SLATE-800 uppercase text-[10px] tracking-wider font-bold"><tr><th class="px-5 py-3">Rank</th><th class="px-5 py-3">Product Name</th><th class="px-5 py-3 text-right">Qty Sold</th></tr></thead><tbody class="divide-y divide-gray-100">`;
+
         topProducts.forEach((item, index) => {
             let rankClass = "bg-gray-100 text-gray-500 border border-gray-200 shadow-sm";
             if (index === 0) rankClass = "bg-gradient-to-br from-yellow-200 to-yellow-400 text-yellow-900 border border-yellow-400 shadow-md";
@@ -904,19 +904,19 @@ async function showTopProductsHistory() {
                         <span class="w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold ${rankClass}">${index + 1}</span>
                     </td>
                     <td class="px-5 py-3 font-semibold text-gray-800">${item.name}</td>
-                    <td class="px-5 py-3 text-right font-extrabold text-indigo-600 bg-indigo-50/20">${item.qty}</td>
+                    <td class="px-5 py-3 text-right font-extrabold text-SLATE-600 bg-SLATE-50/20">${item.qty}</td>
                 </tr>
             `;
         });
-        
+
         html += `</tbody></table></div>`;
         const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-        if(contentContainer) contentContainer.innerHTML = html;
+        if (contentContainer) contentContainer.innerHTML = html;
 
     } catch (e) {
         console.error("Error fetching top products:", e);
         const contentContainer = document.querySelector('#widget-detail-dialog .p-6');
-        if(contentContainer) contentContainer.innerHTML = `<div class="text-center py-8 text-red-500 font-bold">Error loading data.</div>`;
+        if (contentContainer) contentContainer.innerHTML = `<div class="text-center py-8 text-red-500 font-bold">Error loading data.</div>`;
     }
 }
 export async function renderFinancialAlerts() {
@@ -929,19 +929,19 @@ export async function renderFinancialAlerts() {
     const alertsContainer = document.createElement('div');
     alertsContainer.id = 'financial-alerts-container';
     alertsContainer.className = 'w-full mb-6 space-y-3';
-    
+
     let hasAlerts = false;
     let alertsHtml = '';
     const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
 
     try {
-        let totalReceivables = 0; let receivablesCount = 0; 
-        let totalPayables = 0; let payablesCount = 0;       
+        let totalReceivables = 0; let receivablesCount = 0;
+        let totalPayables = 0; let payablesCount = 0;
 
         // 1. 🚀 FETCH ALL PARTNER BALANCES (SQLite Offline)
         if (window.dbAPI && window.dbAPI.getCustomers) {
             const customers = await window.dbAPI.getCustomers();
-            
+
             customers.forEach(data => {
                 const rawBal = (parseFloat(data.dues) || 0) + (parseFloat(data.balance) || 0);
 

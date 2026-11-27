@@ -1,4 +1,6 @@
 //src/printing/PrinterEngine.js
+import { ProtocolRegistry } from './adapters/ProtocolRegistry.js';
+
 export const MediaProfiles = {
     'label_50x25': { totalWidth: 50, height: 25, gap: 3, columns: 1, colWidth: 50, colSpacing: 0, templateId: 'tpl_50x25' },
     'label_38x25': { totalWidth: 38, height: 25, gap: 3, columns: 1, colWidth: 38, colSpacing: 0, templateId: 'tpl_38x25' },
@@ -38,6 +40,8 @@ export class LabelLayoutEngine {
     constructor(printerProfile) {
         this.dpi = printerProfile.dpi || 203;
         this.dotsPerMm = this.dpi / 25.4;
+        this.offsetX = printerProfile.offsetX ? Math.round(printerProfile.offsetX * this.dotsPerMm) : 0;
+        this.offsetY = printerProfile.offsetY ? Math.round(printerProfile.offsetY * this.dotsPerMm) : 0;
     }
 
     mmToDots(mm) {
@@ -45,6 +49,7 @@ export class LabelLayoutEngine {
     }
 
     extractValue(element, data) {
+        if (element.content) return element.content; // Direct content for test labels
         let val = data[element.field] || '';
         if (element.prefix && val) val = `${element.prefix}${val}`;
         return val;
@@ -55,8 +60,9 @@ export class LabelLayoutEngine {
             const content = this.extractValue(el, data);
             if (!content) return null;
 
-            const xDots = this.mmToDots(el.x);
-            const yDots = this.mmToDots(el.y);
+            // Apply offsets
+            const xDots = this.mmToDots(el.x) + this.offsetX;
+            const yDots = this.mmToDots(el.y) + this.offsetY;
 
             if (el.type === 'text') {
                 let alignInt = 0; // 0=left, 1=center, 2=right
@@ -161,28 +167,82 @@ export class TSCAdapter extends PrinterAdapter {
  * 5. ORCHESTRATOR
  */
 export class PrinterManager {
-    static async printLabel(printerProfile, mediaId, data, quantity) {
-        if (!printerProfile.name) throw new Error("No printer selected.");
-
+    /**
+     * Print a label using the standard template system.
+     * @param {Object} printerProfile - Printer configuration
+     * @param {string} mediaId - Media profile ID (e.g., 'label_50x25')
+     * @param {Object} data - Label data
+     * @param {number} quantity - Number of labels
+     */
+    /**
+     * Generate raw printer commands without dispatching.
+     * @param {Object} printerProfile - Printer configuration
+     * @param {string} mediaId - Media profile ID (e.g., 'label_50x25')
+     * @param {Object} data - Label data
+     * @param {number} quantity - Number of labels
+     * @returns {Object} { type: 'RAW', payload: string }
+     */
+    static generateRawPayload(printerProfile, mediaId, data, quantity) {
         const mediaProfile = MediaProfiles[mediaId] || MediaProfiles['label_50x25'];
         const template = LabelTemplates[mediaProfile.templateId];
 
-        // Process Layout Math
         const layoutEngine = new LabelLayoutEngine(printerProfile);
         const renderTree = layoutEngine.generateRenderTree(template, data);
 
-        // Select Adapter
-        let adapter;
         const manufacturer = (printerProfile.manufacturer || '').toLowerCase();
-        
-        if (manufacturer === 'tsc' || manufacturer === 'zebra') {
-            adapter = new TSCAdapter(printerProfile);
-        } else {
-            throw new Error(`Manufacturer ${manufacturer} requires generic raster fallback.`);
-        }
+        const AdapterClass = ProtocolRegistry.getAdapterClass(manufacturer);
 
-        // Generate and Return Hardware Payload
-        const job = adapter.generatePrintJob(renderTree, quantity, mediaProfile);
+        if (!AdapterClass) {
+            throw new Error(`Unsupported manufacturer: ${manufacturer}.`);
+        }
+        const adapter = new AdapterClass(printerProfile);
+        return adapter.generatePrintJob(renderTree, quantity, mediaProfile);
+    }
+
+    /**
+     * Generate raw printer commands for a custom template without dispatching.
+     */
+    static generateCustomRawPayload(printerProfile, customTemplate, data, quantity, mediaProfileOverride = null) {
+        const mediaProfile = mediaProfileOverride || {
+            totalWidth: customTemplate.dimensions?.width || 50,
+            height: customTemplate.dimensions?.height || 25,
+            gap: 3,
+            columns: 1,
+            colWidth: customTemplate.dimensions?.width || 50,
+            colSpacing: 0,
+        };
+
+        const layoutEngine = new LabelLayoutEngine(printerProfile);
+        const renderTree = layoutEngine.generateRenderTree(customTemplate, data);
+
+        const manufacturer = (printerProfile.manufacturer || '').toLowerCase();
+        const AdapterClass = ProtocolRegistry.getAdapterClass(manufacturer);
+
+        if (!AdapterClass) {
+            throw new Error(`Unsupported manufacturer: ${manufacturer}.`);
+        }
+        const adapter = new AdapterClass(printerProfile);
+        return adapter.generatePrintJob(renderTree, quantity, mediaProfile);
+    }
+
+    static async printLabel(printerProfile, mediaId, data, quantity) {
+        if (!printerProfile.name) throw new Error("No printer selected.");
+
+        const job = this.generateRawPayload(printerProfile, mediaId, data, quantity);
+
+        if (job.type === 'RAW' && window.electronAPI?.printRaw) {
+            return await window.electronAPI.printRaw({
+                printerName: printerProfile.name,
+                data: job.payload
+            });
+        }
+        throw new Error("Raw Print API is unavailable in this environment.");
+    }
+
+    static async printCustomLabel(printerProfile, customTemplate, data, quantity, mediaProfileOverride = null) {
+        if (!printerProfile.name) throw new Error("No printer selected.");
+
+        const job = this.generateCustomRawPayload(printerProfile, customTemplate, data, quantity, mediaProfileOverride);
 
         if (job.type === 'RAW' && window.electronAPI?.printRaw) {
             return await window.electronAPI.printRaw({

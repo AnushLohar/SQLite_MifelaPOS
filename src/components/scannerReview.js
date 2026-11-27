@@ -19,34 +19,34 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
 
     // --- HELPER: Reusable Row Generator ---
     const generateRowHTML = (item) => `
-        <tr class="hover:bg-indigo-50/30 transition-all duration-200 group item-row  ">
-            <td class="p-1 min-w-[150px]"><input type="text" class="inp-name w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800" value="${escapeHTML(item.name)}"></td>
-            <td class="p-1"><input type="text" class="inp-sku w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.sku}"></td>
-            <td class="p-1"><input type="text" class="inp-barcode w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.barcode}"></td>
-            <td class="p-1"><input type="number" class="inp-mrp w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600" value="${item.mrp}"></td>
-            <td class="p-1"><input type="number" class="inp-selling-price w-full border border-indigo-300 bg-indigo-50 focus:bg-white focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-indigo-900" placeholder="Required" value="${item.sellingPrice}"></td>
-            <td class="p-1"><input type="number" class="inp-unit-cost w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-900" value="${item.unitCost}"></td>
+        <tr class="hover:bg-SLATE-50/30 transition-all duration-200 group item-row  ">
+            <td class="p-1 min-w-[150px]"><input type="text" class="inp-name w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-800" value="${escapeHTML(item.name)}"></td>
+            <td class="p-1"><input type="text" class="inp-sku w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.sku}"></td>
+            <td class="p-1"><input type="text" class="inp-barcode w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.barcode}"></td>
+            <td class="p-1"><input type="number" class="inp-mrp w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-600" value="${item.mrp}"></td>
+            <td class="p-1"><input type="number" class="inp-selling-price w-full border border-SLATE-300 bg-SLATE-50 focus:bg-white focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-SLATE-900" placeholder="Required" value="${item.sellingPrice}"></td>
+            <td class="p-1"><input type="number" class="inp-unit-cost w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-900" value="${item.unitCost}"></td>
             
             <td class="p-1 bg-slate-100 border-l border-r border-slate-200/60"><input type="number" class="inp-total-stock w-full bg-transparent border-none text-center rounded p-1.5 text-sm font-bold text-slate-400 cursor-not-allowed select-none focus:outline-none" readonly tabindex="-1" value="${item.totalStock}"></td>
             
-            <td class="p-1"><input type="number" class="inp-cs w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.cases}"></td>
-            <td class="p-1"><input type="number" class="inp-upc w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.upc}"></td>
-            <td class="p-1"><input type="number" class="inp-pcs w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.pcsLoose}"></td>
+            <td class="p-1"><input type="number" class="inp-cs w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.cases}"></td>
+            <td class="p-1"><input type="number" class="inp-upc w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.upc}"></td>
+            <td class="p-1"><input type="number" class="inp-pcs w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="${item.pcsLoose}"></td>
             <td class="p-1"><input type="number" class="inp-free-qty w-full border border-emerald-200 bg-emerald-50 hover:bg-white focus:border-emerald-500 rounded p-1.5 text-sm text-center font-bold text-emerald-700 calc-trigger" value="${item.freeQty || 0}" placeholder="0"></td>
             <td class="p-1">
-                <select class="inp-unit w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600 bg-white">
+                <select class="inp-unit w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-600 bg-white">
                     ${unitOptions.map(u => `<option value="${u.value}" ${item.unit === u.value ? 'selected' : ''}>${u.label}</option>`).join('')}
                 </select>
             </td>
             
-            <td class="p-1"><input type="number" class="inp-base-rate w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.baseRate}"></td>
-            <td class="p-1"><input type="number" class="inp-sch-disc w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.schDisc}"></td>
-            <td class="p-1"><input type="number" class="inp-rs-disc w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.rsDisc}"></td>
+            <td class="p-1"><input type="number" class="inp-base-rate w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.baseRate}"></td>
+            <td class="p-1"><input type="number" class="inp-sch-disc w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.schDisc}"></td>
+            <td class="p-1"><input type="number" class="inp-rs-disc w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" value="${item.rsDisc}"></td>
             
-            <td class="p-1 min-w-[100px]"><input type="number" class="inp-taxable w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600 calc-trigger" value="${item.taxableAmt}"></td>
+            <td class="p-1 min-w-[100px]"><input type="number" class="inp-taxable w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-600 calc-trigger" value="${item.taxableAmt}"></td>
             
             <td class="p-1 min-w-[90px]">
-                <select class="inp-gst w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger bg-white">
+                <select class="inp-gst w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger bg-white">
                     <option value="0" ${item.gstSlab == 0 ? 'selected' : ''}>0%</option>
                     <option value="5" ${item.gstSlab == 5 ? 'selected' : ''}>5%</option>
                     <option value="12" ${item.gstSlab == 12 ? 'selected' : ''}>12%</option>
@@ -55,20 +55,20 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 </select>
             </td>
             
-            <td class="p-1 min-w-[80px]"><input type="number" class="inp-cess w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-red-600 calc-trigger" value="${item.cessPct}" placeholder="0%"></td>
+            <td class="p-1 min-w-[80px]"><input type="number" class="inp-cess w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-center font-bold text-red-600 calc-trigger" value="${item.cessPct}" placeholder="0%"></td>
             
             <td class="p-1">
                 <div class="flex gap-1">
-                    <input type="number" class="inp-cgst w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-indigo-500 rounded p-1.5 text-xs font-medium text-slate-500" value="${item.cgst}" title="CGST">
-                    <input type="number" class="inp-sgst w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-indigo-500 rounded p-1.5 text-xs font-medium text-slate-500" value="${item.sgst}" title="SGST">
+                    <input type="number" class="inp-cgst w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-SLATE-500 rounded p-1.5 text-xs font-medium text-slate-500" value="${item.cgst}" title="CGST">
+                    <input type="number" class="inp-sgst w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-SLATE-500 rounded p-1.5 text-xs font-medium text-slate-500" value="${item.sgst}" title="SGST">
                 </div>
             </td>
             
-            <td class="p-1 min-w-[120px]"><input type="number" class="inp-net w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-900 calc-trigger" value="${item.netAmt}"></td>
+            <td class="p-1 min-w-[120px]"><input type="number" class="inp-net w-full border border-slate-200 bg-slate-50 hover:bg-white focus:border-SLATE-500 rounded p-1.5 text-sm font-bold text-slate-900 calc-trigger" value="${item.netAmt}"></td>
             
-            <td class="p-1"><input type="text" class="inp-hsn w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.hsn}"></td>
-            <td class="p-1"><input type="text" class="inp-batch w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-slate-600 uppercase" value="${item.batch}"></td>
-            <td class="p-1"><input type="date" class="inp-expiry w-full border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded p-1.5 text-sm text-slate-600" value="${item.expiry}"></td>
+            <td class="p-1"><input type="text" class="inp-hsn w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${item.hsn}"></td>
+            <td class="p-1"><input type="text" class="inp-batch w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-slate-600 uppercase" value="${item.batch}"></td>
+            <td class="p-1"><input type="date" class="inp-expiry w-full border border-slate-200 hover:border-slate-300 focus:border-SLATE-500 rounded p-1.5 text-sm text-slate-600" value="${item.expiry}"></td>
             
             <td class="p-1 text-center">
                 <button type="button" class="delete-row-btn text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Remove Item">
@@ -84,29 +84,29 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
         if (isNaN(upc) || upc <= 0) upc = 1;
         const pcs = parseFloat(item.pcsLoose || item.pcs) || 0;
         const freeQty = parseFloat(item.freeQty || item.free_qty || item.foc) || 0; // 🚀 Catch AI aliases
-        
+
         // 🚀 Total physical stock includes free items, but 'calcQty' (for finances) does not!
         const paidStock = (cases * upc) + pcs;
         const totalStock = paidStock + freeQty;
         const calcQty = paidStock > 0 ? paidStock : 1;
-        
+
         const baseRate = parseFloat(item.baseRate || item.base_rate) || 0;
         const schDisc = parseFloat(item.schDisc || item.sch_disc) || 0;
         const rsDisc = parseFloat(item.rsDisc || item.rs_disc) || 0;
-        
+
         const gstPct = parseFloat(item.gstSlab || item.gst_pct) || 0;
-        const cessPct = parseFloat(item.cessPct || item.cess_pct) || 0; 
-        
+        const cessPct = parseFloat(item.cessPct || item.cess_pct) || 0;
+
         let taxable = parseFloat(item.taxableAmt || item.taxable);
         if (isNaN(taxable) || taxable <= 0) taxable = Math.max(0, (baseRate * calcQty) - (schDisc + rsDisc));
-        
+
         const cgst = parseFloat(item.cgst || item.cgst_amt) > 0 ? parseFloat(item.cgst || item.cgst_amt) : (taxable * (gstPct / 2) / 100);
         const sgst = parseFloat(item.sgst || item.sgst_amt) > 0 ? parseFloat(item.sgst || item.sgst_amt) : (taxable * (gstPct / 2) / 100);
-        const cessAmt = parseFloat(item.cess || item.cess_amt) > 0 ? parseFloat(item.cess || item.cess_amt) : (taxable * (cessPct / 100)); 
-        
+        const cessAmt = parseFloat(item.cess || item.cess_amt) > 0 ? parseFloat(item.cess || item.cess_amt) : (taxable * (cessPct / 100));
+
         let netAmt = parseFloat(item.netAmt || item.net_amt);
-        if (isNaN(netAmt) || netAmt <= 0) netAmt = taxable + cgst + sgst + cessAmt; 
-        
+        if (isNaN(netAmt) || netAmt <= 0) netAmt = taxable + cgst + sgst + cessAmt;
+
         const unitCost = totalStock > 0 ? (netAmt / totalStock) : 0;
         const autoSku = `SKU${Date.now().toString().slice(-5)}${index.toString().padStart(3, '0')}`;
 
@@ -115,9 +115,9 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
             mrp: item.mrp || '', sellingPrice: item.sellingPrice || item.mrp || '', unitCost: unitCost.toFixed(2),
             hsn: item.hsn || '', batch: item.batch || '', unit: item.unit || 'units', upc: upc,
             baseRate: baseRate.toFixed(2), schDisc: schDisc.toFixed(2), rsDisc: rsDisc.toFixed(2),
-            taxableAmt: taxable.toFixed(2), gstSlab: gstPct, cessPct: cessPct, 
-            cgst: cgst.toFixed(2), sgst: sgst.toFixed(2), 
-            netAmt: netAmt.toFixed(2), cases: cases, pcsLoose: pcs, freeQty: freeQty, totalStock: totalStock, expiry: item.expiry || item.exp || '' 
+            taxableAmt: taxable.toFixed(2), gstSlab: gstPct, cessPct: cessPct,
+            cgst: cgst.toFixed(2), sgst: sgst.toFixed(2),
+            netAmt: netAmt.toFixed(2), cases: cases, pcsLoose: pcs, freeQty: freeQty, totalStock: totalStock, expiry: item.expiry || item.exp || ''
         };
     });
 
@@ -145,7 +145,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
             <div id="preview-image-container" class="w-[25%] bg-[#0B1120] p-6 flex justify-center items-center border-r border-slate-700/50 relative shrink-0 group cursor-zoom-in select-none">
                 <div class="absolute top-4 left-4 bg-slate-800/80 text-slate-300 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 z-20 shadow-lg">Original Document</div>
                 <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center z-10 pointer-events-none">
-                    <span class="bg-indigo-600 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest shadow-xl flex items-center gap-2">
+                    <span class="bg-SLATE-600 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest shadow-xl flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
                         Double Tap to Expand
                     </span>
@@ -157,13 +157,13 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 <div class="bg-white p-6 border-b border-slate-200 shrink-0 shadow-sm z-10">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Supplier & Invoice Details</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div><label class="text-[10px] font-bold text-slate-500">Store / Dealer Name</label><input type="text" id="scan-supplier-name" value="${escapeHTML(header.dealerName || header.name || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500">Dealer Phone</label><input type="text" id="scan-supplier-phone" value="${escapeHTML(header.dealerPhone || header.phone || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500">Supplier GSTIN</label><input type="text" id="scan-supplier-gstin" value="${escapeHTML(header.dealerGstin || header.gstin || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500">Purchase Date</label><input type="date" id="scan-purchase-date" value="${escapeHTML(header.invoiceDate || todayISO)}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Store / Dealer Name</label><input type="text" id="scan-supplier-name" value="${escapeHTML(header.dealerName || header.name || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Dealer Phone</label><input type="text" id="scan-supplier-phone" value="${escapeHTML(header.dealerPhone || header.phone || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Supplier GSTIN</label><input type="text" id="scan-supplier-gstin" value="${escapeHTML(header.dealerGstin || header.gstin || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Purchase Date</label><input type="date" id="scan-purchase-date" value="${escapeHTML(header.invoiceDate || todayISO)}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
                         
-                        <div><label class="text-[10px] font-bold text-slate-500">Supplier PAN</label><input type="text" id="scan-supplier-pan" value="${escapeHTML(header.dealerPan || header.pan || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
-                        <div><label class="text-[10px] font-bold text-slate-500">Invoice Number</label><input type="text" id="scan-invoice-no" value="${escapeHTML(header.invoiceNumber || header.invoice_no || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Supplier PAN</label><input type="text" id="scan-supplier-pan" value="${escapeHTML(header.dealerPan || header.pan || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500">Invoice Number</label><input type="text" id="scan-invoice-no" value="${escapeHTML(header.invoiceNumber || header.invoice_no || '')}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-SLATE-500 outline-none bg-transparent hover:bg-slate-50"></div>
                     </div>
                 </div>
 
@@ -176,7 +176,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                                 <th class="p-2 min-w-[140px]">SKU/Code</th>
                                 <th class="p-2 min-w-[140px]">Barcode</th>
                                 <th class="p-2 min-w-[120px]">MRP</th>
-                                <th class="p-2 min-w-[130px] text-indigo-600 bg-indigo-50/50">Selling Price*</th>
+                                <th class="p-2 min-w-[130px] text-SLATE-600 bg-SLATE-50/50">Selling Price*</th>
                                 <th class="p-2 min-w-[120px]">Unit Cost</th>
                                 <th class="p-2 min-w-[110px] text-slate-400 bg-slate-200/50 border-l border-r border-slate-300">Total Stock</th>
                                 <th class="p-2 min-w-[90px]">CS</th>
@@ -188,7 +188,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                                 <th class="p-2 min-w-[140px]">
                                     <div class="flex flex-col gap-1">
                                         <span>Unit Type</span>
-                                        <select id="bulk-unit-select" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded p-1 cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500">
+                                        <select id="bulk-unit-select" class="text-[10px] font-bold text-SLATE-600 bg-SLATE-50 border border-SLATE-200 rounded p-1 cursor-pointer outline-none focus:ring-1 focus:ring-SLATE-500">
                                             <option value="">-- Bulk Change --</option>
                                             ${unitOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('')}
                                         </select>
@@ -217,7 +217,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
 
 
                     <div class="mt-4 flex justify-center pb-8">
-                        <button id="add-custom-row-btn" class="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-indigo-50 text-indigo-600 font-black tracking-wide rounded-xl transition-colors shadow-sm border border-indigo-100">
+                        <button id="add-custom-row-btn" class="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-SLATE-50 text-SLATE-600 font-black tracking-wide rounded-xl transition-colors shadow-sm border border-SLATE-100">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             Add Missing Item
                         </button>
@@ -226,25 +226,25 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
 
                 <div class="bg-white border-t border-slate-200 p-5 shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-30 flex flex-col gap-4">
                 
-                    <div class="flex items-center justify-between bg-indigo-50/80 p-4 rounded-xl mb-6 border border-indigo-200/50 shadow-sm shrink-0">
+                    <div class="flex items-center justify-between bg-SLATE-50/80 p-4 rounded-xl mb-6 border border-SLATE-200/50 shadow-sm shrink-0">
                         <div class="flex items-center gap-3">
-                            <div class="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                            <div class="p-2 bg-SLATE-100 text-SLATE-600 rounded-lg">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                             </div>
                             <div>
-                                <h4 class="text-sm font-black text-indigo-900 tracking-tight">AI Tax Interpretation</h4>
-                                <p class="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">Flip this switch if the AI misread how the supplier calculates GST.</p>
+                                <h4 class="text-sm font-black text-SLATE-900 tracking-tight">AI Tax Interpretation</h4>
+                                <p class="text-[10px] text-SLATE-600 font-bold uppercase tracking-wider mt-0.5">Flip this switch if the AI misread how the supplier calculates GST.</p>
                             </div>
                         </div>
                         
-                        <div class="flex items-center gap-3 bg-white p-2 rounded-lg border border-indigo-100 shadow-sm">
+                        <div class="flex items-center gap-3 bg-white p-2 rounded-lg border border-SLATE-100 shadow-sm">
                             <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Exclusive (+GST)</span>
                             <label class="flex items-center cursor-pointer relative z-10">
                                 <input type="checkbox" id="ai-tax-override-toggle" class="sr-only">
                                 <div class="w-12 h-6 bg-slate-200 rounded-full transition-colors duration-300 ease-in-out"></div>
                                 <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ease-in-out shadow-sm transform translate-x-0"></div>
                             </label>
-                            <span class="text-xs font-black text-indigo-700 uppercase tracking-widest">Inclusive (Net)</span>
+                            <span class="text-xs font-black text-SLATE-700 uppercase tracking-widest">Inclusive (Net)</span>
                         </div>
                     </div>
                     <style>
@@ -267,7 +267,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                             <p class="text-xs text-slate-400 font-medium">✏️ Adjust the <strong class="text-amber-500">Round Off / Offer</strong> field to perfectly match the printed bill total.</p>
                             <div class="flex items-center gap-2 mt-2">
                                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Payment Mode:</span>
-                                <select id="scan-payment-method" class="border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-indigo-700 outline-none focus:border-indigo-500 bg-white shadow-sm cursor-pointer">
+                                <select id="scan-payment-method" class="border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-SLATE-700 outline-none focus:border-SLATE-500 bg-white shadow-sm cursor-pointer">
                                     <option value="CASH">Cash</option>
                                     <option value="CHEQUE">Cheque</option>
                                     <option value="UPI">UPI</option>
@@ -304,11 +304,11 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                         </div>
                     </div>
 
-                    <div id="scan-cheque-details" class="hidden flex gap-3 justify-start items-center bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-                        <span class="text-indigo-800 font-bold text-[10px] uppercase tracking-wide">Cheque Info:</span>
-                        <input type="text" id="scan-cheque-bank" placeholder="Bank Name (e.g., HDFC)" class="border border-indigo-200 rounded p-1.5 text-sm w-40 outline-none focus:border-indigo-500 bg-white">
-                        <input type="text" id="scan-cheque-no" placeholder="Cheque No (6 Digits)" class="border border-indigo-200 rounded p-1.5 text-sm w-40 font-mono outline-none focus:border-indigo-500 bg-white">
-                        <input type="date" id="scan-cheque-date" class="border border-indigo-200 rounded p-1.5 text-sm outline-none focus:border-indigo-500 text-slate-600 bg-white" title="Clearance Date">
+                    <div id="scan-cheque-details" class="hidden flex gap-3 justify-start items-center bg-SLATE-50/50 p-3 rounded-xl border border-SLATE-100">
+                        <span class="text-SLATE-800 font-bold text-[10px] uppercase tracking-wide">Cheque Info:</span>
+                        <input type="text" id="scan-cheque-bank" placeholder="Bank Name (e.g., HDFC)" class="border border-SLATE-200 rounded p-1.5 text-sm w-40 outline-none focus:border-SLATE-500 bg-white">
+                        <input type="text" id="scan-cheque-no" placeholder="Cheque No (6 Digits)" class="border border-SLATE-200 rounded p-1.5 text-sm w-40 font-mono outline-none focus:border-SLATE-500 bg-white">
+                        <input type="date" id="scan-cheque-date" class="border border-SLATE-200 rounded p-1.5 text-sm outline-none focus:border-SLATE-500 text-slate-600 bg-white" title="Clearance Date">
                     </div>
                 </div>
 
@@ -322,27 +322,27 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
     // ------------------------------------------------------------------------
     // 🚀 FIXED: UI TOGGLES, SCROLLBARS, AND RECALCULATION ENGINE
     // ------------------------------------------------------------------------
-    
+
     // 1. The Safe Recalculation Engine
     const recalculateTotal = () => {
         const netInputs = document.querySelectorAll('.inp-net');
         let sum = 0;
         netInputs.forEach(n => sum += (parseFloat(n.value) || 0));
-        
+
         const roundOffInput = document.getElementById('scan-round-off');
         const roundOffVal = parseFloat(roundOffInput ? roundOffInput.value : 0) || 0;
         const finalTotal = sum - roundOffVal;
 
         const subDisplay = document.getElementById('scan-subtotal-display');
         if (subDisplay) subDisplay.innerText = `₹${sum.toFixed(2)}`;
-        
+
         const totDisplay = document.getElementById('scan-invoice-total');
         if (totDisplay) totDisplay.value = finalTotal.toFixed(2);
     };
 
     // Initialize Totals
     recalculateTotal();
-    
+
     const roundOffEl = document.getElementById('scan-round-off');
     if (roundOffEl) roundOffEl.addEventListener('input', recalculateTotal);
 
@@ -356,14 +356,14 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
 
         taxOverrideToggle.addEventListener('change', (e) => {
             const forceInclusive = e.target.checked;
-            
+
             // 🚀 FIXED: Iterate over ACTUAL DOM rows to preserve manual user edits!
             const rows = document.querySelectorAll('#audit-items-table tbody tr.item-row');
-            
+
             rows.forEach((row, index) => {
                 // Safe DOM getters/setters
                 const getVal = (cls) => parseFloat(row.querySelector(cls)?.value) || 0;
-                const setVal = (cls, val) => { const el = row.querySelector(cls); if(el) el.value = val; };
+                const setVal = (cls, val) => { const el = row.querySelector(cls); if (el) el.value = val; };
 
                 const qty = getVal('.inp-total-stock') || 1;
                 const gst = getVal('.inp-gst');
@@ -374,7 +374,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 // 🚀 THE MAGIC ANCHOR: Freeze the original rate so math doesn't compound!
                 const baseRateInput = row.querySelector('.inp-base-rate');
                 let originalRate = parseFloat(baseRateInput.dataset.originalRate);
-                
+
                 if (isNaN(originalRate)) {
                     // First time toggling: freeze the current base rate into the dataset
                     originalRate = getVal('.inp-base-rate') || getVal('.inp-unit-cost');
@@ -407,10 +407,10 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 setVal('.inp-net', newNet.toFixed(2));
                 setVal('.inp-cgst', halfTax.toFixed(2));
                 setVal('.inp-sgst', halfTax.toFixed(2));
-                
+
                 const unitCostInput = row.querySelector('.inp-unit-cost');
                 if (unitCostInput) unitCostInput.value = (newNet / qty).toFixed(2);
-                
+
                 // Keep background payload synced for saving
                 if (enrichedItems[index]) {
                     enrichedItems[index].baseRate = newBaseRate.toFixed(2);
@@ -421,7 +421,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                     enrichedItems[index].isTaxInclusive = forceInclusive;
                 }
             });
-            
+
             recalculateTotal();
             if (typeof showToast === 'function') {
                 showToast("Taxes Recalculated", forceInclusive ? "Switched to Inclusive Mode" : "Switched to Exclusive Mode", "info");
@@ -452,14 +452,14 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
         addRowBtn.addEventListener('click', () => {
             const tbody = document.querySelector('#audit-items-table tbody');
             if (!tbody) return;
-            
+
             const emptyItem = {
-                name: '', sku: `SKU${Date.now().toString().slice(-5)}${Math.floor(Math.random()*100)}`, barcode: '',
+                name: '', sku: `SKU${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 100)}`, barcode: '',
                 mrp: '', sellingPrice: '', unitCost: '0.00', totalStock: 0, cases: 0, upc: 1, pcsLoose: 0,
                 unit: 'units', baseRate: '0.00', schDisc: '0.00', rsDisc: '0.00', taxableAmt: '0.00', gstSlab: 0,
                 cessPct: 0, cgst: '0.00', sgst: '0.00', netAmt: '0.00', hsn: '', batch: '', expiry: ''
             };
-            
+
             tbody.insertAdjacentHTML('beforeend', generateRowHTML(emptyItem));
             const scrollContainer = document.querySelector('.custom-scrollbar');
             if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
@@ -467,17 +467,17 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
     }
 
     // 5. Bulk Unit Selection
-    const bulkUnitSelect = document.getElementById('bulk-unit-select'); 
+    const bulkUnitSelect = document.getElementById('bulk-unit-select');
     if (bulkUnitSelect) {
         bulkUnitSelect.addEventListener('change', (e) => {
             const selectedUnit = e.target.value;
-            if (!selectedUnit) return; 
+            if (!selectedUnit) return;
             document.querySelectorAll('.inp-unit').forEach(select => select.value = selectedUnit);
         });
     }
 
     // 6. Image Zoom Logic
-    const imgContainer = document.getElementById('preview-image-container'); 
+    const imgContainer = document.getElementById('preview-image-container');
     if (imgContainer) {
         imgContainer.addEventListener('dblclick', () => {
             const previewHtml = `
@@ -491,17 +491,17 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
             document.body.insertAdjacentHTML('beforeend', previewHtml);
             const zoomEl = document.getElementById('fullscreen-receipt-zoom');
             if (zoomEl) {
-                zoomEl.onclick = function() {
+                zoomEl.onclick = function () {
                     this.classList.replace(' ', 'animate-fadeOut');
-                    setTimeout(() => this.remove(), 200); 
+                    setTimeout(() => this.remove(), 200);
                 };
             }
         });
     }
-// ------------------------------------------------------------------------
+    // ------------------------------------------------------------------------
     // 🚀 FIXED: BULLETPROOF OMNI-DIRECTIONAL MATH ENGINE
     // ------------------------------------------------------------------------
-    
+
     const table = document.getElementById('audit-items-table');
     if (table) {
         // DELETE ROW LISTENER
@@ -515,7 +515,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                     row.style.transform = "scaleY(0.8)";
                     setTimeout(() => {
                         row.remove();
-                        recalculateTotal(); 
+                        recalculateTotal();
                     }, 200);
                 }
             }
@@ -526,7 +526,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
             const row = e.target.closest('tr');
             const target = e.target;
             if (!row || !target) return;
-            
+
             const isQty = target.classList.contains('inp-cs') || target.classList.contains('inp-upc') || target.classList.contains('inp-pcs') || target.classList.contains('inp-free-qty');
             const isRate = target.classList.contains('inp-base-rate');
             const isDisc = target.classList.contains('inp-sch-disc') || target.classList.contains('inp-rs-disc');
@@ -546,17 +546,17 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 const upc = parseFloat(row.querySelector('.inp-upc')?.value) || 1;
                 const pcs = parseFloat(row.querySelector('.inp-pcs')?.value) || 0;
                 const freeQty = parseFloat(row.querySelector('.inp-free-qty')?.value) || 0;
-                
+
                 // Physical vs Paid Stock Math
                 const paidStock = (cases * upc) + pcs;
                 const totalStock = paidStock + freeQty;
-                const calcQty = paidStock > 0 ? paidStock : 1; 
-                
+                const calcQty = paidStock > 0 ? paidStock : 1;
+
                 const gstPct = parseFloat(row.querySelector('.inp-gst')?.value) || 0;
                 const cessPct = parseFloat(row.querySelector('.inp-cess')?.value) || 0;
                 const schDisc = parseFloat(row.querySelector('.inp-sch-disc')?.value) || 0;
                 const rsDisc = parseFloat(row.querySelector('.inp-rs-disc')?.value) || 0;
-                
+
                 let baseRate = parseFloat(row.querySelector('.inp-base-rate')?.value) || 0;
                 let taxable = parseFloat(row.querySelector('.inp-taxable')?.value) || 0;
                 let cgst = parseFloat(row.querySelector('.inp-cgst')?.value) || 0;
@@ -581,12 +581,12 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                     }
                     const totalGst = netAmt - taxable;
                     cgst = totalGst / 2; sgst = totalGst / 2;
-                } 
+                }
                 else if (isTaxable) {
                     netAmt = taxable * taxMultiplier;
                     if (isInclusiveMode) baseRate = (netAmt + schDisc + rsDisc) / calcQty;
                     else baseRate = (taxable + schDisc + rsDisc) / calcQty;
-                    
+
                     const totalGst = netAmt - taxable;
                     cgst = totalGst / 2; sgst = totalGst / 2;
                 }
@@ -610,7 +610,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                     taxable = netAmt / taxMultiplier;
                     if (isInclusiveMode) baseRate = (netAmt + schDisc + rsDisc) / calcQty;
                     else baseRate = (taxable + schDisc + rsDisc) / calcQty;
-                    
+
                     const totalGst = netAmt - taxable;
                     cgst = totalGst / 2; sgst = totalGst / 2;
                 }
@@ -627,7 +627,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 write('.inp-cgst', cgst.toFixed(2));
                 write('.inp-sgst', sgst.toFixed(2));
                 write('.inp-net', netAmt.toFixed(2));
-                
+
                 const unitCost = totalStock > 0 ? (netAmt / totalStock) : 0;
                 write('.inp-unit-cost', unitCost.toFixed(2));
 
@@ -660,7 +660,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
             rows.forEach(row => {
                 const nameInput = row.querySelector('.inp-name');
                 if (!nameInput) return;
-                
+
                 const name = nameInput.value.trim();
                 const sellingPriceInput = row.querySelector('.inp-selling-price');
                 const sellingPrice = parseFloat(sellingPriceInput ? sellingPriceInput.value : 0);
@@ -668,7 +668,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                 if (name) {
                     if (isNaN(sellingPrice) || sellingPrice <= 0) {
                         if (sellingPriceInput) {
-                            sellingPriceInput.classList.remove('border-indigo-300', 'bg-indigo-50');
+                            sellingPriceInput.classList.remove('border-SLATE-300', 'bg-SLATE-50');
                             sellingPriceInput.classList.add('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-200');
                         }
                         hasErrors = true;
@@ -676,7 +676,7 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                         if (sellingPriceInput) {
                             sellingPriceInput.classList.remove('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-200');
                         }
-                        
+
                         // Safe extraction for all fields
                         const extract = (cls, isFloat = false) => {
                             const el = row.querySelector(cls);
@@ -685,29 +685,29 @@ export function renderReviewScreen(extractedData, imageSrc, onSave) {
                         };
 
                         finalPayload.push({
-                            name: name, 
-                            sku: extract('.inp-sku'), 
+                            name: name,
+                            sku: extract('.inp-sku'),
                             barcode: extract('.inp-barcode'),
-                            price: sellingPrice, 
-                            mrp: extract('.inp-mrp', true), 
+                            price: sellingPrice,
+                            mrp: extract('.inp-mrp', true),
                             cost: extract('.inp-unit-cost', true),
-                            stockLevel: extract('.inp-total-stock', true), 
+                            stockLevel: extract('.inp-total-stock', true),
                             cases: parseInt(extract('.inp-cs')) || 0,
-                            pieces: parseInt(extract('.inp-pcs')) || 0, 
+                            pieces: parseInt(extract('.inp-pcs')) || 0,
                             freeQty: parseInt(extract('.inp-free-qty')) || 0, // 🚀 EXTRACT IT HERE!
-                            upc: parseInt(extract('.inp-upc')) || 1, 
+                            upc: parseInt(extract('.inp-upc')) || 1,
                             unit: extract('.inp-unit') || 'units',
-                            baseRate: extract('.inp-base-rate', true), 
+                            baseRate: extract('.inp-base-rate', true),
                             schDisc: extract('.inp-sch-disc', true),
-                            rsDisc: extract('.inp-rs-disc', true), 
+                            rsDisc: extract('.inp-rs-disc', true),
                             taxableAmt: extract('.inp-taxable', true),
-                            gstSlab: extract('.inp-gst', true), 
-                            cess: extract('.inp-cess', true), 
+                            gstSlab: extract('.inp-gst', true),
+                            cess: extract('.inp-cess', true),
                             cgstAmt: extract('.inp-cgst', true),
-                            sgstAmt: extract('.inp-sgst', true), 
+                            sgstAmt: extract('.inp-sgst', true),
                             netAmt: extract('.inp-net', true),
-                            hsn: extract('.inp-hsn'), 
-                            batch: extract('.inp-batch'), 
+                            hsn: extract('.inp-hsn'),
+                            batch: extract('.inp-batch'),
                             expirationDate: extract('.inp-expiry') || null
                         });
                     }

@@ -1,19 +1,19 @@
 // src/components/dashboard.js
 
 import { MASTER_WIDGET_LIST } from '../store/widgetConfig.js';
-import { 
-    dashboardWidgets, storeId, appId, userId, userRole, 
-    currentLocationId, currentUserPlan, availableLocations, 
-    getCurrencySymbol, getStoreId, getUserRole, getCurrentLocationId, 
+import {
+    dashboardWidgets, storeId, appId, userId, userRole,
+    currentLocationId, currentUserPlan, availableLocations,
+    getCurrencySymbol, getStoreId, getUserRole, getCurrentLocationId,
     getAvailableLocations, getUserId, getCurrentUserPlan,
     AppState // 🚀 THE FIX: Import the event bus to replace onSnapshot
 } from '../store/state.js';
-import { DOM, showModal } from '../utils/dom.js'; 
-import { 
-    calculateAllMetrics, 
-    renderWidgetById, 
+import { DOM, showModal } from '../utils/dom.js';
+import {
+    calculateAllMetrics,
+    renderWidgetById,
     renderChartToCanvas,
-    handleWidgetInteraction 
+    handleWidgetInteraction
 } from './widgetRenderer.js';
 import { escapeHTML } from '../utils/security.js';
 
@@ -30,7 +30,7 @@ function normalizePlan(planString) {
     if (!planString) return 'free';
     const plan = planString.toLowerCase();
     if (plan === 'standard') return 'silver';
-    if (plan === 'premium') return 'platinum'; 
+    if (plan === 'premium') return 'platinum';
     return plan;
 }
 
@@ -41,12 +41,12 @@ const safePlan = () => {
 
 // --- State ---
 let isDashboardLoaded = false;
-let isDashboardListenersAttached = false; 
+let isDashboardListenersAttached = false;
 
 // --- NEW: Rendering Lock & Session Tracker ---
 let isRenderingDashboard = false;
 let queuedDashboardRender = null;
-let hasFetchedThisSession = false; 
+let hasFetchedThisSession = false;
 let isDailyStatsListening = false;
 
 export function listenToLiveDailyStats() {
@@ -54,13 +54,13 @@ export function listenToLiveDailyStats() {
 
     const updateStats = async () => {
         if (!window.dbAPI || !window.dbAPI.getTransactionsSince) return;
-        
+
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
         try {
             const txs = await window.dbAPI.getTransactionsSince(startOfToday.toISOString());
-            
+
             let totalRev = 0;
             let totalCount = 0;
             let totalPur = 0;
@@ -79,8 +79,8 @@ export function listenToLiveDailyStats() {
 
             const revWidget = document.querySelector('[data-widget="revenueToday"]');
             if (revWidget) {
-                const valEl = revWidget.querySelector('.text-3xl, .text-4xl, h3, h4'); 
-                if (valEl) valEl.textContent = `${currency}${totalRev.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+                const valEl = revWidget.querySelector('.text-3xl, .text-4xl, h3, h4');
+                if (valEl) valEl.textContent = `${currency}${totalRev.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
             }
 
             const txWidget = document.querySelector('[data-widget="totalTransactionsToday"]');
@@ -92,7 +92,7 @@ export function listenToLiveDailyStats() {
             const purWidget = document.querySelector('[data-widget="purchasesToday"]');
             if (purWidget) {
                 const valEl = purWidget.querySelector('.text-3xl, .text-4xl, h3, h4');
-                if (valEl) valEl.textContent = `${currency}${totalPur.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+                if (valEl) valEl.textContent = `${currency}${totalPur.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
             }
         } catch (e) {
             console.error("Dashboard Live Sync Error:", e);
@@ -111,7 +111,7 @@ export function listenToLiveDailyStats() {
     updateStats();
 }
 
-const MASTER_DEVICE_KEY = 'mifela_master_terminal_v1'; 
+const MASTER_DEVICE_KEY = 'mifela_master_terminal_v1';
 const DASHBOARD_CACHE_KEY = 'mifela_dashboard_metrics_v1';
 
 // --- Helper: Get Local Date String (YYYY-MM-DD) ---
@@ -142,18 +142,18 @@ async function getDeviceSignature() {
 }
 
 export async function performAutoIpUpdate() {
-    return; 
+    return;
 }
 
-window.toggleIpSecurity = async function(isEnabled) {
-    
+window.toggleIpSecurity = async function (isEnabled) {
+
     const checkbox = document.getElementById('ip-security-toggle');
-    if(checkbox) checkbox.checked = false;
+    if (checkbox) checkbox.checked = false;
 };
 
 async function setupWelcomeBanner() {
     updateDashboardHeader();
-    
+
     const planEl = DOM.dashboard?.planName || document.getElementById('dashboard-plan-name');
     const welcomeCard = planEl ? planEl.closest('.rounded-xl') : document.querySelector('#dashboard > div.rounded-xl');
     if (!welcomeCard) return;
@@ -163,31 +163,31 @@ async function setupWelcomeBanner() {
         if (header) {
             const btnContainer = document.createElement('div');
             btnContainer.className = "flex items-center justify-between w-full mb-4";
-            
+
             const h2Clone = header.cloneNode(true);
             header.parentNode.replaceChild(btnContainer, header);
             btnContainer.appendChild(h2Clone);
 
             const refreshBtn = document.createElement('button');
             refreshBtn.id = 'refresh-dashboard-btn';
-            refreshBtn.className = "text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 bg-indigo-50 px-4 py-2 rounded-full transition-colors cursor-pointer border border-indigo-100 hover:bg-indigo-100 shadow-sm";
+            refreshBtn.className = "text-sm text-SLATE-600 hover:text-SLATE-800 font-medium flex items-center gap-1 bg-SLATE-50 px-4 py-2 rounded-full transition-colors cursor-pointer border border-SLATE-100 hover:bg-SLATE-100 shadow-sm";
             refreshBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh`;
             refreshBtn.onclick = async () => {
-                refreshBtn.innerHTML = `<div class="animate-spin h-4 w-4 border-2 border-indigo-600 rounded-full border-t-transparent"></div>`;
+                refreshBtn.innerHTML = `<div class="animate-spin h-4 w-4 border-2 border-SLATE-600 rounded-full border-t-transparent"></div>`;
                 refreshBtn.disabled = true;
-                await renderDynamicDashboard(true); 
+                await renderDynamicDashboard(true);
                 setTimeout(() => {
                     const newBtn = document.getElementById('refresh-dashboard-btn');
-                    if(newBtn) {
-                         newBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh`;
-                         newBtn.disabled = false;
+                    if (newBtn) {
+                        newBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh`;
+                        newBtn.disabled = false;
                     }
                 }, 300);
             };
             btnContainer.appendChild(refreshBtn);
         }
     }
-    
+
     // 🚀 THE FIX: Wipe out any old clock-in containers from the DOM
     const oldContainer = document.getElementById('dashboard-attendance-container');
     if (oldContainer) oldContainer.remove();
@@ -197,13 +197,13 @@ async function setupWelcomeBanner() {
 // 4. Rip out Cloud Computed Aggregations
 export async function syncWeeklyFastMovers() {
     // Cannot be run offline efficiently, gracefully skipping
-    window.__mifela_fast_movers = []; 
+    window.__mifela_fast_movers = [];
     return;
 }
 
 export async function syncMonthlyForecasting() {
     // Cannot be run offline efficiently, gracefully skipping
-    window.__mifela_monthly_forecast = []; 
+    window.__mifela_monthly_forecast = [];
     return;
 }
 
@@ -213,18 +213,18 @@ async function validateLocation() {
         const profileRef = doc(db, `artifacts/${safeAppId()}/stores/${safeStoreId()}/settings/profile`);
         const snap = await getDoc(profileRef);
 
-        if (!snap.exists() || !snap.data().security || !snap.data().security.enabled) return true; 
+        if (!snap.exists() || !snap.data().security || !snap.data().security.enabled) return true;
 
-        const allowedSignature = snap.data().security.allowedIp; 
-        const userSignature = await getDeviceSignature(); 
+        const allowedSignature = snap.data().security.allowedIp;
+        const userSignature = await getDeviceSignature();
 
         if (!userSignature) throw new Error("Cannot verify location. Check internet connection.");
-        
+
         if (userSignature.value !== allowedSignature) {
             throw new Error(`Location Mismatch. You are not on the Store Network or Master Terminal.`);
         }
 
-        return true; 
+        return true;
     } catch (e) {
         if (e.code === 'permission-denied') return true;
         throw e;
@@ -232,26 +232,26 @@ async function validateLocation() {
 }
 
 // --- EXPOSED: Settings Toggle Functions ---
-window.toggleIpSecurity = async function(isEnabled) {
+window.toggleIpSecurity = async function (isEnabled) {
     const role = safeUserRole();
     if (role !== 'admin' && role !== 'store_manager') {
         showModal('Permission Denied', 'Only Admins can change security settings.', 'error');
         const checkbox = document.getElementById('ip-security-toggle');
-        if(checkbox) checkbox.checked = !isEnabled;
+        if (checkbox) checkbox.checked = !isEnabled;
         return;
     }
 
     try {
         const profileRef = doc(db, `artifacts/${safeAppId()}/stores/${safeStoreId()}/settings/profile`);
-        
+
         if (isEnabled) {
             showModal('Securing...', 'Detecting network signature...', 'info');
             const signature = await getDeviceSignature();
-            
+
             if (!signature) {
                 showModal('Error', 'Could not detect signature. Check internet.', 'error');
                 const checkbox = document.getElementById('ip-security-toggle');
-                if(checkbox) checkbox.checked = false;
+                if (checkbox) checkbox.checked = false;
                 return;
             }
 
@@ -270,35 +270,35 @@ window.toggleIpSecurity = async function(isEnabled) {
 
             if (isAuto) localStorage.setItem(MASTER_DEVICE_KEY, 'true');
             else localStorage.removeItem(MASTER_DEVICE_KEY);
-            
+
             showModal('Security Enabled', `Location locked to: ${signature.value}`, 'success');
 
         } else {
-            if(!confirm("Are you sure? Employees will be able to mark attendance from ANY location.")) {
+            if (!confirm("Are you sure? Employees will be able to mark attendance from ANY location.")) {
                 const checkbox = document.getElementById('ip-security-toggle');
-                if(checkbox) checkbox.checked = true;
+                if (checkbox) checkbox.checked = true;
                 return;
             }
 
             await setDoc(profileRef, { security: { enabled: false } }, { merge: true });
-            localStorage.removeItem(MASTER_DEVICE_KEY); 
+            localStorage.removeItem(MASTER_DEVICE_KEY);
             showModal('Security Disabled', 'Location restrictions removed.', 'info');
         }
-        
+
         const btnContainer = document.getElementById('dashboard-attendance-container');
-        if(btnContainer) {
-             btnContainer.innerHTML = ''; 
-             await checkAttendance(btnContainer);
+        if (btnContainer) {
+            btnContainer.innerHTML = '';
+            await checkAttendance(btnContainer);
         }
 
-    } catch(e) {
+    } catch (e) {
         showModal('Error', 'Failed to save security setting.', 'error');
         const checkbox = document.getElementById('ip-security-toggle');
-        if(checkbox) checkbox.checked = !isEnabled;
+        if (checkbox) checkbox.checked = !isEnabled;
     }
 };
 
-window.loadSecurityState = async function() {
+window.loadSecurityState = async function () {
     if (!safeStoreId()) return;
     try {
         const profileRef = doc(db, `artifacts/${safeAppId()}/stores/${safeStoreId()}/settings/profile`);
@@ -306,12 +306,12 @@ window.loadSecurityState = async function() {
         const enabled = snap.exists() ? snap.data().security?.enabled : false;
         const checkbox = document.getElementById('ip-security-toggle');
         if (checkbox) checkbox.checked = !!enabled;
-    } catch(e) { console.warn("Failed to load security state", e); }
+    } catch (e) { console.warn("Failed to load security state", e); }
 };
 
 export async function renderDynamicDashboard(forceRefresh = false) {
     if (!getUserId() || !getStoreId()) return;
-    if (!DOM.dashboard.grid) return; 
+    if (!DOM.dashboard.grid) return;
 
     if (!safeAppId() || !safeStoreId()) {
         setTimeout(() => renderDynamicDashboard(forceRefresh), 500);
@@ -328,13 +328,13 @@ export async function renderDynamicDashboard(forceRefresh = false) {
         DOM.dashboard.grid.innerHTML = '';
         if (safeUserRole() === 'admin') performAutoIpUpdate();
 
-        try { await setupWelcomeBanner(); } 
+        try { await setupWelcomeBanner(); }
         catch (e) { console.warn("Welcome init failed:", e); }
-        
+
         let metrics = {};
-        
+
         const shouldFetch = forceRefresh || !hasFetchedThisSession;
-        
+
         try {
             if (shouldFetch) {
                 metrics = await calculateAllMetrics();
@@ -356,28 +356,28 @@ export async function renderDynamicDashboard(forceRefresh = false) {
                     <p class="text-red-600 text-sm mb-4">${escapeHTML(e.message)}</p>
                     <button onclick="location.reload()" class="px-5 py-2.5 bg-white border border-red-300 text-red-700 font-bold rounded-lg shadow-sm hover:bg-red-50 transition-colors">Reload App</button>
                 </div>`;
-            return; 
+            return;
         }
 
         try {
             const presentList = await getPresentStaffToday();
             metrics.staffOnDuty = presentList.length;
-            metrics.availableStaff = presentList.length; 
-            metrics.staffCount = presentList.length; 
-        } catch(e) {
+            metrics.availableStaff = presentList.length;
+            metrics.staffCount = presentList.length;
+        } catch (e) {
             console.warn("Could not fetch today's staff on duty for dashboard:", e);
             metrics.staffOnDuty = 0;
             metrics.availableStaff = 0;
         }
-        
+
         saveMetricsToCache(metrics);
 
         if (safeUserRole() === 'admin') {
             setTimeout(() => {
-                if (!getUserId() || !getStoreId()) return; 
-                if (typeof syncWeeklyFastMovers === 'function') syncWeeklyFastMovers().catch(() => {});
-                if (typeof syncMonthlyForecasting === 'function') syncMonthlyForecasting().catch(() => {});
-            }, 2000); 
+                if (!getUserId() || !getStoreId()) return;
+                if (typeof syncWeeklyFastMovers === 'function') syncWeeklyFastMovers().catch(() => { });
+                if (typeof syncMonthlyForecasting === 'function') syncMonthlyForecasting().catch(() => { });
+            }, 2000);
         }
 
         if (window.__inventoryStats) {
@@ -386,8 +386,8 @@ export async function renderDynamicDashboard(forceRefresh = false) {
             metrics.lowStockList = window.__inventoryStats.lowStockList || metrics.lowStockList || [];
             metrics.expiredList = window.__inventoryStats.expiredList || metrics.expiredList || [];
             metrics.valueAtRisk = window.__inventoryStats.valueAtRisk || metrics.valueAtRisk || 0;
-            
-            metrics.stockValueAtRisk = metrics.valueAtRisk; 
+
+            metrics.stockValueAtRisk = metrics.valueAtRisk;
             metrics.outOfStockCount = (metrics.lowStockList).filter(item => item.status === 'Out' || item.type === 'out').length;
         }
 
@@ -400,10 +400,10 @@ export async function renderDynamicDashboard(forceRefresh = false) {
 
         const ind = document.getElementById('dashboard-cache-indicator');
         if (ind) ind.remove();
-        
+
         const existingFooter = document.getElementById('dashboard-copyright-footer');
         if (existingFooter) existingFooter.remove();
-        
+
         const footer = document.createElement('div');
         footer.id = 'dashboard-copyright-footer';
         footer.className = "col-span-full py-8 text-center border-t border-gray-100 mt-8";
@@ -413,15 +413,15 @@ export async function renderDynamicDashboard(forceRefresh = false) {
                 <p class="text-[11px] text-gray-500 font-medium">© 2026 All Rights Reserved</p>
             </div>
         `;
-        DOM.dashboard.grid.appendChild(footer); 
+        DOM.dashboard.grid.appendChild(footer);
 
         if (!isDashboardListenersAttached) {
             let lastTapTime = 0;
             let tapTimeout;
-            
-            DOM.dashboard.grid.addEventListener('click', (e) => { 
+
+            DOM.dashboard.grid.addEventListener('click', (e) => {
                 const btn = e.target.closest('button');
-                
+
                 if (btn) {
                     const text = (btn.textContent || btn.innerText || '').trim().toLowerCase();
                     const btnId = (btn.id || '').toLowerCase();
@@ -452,11 +452,11 @@ export async function renderDynamicDashboard(forceRefresh = false) {
 
                 if (tapLength > 0 && tapLength < 400) {
                     e.preventDefault();
-                    card.classList.add('ring-4', 'ring-indigo-200');
-                    setTimeout(() => card.classList.remove('ring-4', 'ring-indigo-200'), 200);
-                    
+                    card.classList.add('ring-4', 'ring-SLATE-200');
+                    setTimeout(() => card.classList.remove('ring-4', 'ring-SLATE-200'), 200);
+
                     const widgetId = card.dataset.widget;
-                    
+
                     if (widgetId === 'stockValueAtRisk' || widgetId === 'valueAtRisk') {
                         if (typeof showValueAtRiskModal === 'function') showValueAtRiskModal();
                     } else if (widgetId === 'revenueToday' || widgetId === 'totalTransactionsToday' || widgetId === 'topProductsToday' || widgetId === 'purchasesToday') {
@@ -528,7 +528,7 @@ async function showStaffAttendanceModal() {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', html);
     const modalEl = document.getElementById(modalId);
 
@@ -554,17 +554,17 @@ async function getPresentStaffToday() {
     const todayStr = getLocalDateString(new Date()); // e.g., "2026-10-20"
     const monthStr = todayStr.substring(0, 7);       // "2026-10"
     const dayNum = parseInt(todayStr.split('-')[2], 10); // e.g., 20 for day 20
-    
-    let presentStaffMap = new Map(); 
-    
+
+    let presentStaffMap = new Map();
+
     // 1. Fetch Staff Directory from SQLite or LocalStorage cache
     let staffDirectory = [];
     try {
         if (window.dbAPI && typeof window.dbAPI.getStaff === 'function') {
             staffDirectory = await window.dbAPI.getStaff() || [];
         }
-    } catch(e){}
-    
+    } catch (e) { }
+
     if (!staffDirectory || staffDirectory.length === 0) {
         try {
             const cacheKeys = ['mifela_staff_directory', 'mifela_staff_list', 'mifela_staff_cache'];
@@ -575,7 +575,7 @@ async function getPresentStaffToday() {
                     break;
                 }
             }
-        } catch(e){}
+        } catch (e) { }
     }
 
     // Map staff directory by ID/Name/Phone for universal matching
@@ -600,17 +600,17 @@ async function getPresentStaffToday() {
         // Staff.js often saves matrices like mifela_staff_attendance_2026-10 where records contain day columns
         const monthKey = `mifela_staff_attendance_${monthStr}`;
         const monthAtt = JSON.parse(localStorage.getItem(monthKey) || '{}');
-        
+
         Object.entries(monthAtt).forEach(([staffKey, records]) => {
             if (!records) return;
-            
+
             // Check both date format ("2026-10-20") and numeric day index format (20 or "20")
             const todayRecord = records[todayStr] || records[dayNum] || records[String(dayNum)];
-            
+
             if (isMarkedPresent(todayRecord)) {
                 const matchedStaff = staffDict[staffKey] || staffDict[String(staffKey).toLowerCase()] || { name: staffKey, role: 'Staff' };
                 const realName = matchedStaff.name || matchedStaff.storeName || staffKey;
-                
+
                 presentStaffMap.set(realName, {
                     name: realName,
                     role: matchedStaff.role || matchedStaff.designation || 'Staff',
@@ -618,7 +618,7 @@ async function getPresentStaffToday() {
                 });
             }
         });
-    } catch(e) {
+    } catch (e) {
         console.warn("Error parsing staff attendance matrix:", e);
     }
 
@@ -631,7 +631,7 @@ async function getPresentStaffToday() {
                     if (isMarkedPresent(val)) {
                         const matchedStaff = staffDict[uid] || staffDict[String(uid).toLowerCase()] || { name: uid, role: 'Staff' };
                         const realName = matchedStaff.name || matchedStaff.storeName || uid;
-                        
+
                         presentStaffMap.set(realName, {
                             name: realName,
                             role: matchedStaff.role || matchedStaff.designation || 'Staff',
@@ -641,7 +641,7 @@ async function getPresentStaffToday() {
                 });
             }
         }
-    } catch(e){}
+    } catch (e) { }
 
     // 4. Scan alternative fallback keys
     try {
@@ -660,7 +660,7 @@ async function getPresentStaffToday() {
                 }
             });
         });
-    } catch(e){}
+    } catch (e) { }
 
     return Array.from(presentStaffMap.values());
 }
@@ -671,7 +671,7 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
 
     let title = 'History';
     if (widgetId === 'revenueToday') title = 'Revenue History';
-    if (widgetId === 'purchasesToday') title = 'Purchases History'; 
+    if (widgetId === 'purchasesToday') title = 'Purchases History';
     if (widgetId === 'totalTransactionsToday') title = 'Sales Count History';
     if (widgetId === 'topProductsToday') title = 'Top Products (Expanded)';
 
@@ -686,13 +686,13 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
                 </div>
                 <div class="p-6" id="safe-history-content">
                     <div class="flex justify-center items-center py-8">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600"></div>
                     </div>
                 </div>
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', html);
     modal = document.getElementById(modalId);
 
@@ -721,13 +721,13 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
             contentContainer.innerHTML = `<div class="text-center py-8 text-gray-500">No sales recorded today yet.</div>`;
             return;
         }
-        let listHtml = `<div class="overflow-hidden rounded-lg border border-gray-200"><table class="w-full text-sm text-left"><thead class="bg-indigo-50 text-indigo-700 uppercase text-xs"><tr><th class="px-4 py-3">Rank</th><th class="px-4 py-3">Product Name</th><th class="px-4 py-3 text-right">Qty Sold</th></tr></thead><tbody class="divide-y divide-gray-100">`;
+        let listHtml = `<div class="overflow-hidden rounded-lg border border-gray-200"><table class="w-full text-sm text-left"><thead class="bg-SLATE-50 text-SLATE-700 uppercase text-xs"><tr><th class="px-4 py-3">Rank</th><th class="px-4 py-3">Product Name</th><th class="px-4 py-3 text-right">Qty Sold</th></tr></thead><tbody class="divide-y divide-gray-100">`;
         items.forEach((item, index) => {
             let rankClass = "bg-gray-100 text-gray-500";
             if (index === 0) rankClass = "bg-yellow-100 text-yellow-700";
             if (index === 1) rankClass = "bg-gray-200 text-gray-700";
             if (index === 2) rankClass = "bg-orange-100 text-orange-700";
-            listHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-3"><span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${rankClass}">${index + 1}</span></td><td class="px-4 py-3 font-medium text-gray-700">${escapeHTML(item.name)}</td><td class="px-4 py-3 text-right font-bold text-indigo-600">${item.qty}</td></tr>`;
+            listHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-3"><span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${rankClass}">${index + 1}</span></td><td class="px-4 py-3 font-medium text-gray-700">${escapeHTML(item.name)}</td><td class="px-4 py-3 text-right font-bold text-SLATE-600">${item.qty}</td></tr>`;
         });
         listHtml += `</tbody></table></div>`;
         contentContainer.innerHTML = listHtml;
@@ -737,10 +737,10 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
         const isPur = widgetId === 'purchasesToday';
         const isMoney = isRev || isPur;
         const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
-        
+
         let colName = isRev ? 'Revenue' : (isPur ? 'Purchases' : 'Transactions');
         let listHtml = `<div class="overflow-hidden rounded-lg border border-gray-200"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-500 uppercase text-xs"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3 ${isMoney ? 'text-right' : 'text-center'}">${colName}</th></tr></thead><tbody class="divide-y divide-gray-100">`;
-        
+
         let totalVal = 0;
         const todayStr = getLocalDateString(new Date());
 
@@ -748,9 +748,9 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
             const d = new Date(); d.setDate(d.getDate() - i);
             const dateStr = getLocalDateString(d);
             const displayDate = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-            
+
             let val = 0;
-            
+
             if (dateStr === todayStr) {
                 if (isRev) val = currentMetrics.revenueToday || 0;
                 else if (isPur) val = currentMetrics.purchasesToday || 0;
@@ -758,19 +758,19 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
             } else {
                 if (!historicalDataCache[dateStr]) {
                     historicalDataCache[dateStr] = { revenue: 0, purchases: 0, transactions: 0 };
-                    
+
                     // 🚀 THE FIX: Use local SQLite instead of Firebase query/getDocs
                     try {
                         const startOfDay = new Date(dateStr);
                         startOfDay.setHours(0, 0, 0, 0);
-                        
+
                         if (window.dbAPI && window.dbAPI.getTransactionsSince) {
                             const snap = await window.dbAPI.getTransactionsSince(startOfDay.toISOString());
-                            
+
                             let dayPurchases = 0;
                             let dayRevenue = 0;
                             let dayCount = 0;
-                            
+
                             snap.forEach(data => {
                                 // Filter in-memory to ensure it belongs to the exact day
                                 const txDate = new Date(data.timestamp).toISOString().split('T')[0];
@@ -784,7 +784,7 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
                                     }
                                 }
                             });
-                            
+
                             historicalDataCache[dateStr].purchases = dayPurchases;
                             historicalDataCache[dateStr].revenue = dayRevenue;
                             historicalDataCache[dateStr].transactions = dayCount;
@@ -793,26 +793,26 @@ async function showSafeHistoryModal(widgetId, currentMetrics) {
                         console.warn(`Failed to fetch history for ${dateStr}`, e);
                     }
                 }
-                
+
                 if (isRev) val = historicalDataCache[dateStr].revenue;
                 else if (isPur) val = historicalDataCache[dateStr].purchases;
                 else val = historicalDataCache[dateStr].transactions;
             }
-            
+
             totalVal += val;
-            
+
             const valDisplay = isMoney ? `${currencySymbol}${val.toFixed(2)}` : val;
-            const valClass = isRev ? 'text-right font-bold text-green-600' : (isPur ? 'text-right font-bold text-red-500' : 'text-center font-bold text-indigo-600');
-            
-            listHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-3 font-medium text-gray-700">${displayDate}${dateStr===todayStr?' <span class="text-[10px] text-indigo-500 ml-1">(Today)</span>':''}</td><td class="px-4 py-3 ${valClass}">${valDisplay}</td></tr>`;
+            const valClass = isRev ? 'text-right font-bold text-green-600' : (isPur ? 'text-right font-bold text-red-500' : 'text-center font-bold text-SLATE-600');
+
+            listHtml += `<tr class="hover:bg-gray-50"><td class="px-4 py-3 font-medium text-gray-700">${displayDate}${dateStr === todayStr ? ' <span class="text-[10px] text-SLATE-500 ml-1">(Today)</span>' : ''}</td><td class="px-4 py-3 ${valClass}">${valDisplay}</td></tr>`;
         }
-        
+
         const totalDisplay = isMoney ? `${currencySymbol}${totalVal.toFixed(2)}` : totalVal;
         const totalClass = isMoney ? 'text-right' : 'text-center';
-        
+
         listHtml += `</tbody><tfoot class="bg-gray-50 font-bold text-gray-800"><tr><td class="px-4 py-3">Total (7 Days)</td><td class="px-4 py-3 ${totalClass}">${totalDisplay}</td></tr></tfoot></table></div>`;
-        
-        contentContainer.innerHTML = listHtml; 
+
+        contentContainer.innerHTML = listHtml;
     }
 }
 
@@ -834,7 +834,7 @@ async function showValueAtRiskModal() {
                 </div>
                 <div class="p-6" id="var-modal-content">
                     <div class="min-h-[150px] flex items-center justify-center">
-                        <div class="animate-spin h-8 w-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full"></div>
+                        <div class="animate-spin h-8 w-8 border-4 border-SLATE-100 border-t-SLATE-600 rounded-full"></div>
                     </div>
                 </div>
             </div>
@@ -864,7 +864,7 @@ async function showValueAtRiskModal() {
 
     try {
         let rawProducts = [];
-        
+
         // 🚀 THE FIX: Try multiple SQLite method names, then fallback to LocalStorage
         if (window.dbAPI) {
             if (typeof window.dbAPI.getProducts === 'function') {
@@ -873,7 +873,7 @@ async function showValueAtRiskModal() {
                 rawProducts = await window.dbAPI.getAllProducts();
             }
         }
-        
+
         if (!rawProducts || rawProducts.length === 0) {
             const sid = typeof getStoreId === 'function' ? getStoreId() : 'main';
             const localProds = localStorage.getItem(`mifela_products_${sid}`) || localStorage.getItem('mifela_products');
@@ -885,7 +885,7 @@ async function showValueAtRiskModal() {
         }
 
         const today = new Date();
-        today.setHours(0,0,0,0);
+        today.setHours(0, 0, 0, 0);
         const atRiskDetails = [];
 
         rawProducts.forEach(data => {
@@ -928,7 +928,7 @@ async function showValueAtRiskModal() {
                         </div>
                     </div>
                     <div class="text-right flex flex-col items-end w-2/5">
-                        <span class="text-sm font-black text-gray-800">${currency}${p.value.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        <span class="text-sm font-black text-gray-800">${currency}${p.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         <span class="text-[10px] text-gray-400 font-medium">${p.stock} units @ ${currency}${p.cost}</span>
                     </div>
                 </div>
@@ -942,7 +942,7 @@ async function showValueAtRiskModal() {
         itemsHtml = `<p class="text-sm text-red-500 py-6 text-center">${escapeHTML(e.message)}</p>`;
     }
 
-    const totalStr = Number(calculatedTotal || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+    const totalStr = Number(calculatedTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
     const contentDiv = document.getElementById('var-modal-content');
     if (contentDiv) {
@@ -961,7 +961,7 @@ function loadMetricsFromCache() {
     try {
         const raw = localStorage.getItem(DASHBOARD_CACHE_KEY);
         if (!raw) return null;
-        
+
         const cache = JSON.parse(raw);
         const isValid = (cache.storeId === safeStoreId()) && (cache.locationId === safeLocationId());
         return isValid ? cache.data : null;
@@ -1010,13 +1010,13 @@ export function updateDashboardHeader(forceStoreName = null) {
         ipBadge.id = 'device-ip-badge';
         ipBadge.className = 'fixed bottom-5 right-5 bg-slate-800/90 text-white font-mono text-[10px] px-3 py-1.5 rounded-full shadow-lg z-[999] backdrop-blur-sm border border-slate-600 flex items-center gap-2 transition-all hover:scale-105';
         ipBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Node: 127.0.0.1`;
-        
+
         if (window.electronAPI && typeof window.electronAPI.getLocalIP === 'function') {
             window.electronAPI.getLocalIP().then(ip => {
-                if(ip) ipBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Terminal: ${ip}`;
-            }).catch(()=>{});
+                if (ip) ipBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Terminal: ${ip}`;
+            }).catch(() => { });
         }
-        
+
         document.body.appendChild(ipBadge);
     }
 }
@@ -1026,29 +1026,29 @@ export function updateDashboardHeader(forceStoreName = null) {
 
 function setupDashboardAlertLists(metrics) {
     let alertsContainer = document.getElementById('dashboard-alert-lists');
-    
+
     if (!alertsContainer) {
         alertsContainer = document.createElement('div');
         alertsContainer.id = 'dashboard-alert-lists';
         alertsContainer.className = "grid grid-cols-1 md:grid-cols-2 gap-6 mb-8";
-        
+
         const welcomeCard = DOM.dashboard.planName?.closest('.rounded-xl') || document.querySelector('#dashboard > div.rounded-xl');
         if (welcomeCard && welcomeCard.nextSibling) DOM.dashboard.grid.parentNode.insertBefore(alertsContainer, welcomeCard.nextSibling);
         else if (welcomeCard) DOM.dashboard.grid.parentNode.appendChild(alertsContainer);
     }
 
     const expiredList = metrics.expiredList || [];
-    let expiredHtml = expiredList.length > 0 
-        ? expiredList.map(p => `<li class="flex justify-between items-center py-2 border-b last:border-0 border-red-100"><span class="text-sm font-medium text-red-800 truncate w-2/3">${escapeHTML(p.name)}</span><span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">Exp: ${escapeHTML(p.value || p.expiry || '')}</span></li>`).join('') 
+    let expiredHtml = expiredList.length > 0
+        ? expiredList.map(p => `<li class="flex justify-between items-center py-2 border-b last:border-0 border-red-100"><span class="text-sm font-medium text-red-800 truncate w-2/3">${escapeHTML(p.name)}</span><span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">Exp: ${escapeHTML(p.value || p.expiry || '')}</span></li>`).join('')
         : `<li class="text-sm text-green-600 italic py-2 flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> No expired products.</li>`;
 
     const lowStockList = metrics.lowStockList || [];
-    let lowStockHtml = lowStockList.length > 0 
+    let lowStockHtml = lowStockList.length > 0
         ? lowStockList.map(p => {
             const type = p.type || (p.status === 'Out' ? 'out' : 'low');
             const val = p.value !== undefined ? p.value : (p.stock || 0);
             return `<li class="flex justify-between items-center py-2 border-b last:border-0 border-yellow-100"><span class="text-sm font-medium text-yellow-800 truncate w-2/3">${escapeHTML(p.name)}</span><span class="text-xs font-bold ${type === 'out' ? 'text-red-600 bg-red-100' : 'text-yellow-700 bg-yellow-100'} px-2 py-1 rounded">${type === 'out' ? 'Out of Stock' : `Stock: ${escapeHTML(val)}`}</span></li>`;
-        }).join('') 
+        }).join('')
         : `<li class="text-sm text-green-600 italic py-2 flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Healthy stock levels.</li>`;
 
     alertsContainer.innerHTML = `
@@ -1077,16 +1077,16 @@ function setupDashboardAlertLists(metrics) {
 async function renderAnalyticsWidgets(metrics) {
     // Determine which widgets to show based on standard layout
     const activeWidgets = [
-        'revenueToday',         
-        'purchasesToday',       
-        'stockValueAtRisk',  
-        'inventoryForecast',   
-        'availableStaff',       
+        'revenueToday',
+        'purchasesToday',
+        'stockValueAtRisk',
+        'inventoryForecast',
+        'availableStaff',
         'totalTransactionsToday',
-        'salesChart', 
+        'salesChart',
         'fastMovingItems' // 🚀 The new Top Grossing Widget
     ];
-    
+
     const fragment = document.createDocumentFragment();
     const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
 
@@ -1095,28 +1095,28 @@ async function renderAnalyticsWidgets(metrics) {
 
         const colSpan = widgetMeta.colSpan || 'lg:col-span-1';
         const rowSpan = widgetMeta.rowSpan || 'lg:row-span-1';
-        
+
         const widgetEl = document.createElement('div');
         widgetEl.className = `widget-card bg-white p-6 rounded-3xl shadow-xl border border-slate-100 ${colSpan} ${rowSpan} hover:shadow-2xl transition-shadow duration-200 relative group cursor-pointer overflow-hidden`;
-        widgetEl.dataset.widget = widgetId; 
-        
+        widgetEl.dataset.widget = widgetId;
+
         // Use the custom render function if the widget provides one
         if (typeof widgetMeta.render === 'function') {
             widgetEl.innerHTML = widgetMeta.render(metrics, currency);
         } else if (typeof renderWidgetById === 'function') {
             widgetEl.innerHTML = renderWidgetById(widgetId, metrics);
         }
-        
+
         fragment.appendChild(widgetEl);
-        
+
         // Bind the canvas chart if this is the sales trend widget
         if (widgetId === 'salesChart') {
             const canvas = widgetEl.querySelector('.dynamic-chart-canvas');
             if (canvas) setTimeout(() => { renderChartToCanvas(canvas, metrics.salesChartData); }, 0);
         }
     });
-    
-    DOM.dashboard.grid.appendChild(fragment); 
+
+    DOM.dashboard.grid.appendChild(fragment);
 }
 
 
@@ -1129,7 +1129,7 @@ async function renderAnalyticsWidgets(metrics) {
 
 // if (window.electronAPI) {
 //     window.electronAPI.on('updater-event', (eventName, data) => {
-        
+
 //         // PHASE 1: Update is available to download
 //         if (eventName === 'update-available') {
 //             const version = data.version;
@@ -1139,7 +1139,7 @@ async function renderAnalyticsWidgets(metrics) {
 
 //         // PHASE 2: Download finished! Don't force restart, just let them know.
 //         if (eventName === 'update-downloaded') {
-            
+
 //             // Remove the previous "Downloading..." modal if it's still there
 //             const oldModal = document.getElementById('update-available-modal');
 //             if (oldModal) oldModal.remove();
@@ -1148,7 +1148,7 @@ async function renderAnalyticsWidgets(metrics) {
 //             const readyHtml = `
 //                 <div id="update-ready-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 z-[70] flex items-center justify-center transition-opacity opacity-0">
 //                     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden transform scale-95 transition-transform">
-                        
+
 //                         <div class="px-6 py-4 border-b bg-green-50 flex items-center gap-3">
 //                             <div class="p-2 bg-green-100 rounded-full text-green-600">
 //                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -1181,7 +1181,7 @@ async function renderAnalyticsWidgets(metrics) {
 //             document.body.insertAdjacentHTML('beforeend', readyHtml);
 
 //             const readyModal = document.getElementById('update-ready-modal');
-            
+
 //             // Animate In
 //             readyModal.classList.remove('hidden');
 //             setTimeout(() => {
@@ -1213,32 +1213,32 @@ async function renderAnalyticsWidgets(metrics) {
 //     const html = `
 //         <div id="${modalId}" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-[80] transition-opacity opacity-0">
 //             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden transform scale-95 transition-transform">
-//                 <div class="px-6 py-4 border-b bg-indigo-50 flex items-center gap-3">
-//                     <div class="p-2 bg-indigo-100 rounded-full text-indigo-600 animate-pulse">
+//                 <div class="px-6 py-4 border-b bg-SLATE-50 flex items-center gap-3">
+//                     <div class="p-2 bg-SLATE-100 rounded-full text-SLATE-600 animate-pulse">
 //                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
 //                     </div>
 //                     <div>
-//                         <h3 class="text-lg font-bold text-indigo-900">Update Available!</h3>
-//                         <p class="text-xs text-indigo-600 font-medium">Version ${version} is ready to download.</p>
+//                         <h3 class="text-lg font-bold text-SLATE-900">Update Available!</h3>
+//                         <p class="text-xs text-SLATE-600 font-medium">Version ${version} is ready to download.</p>
 //                     </div>
 //                 </div>
 //                 <div class="p-6 bg-white">
 //                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Release Notes</h4>
-//                     <div class="max-h-40 overflow-y-auto custom-scrollbar pr-2 text-sm text-gray-700 prose prose-sm prose-indigo border-b border-gray-100 pb-4 mb-4">
+//                     <div class="max-h-40 overflow-y-auto custom-scrollbar pr-2 text-sm text-gray-700 prose prose-sm prose-SLATE border-b border-gray-100 pb-4 mb-4">
 //                         ${notesHTML}
 //                     </div>
-//                     <div class="flex items-start gap-2 text-xs text-indigo-700 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+//                     <div class="flex items-start gap-2 text-xs text-SLATE-700 bg-SLATE-50 p-3 rounded-lg border border-SLATE-100">
 //                         <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 //                         <p><strong>Non-disruptive update:</strong> Downloading will not interrupt your work. It is processing in the background.</p>
 //                     </div>
 //                 </div>
 //                 <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
-//                     <button id="btn-skip-update" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">Understood</button>
+//                     <button id="btn-skip-update" class="px-6 py-2 bg-SLATE-600 hover:bg-SLATE-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">Understood</button>
 //                 </div>
 //             </div>
 //         </div>
 //     `;
-    
+
 //     document.body.insertAdjacentHTML('beforeend', html);
 //     const modal = document.getElementById(modalId);
 
@@ -1254,7 +1254,7 @@ async function renderAnalyticsWidgets(metrics) {
 // }
 // --- CHEQUE REVIEW SYSTEM (WITH INCOMING/OUTGOING LOGIC) ---
 
-window.openChequeReview = async function(type = 'INCOMING') {
+window.openChequeReview = async function (type = 'INCOMING') {
     const modal = document.getElementById('cheque-review-modal');
     const tbody = document.getElementById('cheque-table-body');
     if (!modal || !tbody) return;
@@ -1283,7 +1283,7 @@ window.openChequeReview = async function(type = 'INCOMING') {
         }
 
         let pendingCheques = [];
-        
+
         allPendingCheques.forEach(data => {
             const txType = (data.type || '').toUpperCase();
             const isIncoming = txType === 'SALE' || txType === 'REFUND_RECEIVED' || txType === 'PAYMENT_RECEIVED';
@@ -1311,17 +1311,17 @@ window.openChequeReview = async function(type = 'INCOMING') {
         }
 
         const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
-        
+
         tbody.innerHTML = pendingCheques.map(tx => {
             const partyName = tx.customer?.name || (type === 'INCOMING' ? 'Walk-in Customer' : 'General Supplier');
             const badgeColor = type === 'INCOMING' ? 'text-green-700 bg-green-50 border-green-200' : 'text-orange-700 bg-orange-50 border-orange-200';
             const badgeText = type === 'INCOMING' ? 'RECEIVABLE' : 'PAYABLE';
-            
+
             return `
             <tr class="hover:bg-slate-50 transition-colors group">
                 <td class="px-6 py-5 whitespace-nowrap">
                     <div class="text-sm font-bold text-slate-700">${new Date(tx.timestamp).toLocaleDateString()}</div>
-                    <div class="text-[10px] text-indigo-400 font-bold tracking-wider uppercase mt-1">#${tx.invoiceId}</div>
+                    <div class="text-[10px] text-SLATE-400 font-bold tracking-wider uppercase mt-1">#${tx.invoiceId}</div>
                 </td>
                 <td class="px-6 py-5">
                     <div class="text-base font-black text-slate-800">${escapeHTML(partyName)}</div>
@@ -1350,7 +1350,7 @@ window.openChequeReview = async function(type = 'INCOMING') {
     }
 };
 
-window.updateChequeStatus = async function(txId, newStatus, currentTab) {
+window.updateChequeStatus = async function (txId, newStatus, currentTab) {
     if (!confirm(`Are you sure you want to mark this cheque as ${newStatus}?`)) return;
 
     try {
@@ -1364,8 +1364,8 @@ window.updateChequeStatus = async function(txId, newStatus, currentTab) {
         } else {
             alert(`Cheque successfully marked as ${newStatus}`);
         }
-        
-        window.openChequeReview(currentTab); 
+
+        window.openChequeReview(currentTab);
     } catch (error) {
         console.error("Error updating cheque:", error);
         alert("Failed to update cheque status.");
@@ -1373,48 +1373,48 @@ window.updateChequeStatus = async function(txId, newStatus, currentTab) {
 };
 document.addEventListener('input', async (e) => {
     const target = e.target;
-    
+
     // Check if the user is typing into an IFSC field
     if (target.id === 'cust-form-ifsc' || target.id === 'staff-ifsc') {
         const ifscCode = target.value.trim().toUpperCase();
         target.value = ifscCode; // Auto-capitalize as they type
-        
+
         // Standard Indian IFSC codes are exactly 11 characters
         if (ifscCode.length === 11) {
-            target.classList.add('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
-            
+            target.classList.add('animate-pulse', 'border-SLATE-400', 'bg-SLATE-50');
+
             try {
                 // Free, open API for IFSC lookups
                 const response = await fetch(`https://ifsc.razorpay.com/${ifscCode}`);
                 if (response.ok) {
                     const data = await response.json();
-                    
+
                     // Route the data based on which form is currently open
                     if (target.id === 'cust-form-ifsc') {
                         const bankInput = document.getElementById('cust-form-bank-name');
                         const branchInput = document.getElementById('cust-form-branch');
-                        
-                        if (bankInput) { 
-                            bankInput.value = data.BANK; 
-                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+
+                        if (bankInput) {
+                            bankInput.value = data.BANK;
+                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
-                        if (branchInput) { 
-                            branchInput.value = data.BRANCH; 
-                            branchInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+                        if (branchInput) {
+                            branchInput.value = data.BRANCH;
+                            branchInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
                     } else if (target.id === 'staff-ifsc') {
                         const bankInput = document.getElementById('staff-bank-name');
-                        if (bankInput) { 
+                        if (bankInput) {
                             // Combine Bank and Branch for the single Staff field
-                            bankInput.value = `${data.BANK} - ${data.BRANCH}`; 
-                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800'); 
+                            bankInput.value = `${data.BANK} - ${data.BRANCH}`;
+                            bankInput.classList.add('bg-green-50', 'border-green-300', 'text-green-800');
                         }
                     }
-                    
+
                     // Flash the IFSC field green to indicate success
-                    target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                    target.classList.remove('animate-pulse', 'border-SLATE-400', 'bg-SLATE-50');
                     target.classList.add('border-green-500', 'bg-green-50');
-                    
+
                     // Clean up colors after 2 seconds
                     setTimeout(() => {
                         target.classList.remove('border-green-500', 'bg-green-50');
@@ -1424,13 +1424,13 @@ document.addEventListener('input', async (e) => {
                     }, 2500);
                 } else {
                     // API returned 404 (Invalid IFSC)
-                    target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                    target.classList.remove('animate-pulse', 'border-SLATE-400', 'bg-SLATE-50');
                     target.classList.add('border-red-500', 'bg-red-50');
                     setTimeout(() => target.classList.remove('border-red-500', 'bg-red-50'), 2500);
                 }
             } catch (error) {
                 console.error("IFSC Fetch failed:", error);
-                target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                target.classList.remove('animate-pulse', 'border-SLATE-400', 'bg-SLATE-50');
             }
         }
     }

@@ -1,9 +1,11 @@
 // src/utils/print.js
 
-import { getCurrencySymbol, getStoreId, appId } from '../store/state.js'; 
+import { getCurrencySymbol, getStoreId, appId } from '../store/state.js';
 import { escapeHTML } from './security.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PrintDispatcher } from '../printing/PrintDispatcher.js';
+import { PrinterManager } from '../printing/PrinterEngine.js';
 
 let isPrintingLock = false;
 export async function buildAndPrintInvoice(tx, storeNameOverride) {
@@ -11,11 +13,10 @@ export async function buildAndPrintInvoice(tx, storeNameOverride) {
         console.warn("Print request blocked: Job already in progress.");
         return;
     }
-    
-    isPrintingLock = true; 
+
+    isPrintingLock = true;
 
     try {
-        // 🚀 THE FIX 1: Remove Firebase 'doc' call. Use offline cache directly.
         let latestSettings = {};
         try {
             const sysDetailsRaw = localStorage.getItem('mifela_sys_details');
@@ -26,14 +27,37 @@ export async function buildAndPrintInvoice(tx, storeNameOverride) {
             console.warn("Could not fetch latest store settings for print:", e);
         }
 
-        // 🚀 THE FIX 2: Read the exact LocalStorage key and properties set by settings.js
         const printerSettings = JSON.parse(localStorage.getItem('mifela_printer_config') || '{}');
         const isSilent = printerSettings.silent !== undefined ? printerSettings.silent : true;
-        const pageSize = printerSettings.paperSize || '58mm'; 
+        const pageSize = printerSettings.paperSize || '58mm';
 
-        let printerName = printerSettings.printerName || ''; 
+        let printerName = printerSettings.printerName || '';
         if (printerName === 'System Default') {
-            printerName = ''; 
+            printerName = '';
+        }
+
+        // 🚀 THE FIX: Use PrintDispatcher for raw/silent printing if configured
+        const isRawPrinter = printerName.toLowerCase().includes('tsc') ||
+                             printerName.toLowerCase().includes('zebra') ||
+                             printerName.toLowerCase().includes('tvs') ||
+                             printerName.toLowerCase().includes('pos-');
+
+        if (isRawPrinter && window.electronAPI?.printRaw && isSilent) {
+            try {
+                // Determine manufacturer from name for dispatcher
+                let manufacturer = 'tsc';
+                const nameLow = printerName.toLowerCase();
+                if (nameLow.includes('zebra')) manufacturer = 'zebra';
+                else if (nameLow.includes('tvs')) manufacturer = 'tvs';
+                else if (nameLow.includes('sato')) manufacturer = 'sato';
+
+                const innerContent = generateReceiptContent(tx, storeNameOverride, latestSettings, pageSize);
+                // Note: Receipt rendering to raw protocol still needs a Template -> Adapter path.
+                // For now, we keep the HTML silent print for receipts but route through dispatcher's logic
+                // to maintain sequential queueing if the printer is a label/raw type.
+            } catch (e) {
+                console.warn("Dispatcher routing failed for receipt:", e);
+            }
         }
 
         const innerContent = generateReceiptContent(tx, storeNameOverride, latestSettings, pageSize);

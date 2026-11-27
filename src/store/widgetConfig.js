@@ -18,37 +18,37 @@ const escapeHTML = (str) => {
 };
 export const MASTER_WIDGET_LIST = [
     // --- KEY METRICS (Top Row) ---
-    { 
-        id: 'revenueToday', 
-        title: 'Revenue (Today)', 
-        description: 'Total sales revenue collected today.', 
+    {
+        id: 'revenueToday',
+        title: 'Revenue (Today)',
+        description: 'Total sales revenue collected today.',
         color: 'text-green-600',
         bg: 'bg-green-100',
         // Icon: Currency Dollar
         icon: '<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
     },
-    { 
-        id: 'totalTransactionsToday', 
-        title: 'Sales Count', 
-        description: 'Transactions processed today.', 
+    {
+        id: 'totalTransactionsToday',
+        title: 'Sales Count',
+        description: 'Transactions processed today.',
         color: 'text-blue-600',
         bg: 'bg-blue-100',
         // Icon: Receipt Refund
         icon: '<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" /></svg>'
     },
-    { 
-        id: 'availableStaff', 
-        title: 'Staff On Duty', 
-        description: 'Staff marked present.', 
+    {
+        id: 'availableStaff',
+        title: 'Staff On Duty',
+        description: 'Staff marked present.',
         color: 'text-teal-600',
         bg: 'bg-teal-100',
         // Icon: User Group
         icon: '<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 5.472m0 0a9.09 9.09 0 00-3.246 1.598 3 3 0 004.664 1.757M12 12.75a3 3 0 110-6 3 3 0 010 6z" /></svg>'
     },
-    { 
-        id: 'stockValueAtRisk', 
-        title: 'Value at Risk', 
-        description: 'Value of expiring stock.', 
+    {
+        id: 'stockValueAtRisk',
+        title: 'Value at Risk',
+        description: 'Value of expiring stock.',
         color: 'text-orange-700',
         bg: 'bg-orange-100',
         // Icon: Exclamation Triangle
@@ -56,41 +56,41 @@ export const MASTER_WIDGET_LIST = [
     },
 
     // --- SECONDARY METRICS ---
-    { 
-        id: 'totalProducts', 
-        title: 'Total SKU Count', 
-        description: 'Unique products in inventory.', 
-        color: 'text-indigo-600',
-        bg: 'bg-indigo-100',
+    {
+        id: 'totalProducts',
+        title: 'Total SKU Count',
+        description: 'Unique products in inventory.',
+        color: 'text-SLATE-600',
+        bg: 'bg-SLATE-100',
         // Icon: Cube
         icon: '<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>'
     },
-    { 
-        id: 'outOfStockCount', 
-        title: 'Out of Stock', 
-        description: 'Items with 0 quantity.', 
+    {
+        id: 'outOfStockCount',
+        title: 'Out of Stock',
+        description: 'Items with 0 quantity.',
         color: 'text-red-600',
         bg: 'bg-red-100',
         // Icon: Archive Box X Mark
         icon: '<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>'
     },
-    
+
     // --- CHARTS & TABLES ---
-    { 
-        id: 'salesChart', 
-        title: 'Revenue Trend (7 Days)', 
-        description: 'Sales performance over last week.', 
-        colSpan: 'lg:col-span-2', 
+    {
+        id: 'salesChart',
+        title: 'Revenue Trend (7 Days)',
+        description: 'Sales performance over last week.',
+        colSpan: 'lg:col-span-2',
         rowSpan: 'lg:row-span-2'
     },
-    { 
-        id: 'topProductsToday', 
-        title: 'Top Sellers (Today)', 
-        description: 'Best performing items.', 
-        colSpan: 'lg:col-span-1', 
+    {
+        id: 'topProductsToday',
+        title: 'Top Sellers (Today)',
+        description: 'Best performing items.',
+        colSpan: 'lg:col-span-1',
         rowSpan: 'lg:row-span-2'
     },
-    
+
     // --- ALERTS ---
     {
         id: 'expiredList',
@@ -122,34 +122,34 @@ export const MASTER_WIDGET_LIST = [
             } else if (metrics.topProductsToday && metrics.topProductsToday.length > 0) {
                 topProducts = metrics.topProductsToday;
             }
-            
+
             let maxProductRev = 100;
             if (topProducts.length > 0) {
                 const rawMaxP = Math.max(...topProducts.map(p => p.revenue || p.total || p.qty || 0));
                 if (rawMaxP > 0) maxProductRev = rawMaxP;
             }
-            
+
             const rankStyles = [
-                'bg-gradient-to-br from-yellow-300 to-yellow-600 text-yellow-900 border-yellow-200 shadow-[0_0_10px_rgba(253,224,71,0.5)]', 
-                'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800 border-slate-300', 
-                'bg-gradient-to-br from-orange-200 to-orange-400 text-orange-900 border-orange-300', 
-                'bg-indigo-50 text-indigo-600 border-indigo-100', 
-                'bg-indigo-50 text-indigo-600 border-indigo-100'  
+                'bg-gradient-to-br from-yellow-300 to-yellow-600 text-yellow-900 border-yellow-200 shadow-[0_0_10px_rgba(253,224,71,0.5)]',
+                'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800 border-slate-300',
+                'bg-gradient-to-br from-orange-200 to-orange-400 text-orange-900 border-orange-300',
+                'bg-SLATE-50 text-SLATE-600 border-SLATE-100',
+                'bg-SLATE-50 text-SLATE-600 border-SLATE-100'
             ];
 
-            const productBars = topProducts.slice(0,5).map((p, idx) => {
-                const rev = p.revenue || p.total || p.qty || 0; 
+            const productBars = topProducts.slice(0, 5).map((p, idx) => {
+                const rev = p.revenue || p.total || p.qty || 0;
                 return `
                 <div class="mb-4 group">
                     <div class="flex justify-between items-end text-xs mb-1.5">
                         <div class="flex items-center gap-2 overflow-hidden pr-2">
                             <span class="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black border ${rankStyles[idx]} shrink-0">${idx + 1}</span>
-                            <span class="font-bold text-slate-700 truncate text-sm group-hover:text-indigo-600 transition-colors">${escapeHTML(p.name)}</span>
+                            <span class="font-bold text-slate-700 truncate text-sm group-hover:text-SLATE-600 transition-colors">${escapeHTML(p.name)}</span>
                         </div>
-                        <span class="font-black text-indigo-700 font-mono tracking-tight shrink-0">${currency}${rev.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>
+                        <span class="font-black text-SLATE-700 font-mono tracking-tight shrink-0">${currency}${rev.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-2.5 shadow-inner overflow-hidden">
-                        <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400 h-full rounded-full transition-all duration-1000 ease-out group-hover:brightness-110 relative" style="width: ${(rev / maxProductRev) * 100}%">
+                        <div class="bg-gradient-to-r from-SLATE-500 via-purple-500 to-SLATE-400 h-full rounded-full transition-all duration-1000 ease-out group-hover:brightness-110 relative" style="width: ${(rev / maxProductRev) * 100}%">
                             <div class="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]"></div>
                         </div>
                     </div>
@@ -171,7 +171,7 @@ export const MASTER_WIDGET_LIST = [
                             </span> 
                             Highest Grossing
                         </h3>
-                        <span class="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded uppercase tracking-wide">Live</span>
+                        <span class="text-[9px] font-bold bg-SLATE-50 text-SLATE-600 px-2 py-1 rounded uppercase tracking-wide">Live</span>
                     </div>
                     <div class="flex-1 flex flex-col justify-center">
                         ${productBars}

@@ -25,12 +25,20 @@ async function getKnexDriver() {
         const { createRequire } = await import('module');
         const req = createRequire(import.meta.url);
         const Module = req('module');
-        const SHIM_PATH = fileURLToPath(new URL('../../shims/better-sqlite3/index.js', import.meta.url));
-        const origResolve = Module._resolveFilename.bind(Module);
-        Module._resolveFilename = function (request, ...args) {
-            if (request === 'better-sqlite3') return SHIM_PATH;
-            return origResolve(request, ...args);
-        };
+        // In vitest/jsdom, import.meta.url may not be a file URL — fall back to direct import.
+        let SHIM_PATH;
+        try {
+            SHIM_PATH = fileURLToPath(new URL('../../shims/better-sqlite3/index.js', import.meta.url));
+        } catch (_) {
+            SHIM_PATH = null;
+        }
+        if (SHIM_PATH) {
+            const origResolve = Module._resolveFilename.bind(Module);
+            Module._resolveFilename = function (request, ...args) {
+                if (request === 'better-sqlite3') return SHIM_PATH;
+                return origResolve(request, ...args);
+            };
+        }
         knexModule = await import('knex');
         knexLoaded = true;
     } catch (err) {

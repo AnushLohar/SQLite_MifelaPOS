@@ -68,7 +68,7 @@ export const DOM = {
         checkoutBtn: null,
         clearBtn: null,
         taxDisplay: null,
-        parkBtn: null, 
+        parkBtn: null,
         viewParkedBtn: null,
         parkedCountBadge: null
     },
@@ -115,7 +115,7 @@ export const DOM = {
         rangeDisplay: null
     },
 
-    
+
 
     // 10. Settings
     settings: {
@@ -124,18 +124,18 @@ export const DOM = {
         currency: null,
         saveBtn: null,
         profile: { email: null, name: null },
-        store: { 
+        store: {
             name: null, phone: null, email: null, address: null, taxId: null,
             tagline: null, website: null, footer: null,
             saveBtn: null
         },
         prefs: { tax: null, currency: null, fee: null, saveBtn: null },
         data: { backupBtn: null, restoreBtn: null, resetBtn: null },
-        security: { 
-            strictMode: null, 
-            adminBypass: null, 
-            masterTerminal: null, 
-            masterLocSelect: null 
+        security: {
+            strictMode: null,
+            adminBypass: null,
+            masterTerminal: null,
+            masterLocSelect: null
         }
     },
 
@@ -164,9 +164,9 @@ export const DOM = {
         transaction: { self: null, title: null, content: null, close: null, print: null },
         stock: { self: null, title: null, current: null, form: null, change: null, reason: null, cancel: null, confirm: null },
         history: { self: null, title: null, subtitle: null, content: null, close: null, print: null },
-        payroll: { 
+        payroll: {
             self: null, title: null, close: null, recordBtn: null, historyList: null,
-            inputs: { daily: null, days: null, bonus: null, deduction: null, advance: null, notes: null }, 
+            inputs: { daily: null, days: null, bonus: null, deduction: null, advance: null, notes: null },
             display: { total: null, unit: null, rate: null },
             sections: { salary: null, advance: null }
         },
@@ -204,7 +204,7 @@ export function initDOMElements() {
     DOM.auth.profileBtn = safeGet('profile-btn');
     DOM.auth.settingsBtn = safeGet('settings-btn');
     DOM.auth.error = safeGet('login-error');
-    
+
     // 🚀 THE FIX: Map the new activation inputs
     DOM.auth.activation.form = safeGet('activation-form');
     DOM.auth.activation.fingerprint = safeGet('hardware-fingerprint-display');
@@ -223,19 +223,19 @@ export function initDOMElements() {
     DOM.inventory.cancelBtn = safeGet('cancel-edit-btn');
     DOM.inventory.genBarcodeBtn = safeGet('generate-barcode-btn', true);
     DOM.inventory.listContainer = safeGet('inventory-list-container', true);
-    
+
     const i = DOM.inventory.inputs;
     i.name = safeGet('name'); i.sku = safeGet('sku'); i.barcode = safeGet('barcode', true);
     i.price = safeGet('price'); i.cost = safeGet('cost'); i.stock = safeGet('stockLevel');
-    i.lowStock = safeGet('lowStockThreshold'); 
-    i.unit = safeGet('unit'); 
+    i.lowStock = safeGet('lowStockThreshold');
+    i.unit = safeGet('unit');
     i.gst = safeGet('gst-slab');
     i.cess = safeGet('prod-cess', true); // <--- ADD THIS LINE
-    i.dealer = safeGet('prod-dealer'); 
+    i.dealer = safeGet('prod-dealer');
     i.dealerId = safeGet('prod-dealer-id', true);
-    i.dealerGst = safeGet('prod-gstin', true); 
-    i.dealerPhone = safeGet('prod-dealer-phone', true); 
-    i.invoice = safeGet('prod-invoice', true); 
+    i.dealerGst = safeGet('prod-gstin', true);
+    i.dealerPhone = safeGet('prod-dealer-phone', true);
+    i.invoice = safeGet('prod-invoice', true);
     i.date = safeGet('prod-date', true);
     i.expiry = safeGet('expirationDate', true); i.bestBefore = safeGet('best-before-months', true); i.packaged = safeGet('packagedDate', true);
 
@@ -279,8 +279,8 @@ export function initDOMElements() {
     DOM.customers.cancelBtn = safeGet('cancel-customer-edit-btn');
     DOM.customers.exportBtn = safeGet('dynamic-export-btn', true); // Update ID to match your new button
     DOM.customers.exportDealersBtn = safeGet('export-dealers-btn', true);
-    
-    
+
+
     const ci = DOM.customers.inputs;
     ci.name = safeGet('cust-form-name'); ci.id = safeGet('cust-form-id'); ci.phone = safeGet('cust-form-phone');
     ci.email = safeGet('cust-form-email'); ci.address = safeGet('cust-form-address'); ci.gstin = safeGet('cust-form-gstin');
@@ -298,7 +298,7 @@ export function initDOMElements() {
     DOM.transactions.exportBtn = safeGet('export-tx-btn');
     DOM.transactions.rangeDisplay = safeGet('tx-export-range');
 
-   
+
 
     // Settings
     DOM.settings.section = safeGet('settings');
@@ -306,7 +306,7 @@ export function initDOMElements() {
     // Staff
     DOM.staff.section = safeGet('staff');
     DOM.staff.table = safeGet('staff-table-body', true);
-    
+
     // Modals
     DOM.modals.generic.self = safeGet('generic-modal') || safeGet('app-modal');
     if (DOM.modals.generic.self) {
@@ -347,20 +347,20 @@ export function initDOMElements() {
     }
 
     DOM.modals.payroll.self = safeGet('payroll-modal');
-    if(DOM.modals.payroll.self) {
+    if (DOM.modals.payroll.self) {
         DOM.modals.payroll.title = safeGet('payroll-title') || safeGet('payroll-staff-name');
         DOM.modals.payroll.close = safeGet('payroll-close-btn') || safeGet('close-payroll-modal');
         DOM.modals.payroll.recordBtn = safeGet('payroll-record-btn') || safeGet('record-payment-btn');
         DOM.modals.payroll.historyList = safeGet('payroll-history-list') || safeGet('payroll-history-body');
-        
+
         const pi = DOM.modals.payroll.inputs;
-        pi.daily = safeGet('payroll-daily-rate') || safeGet('pay-daily-rate'); 
+        pi.daily = safeGet('payroll-daily-rate') || safeGet('pay-daily-rate');
         pi.days = safeGet('payroll-days') || safeGet('pay-days');
-        pi.bonus = safeGet('payroll-bonus') || safeGet('pay-bonus'); 
+        pi.bonus = safeGet('payroll-bonus') || safeGet('pay-bonus');
         pi.deduction = safeGet('payroll-deduction') || safeGet('pay-deduction');
         pi.advance = safeGet('payroll-advance-amount') || safeGet('pay-advance');
-        pi.notes = safeGet('pay-notes'); 
-        
+        pi.notes = safeGet('pay-notes');
+
         DOM.modals.payroll.display.total = safeGet('payroll-total');
         DOM.modals.payroll.display.unit = safeGet('payroll-unit-label');
         DOM.modals.payroll.display.rate = safeGet('payroll-rate-label');
@@ -397,10 +397,10 @@ export function initDOMElements() {
 
 export function showToast(title, message, type = 'info') {
     if (!DOM.toasts) return;
-    
-    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-indigo-600', warning: 'bg-orange-500' };
+
+    const colors = { success: 'bg-slate-600', error: 'bg-red-600', info: 'bg-slate-600', warning: 'bg-slate-600' };
     const bgColor = colors[type] || colors.info;
-    
+
     const toast = document.createElement('div');
     toast.className = `toast w-full ${bgColor} text-white p-4 rounded-lg shadow-lg flex items-start space-x-3 mb-3 animate-slideInFromRight`;
     toast.innerHTML = `
@@ -408,7 +408,7 @@ export function showToast(title, message, type = 'info') {
             <h4 class="font-bold">${title}</h4>
             <p class="text-sm">${message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
         </div>`;
-    
+
     DOM.toasts.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('opacity-0', 'translate-x-full', 'transition-all', 'duration-500');
@@ -450,14 +450,14 @@ export function showModal(title, message, type = 'info', callback = null, imgUrl
         btnColor = 'bg-amber-500 hover:bg-amber-600 shadow-amber-200';
         iconHtml = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
     } else if (type === 'confirm') {
-        iconBg = 'bg-blue-100';
-        iconColor = 'text-blue-600';
-        btnColor = 'bg-blue-600 hover:bg-blue-700 shadow-blue-200';
+        iconBg = 'bg-slate-100';
+        iconColor = 'text-slate-600';
+        btnColor = 'bg-slate-700 hover:bg-slate-800 shadow-slate-200';
         iconHtml = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
     } else {
-        iconBg = 'bg-indigo-100';
-        iconColor = 'text-indigo-600';
-        btnColor = 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200';
+        iconBg = 'bg-slate-100';
+        iconColor = 'text-slate-600';
+        btnColor = 'bg-slate-700 hover:bg-slate-800 shadow-slate-200';
         iconHtml = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
     }
 
@@ -501,17 +501,17 @@ export function showModal(title, message, type = 'info', callback = null, imgUrl
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modal = document.getElementById('global-custom-modal');
-    
+
     // 5. Closing Logic
     const closeModal = () => {
         if (!modal) return;
-        modal.classList.add('opacity-0'); 
-        setTimeout(() => { if (document.body.contains(modal)) modal.remove(); }, 200); 
+        modal.classList.add('opacity-0');
+        setTimeout(() => { if (document.body.contains(modal)) modal.remove(); }, 200);
     };
 
     const closeBtn = document.getElementById('close-custom-modal-btn');
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
-    
+
     const confirmBtn = document.getElementById('confirm-custom-modal-btn');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
@@ -525,12 +525,12 @@ export function showModal(title, message, type = 'info', callback = null, imgUrl
 export function hideModal() {
     const customModal = document.getElementById('global-custom-modal');
     if (customModal) {
-        customModal.classList.add('opacity-0'); 
+        customModal.classList.add('opacity-0');
         setTimeout(() => {
             if (document.body.contains(customModal)) customModal.remove();
-        }, 200); 
+        }, 200);
     }
-    
+
     // Also try to hide the legacy DOM modal just in case
     const legacyModal = DOM.modals?.generic?.self;
     if (legacyModal) {

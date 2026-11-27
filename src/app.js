@@ -195,6 +195,14 @@ async function initializeApplication() {
     attachGlobalListeners();
     updateAboutSection();
 
+    // Initialize GSTIN Auto-Fill for all forms
+    try {
+        const { initAllGstinAutoFill } = await import('./utils/gstinAutoFill.js');
+        initAllGstinAutoFill();
+    } catch (e) {
+        console.warn('GSTIN AutoFill initialization failed:', e);
+    }
+
     // Await the Hardware License Check First
     await initializeAuth();
 
@@ -315,15 +323,15 @@ async function initializeUpdateManager() {
                 </div>
 
                 <div class="py-4 text-center">
-                    <div id="update-status-icon" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4">
-                        <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div id="update-status-icon" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-slate-100 mb-4">
+                        <svg class="h-6 w-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
                     <h4 id="update-status-title" class="text-lg font-bold text-gray-900 mb-1">Up to date</h4>
                     <p id="update-status-text" class="text-sm text-gray-500">You are running the latest version of Mifela POS.</p>
                     
                     <div id="update-progress-container" class="mt-5 hidden">
                         <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div id="update-progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            <div id="update-progress-bar" class="bg-slate-700 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                         </div>
                         <p id="update-progress-text" class="text-xs text-gray-500 mt-2 text-right">0%</p>
                     </div>
@@ -331,7 +339,7 @@ async function initializeUpdateManager() {
 
                 <div class="mt-4 flex gap-3">
                     <button id="btn-check-update" class="flex-1 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition">Check for Updates</button>
-                    <button id="btn-install-update" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium transition hidden shadow-md">Restart & Install</button>
+                    <button id="btn-install-update" class="flex-1 bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-800 font-medium transition hidden shadow-md">Restart & Install</button>
                 </div>
             </div>
         </div>
@@ -401,7 +409,7 @@ async function initializeUpdateManager() {
             if (badge) badge.classList.remove('hidden');
             if (statusTitle) statusTitle.innerText = "Update Available!";
             if (statusText) statusText.innerText = `Version ${data.version} is downloading in the background.`;
-            if (iconWrapper) iconWrapper.innerHTML = `<svg class="h-6 w-6 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"></path></svg>`;
+            if (iconWrapper) iconWrapper.innerHTML = `<svg class="h-6 w-6 text-slate-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"></path></svg>`;
             if (progressContainer) progressContainer.classList.remove('hidden');
             if (btnCheck) btnCheck.classList.add('hidden');
 
@@ -525,13 +533,13 @@ function showUpdateAvailableModal(version, releaseNotes) {
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[100] bg-slate-900/60 animate-fadeIn flex items-center justify-center p-4 transition-opacity animate-fadeIn">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-scaleIn overflow-hidden border border-slate-100">
-                <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center gap-4">
-                    <div class="p-3 bg-blue-500 text-white rounded-2xl shadow-md shadow-blue-200">
+                <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-slate-700 text-white rounded-2xl shadow-md shadow-slate-300">
                         <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"></path></svg>
                     </div>
                     <div>
                         <h2 class="text-xl font-black text-slate-800 tracking-tight">Update Available!</h2>
-                        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">Version ${version} is downloading...</p>
+                        <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Version ${version} is downloading...</p>
                     </div>
                 </div>
                 
@@ -546,7 +554,7 @@ function showUpdateAvailableModal(version, releaseNotes) {
                             <span id="floating-progress-text">0%</span>
                         </div>
                         <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner">
-                            <div id="floating-progress-bar" class="bg-blue-500 h-full rounded-full transition-all duration-300 relative" style="width: 0%">
+                            <div id="floating-progress-bar" class="bg-slate-700 h-full rounded-full transition-all duration-300 relative" style="width: 0%">
                                 <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
                             </div>
                         </div>
@@ -589,7 +597,7 @@ function renderRecoveryScreen(user, deleteDate) {
                 This account was scheduled for deletion. It will be permanently wiped in <strong class="text-red-600">${daysLeft} days</strong>. Would you like to cancel the deletion and restore your account?
             </p>
             <div class="space-y-3">
-                <button id="btn-restore-account" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-95 flex justify-center items-center gap-2">
+                <button id="btn-restore-account" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-95 flex justify-center items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     Restore Account
                 </button>
@@ -648,27 +656,27 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
     const isStoreNameLinked = !!defaultStoreName;
 
     const phoneAttrs = isPhoneLinked ? 'disabled readonly' : 'required';
-    const phoneClass = isPhoneLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
-    const phoneBadge = isPhoneLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
+    const phoneClass = isPhoneLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-slate-500';
+    const phoneBadge = isPhoneLinked ? '<span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
 
     const emailAttrs = isEmailLinked ? 'disabled readonly' : 'required';
-    const emailClass = isEmailLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
-    const emailBadge = isEmailLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
+    const emailClass = isEmailLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-slate-500';
+    const emailBadge = isEmailLinked ? '<span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">Linked to Auth</span>' : '';
 
     const nameAttrs = isNameLinked ? 'disabled readonly' : 'required';
-    const nameClass = isNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
-    const nameBadge = isNameLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
+    const nameClass = isNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-slate-500';
+    const nameBadge = isNameLinked ? '<span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
 
     const storeNameAttrs = isStoreNameLinked ? 'disabled readonly' : 'required';
-    const storeNameClass = isStoreNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-indigo-500';
-    const storeNameBadge = isStoreNameLinked ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
+    const storeNameClass = isStoreNameLinked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white focus:ring-2 focus:ring-slate-500';
+    const storeNameBadge = isStoreNameLinked ? '<span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">Linked to Profile</span>' : '';
 
     const html = `
     <div id="${modalId}" class="fixed inset-0 z-[100] bg-gray-900 bg-opacity-90 flex items-center justify-center animate-fadeIn p-4 transition-opacity">
         <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-scaleIn">
-            <div class="bg-indigo-600 p-6 text-white text-center shrink-0">
+            <div class="bg-slate-700 p-6 text-white text-center shrink-0">
                 <h2 class="text-2xl font-black tracking-tight">Welcome to Mifela Inventory</h2>
-                <p class="text-indigo-100 text-sm mt-1 font-medium">Please configure your main store profile to continue.</p>
+                <p class="text-slate-100 text-sm mt-1 font-medium">Please configure your main store profile to continue.</p>
             </div>
             
             <div class="p-8 overflow-y-auto custom-scrollbar flex-1">
@@ -714,31 +722,31 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
                     
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Full Physical Address *</label>
-                        <textarea id="setup-address" rows="2" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-colors shadow-sm" placeholder="Street, Area, City..." required></textarea>
+                        <textarea id="setup-address" rows="2" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none resize-none transition-colors shadow-sm" placeholder="Street, Area, City..." required></textarea>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-1.5">
                             <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">State/Region *</label>
-                            <input type="text" id="setup-state" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-colors shadow-sm" placeholder="e.g. Maharashtra" required>
+                            <input type="text" id="setup-state" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-colors shadow-sm" placeholder="e.g. Maharashtra" required>
                         </div>
                         <div class="space-y-1.5">
                             <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">GSTIN / Tax ID *</label>
-                            <input type="text" id="setup-tax" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono border-l-4 border-l-indigo-500 transition-colors shadow-sm" placeholder="Enter Tax ID" required>
+                            <input type="text" id="setup-tax" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none uppercase font-mono border-l-4 border-l-slate-500 transition-colors shadow-sm" placeholder="Enter Tax ID" required>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-1.5">
                             <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">PAN NO</label>
-                            <input type="text" id="setup-store-pan" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono transition-colors shadow-sm" placeholder="ABCDE1234F">
+                            <input type="text" id="setup-store-pan" class="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none uppercase font-mono transition-colors shadow-sm" placeholder="ABCDE1234F">
                         </div>
                     </div>
 
                     <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                          <div class="space-y-1.5">
                             <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Currency</label>
-                            <select id="setup-currency" class="w-full border border-gray-300 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer">
+                            <select id="setup-currency" class="w-full border border-gray-300 p-2.5 rounded-xl bg-white focus:ring-2 focus:ring-slate-500 outline-none shadow-sm cursor-pointer">
                                 <option value="INR">INR (₹)</option>
                                 <option value="USD">USD ($)</option>
                                 <option value="EUR">EUR (€)</option>
@@ -746,7 +754,7 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
                         </div>
                         <div class="space-y-1.5">
                             <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Default Tax Rate (%)</label>
-                            <input type="number" id="setup-rate" class="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" placeholder="0" value="0">
+                            <input type="number" id="setup-rate" class="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none shadow-sm" placeholder="0" value="0">
                         </div>
                     </div>
 
@@ -755,7 +763,7 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
             </div>
             
             <div class="p-6 border-t border-gray-100 bg-white shrink-0">
-                <button type="submit" form="setup-store-form" id="setup-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-600/30 transform active:scale-[0.98] flex items-center justify-center gap-2 text-lg">
+                <button type="submit" form="setup-store-form" id="setup-submit-btn" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-slate-700/30 transform active:scale-[0.98] flex items-center justify-center gap-2 text-lg">
                     <span>🚀</span> Create Store & Start
                 </button>
                  <button type="button" id="setup-logout-btn" class="w-full mt-3 text-gray-500 font-semibold text-sm hover:text-gray-900 transition-colors py-2">
@@ -775,8 +783,8 @@ export function renderStoreSetupModal(passedUser, passedProfile) {
             e.target.value = val;
             if (val.length >= 15 && !setupPanInput.value) {
                 setupPanInput.value = val.substring(2, 12);
-                setupPanInput.classList.add('bg-indigo-50', 'transition-colors');
-                setTimeout(() => setupPanInput.classList.remove('bg-indigo-50'), 800);
+                setupPanInput.classList.add('bg-slate-50', 'transition-colors');
+                setTimeout(() => setupPanInput.classList.remove('bg-slate-50'), 800);
             }
         });
     }
@@ -1131,7 +1139,7 @@ function updateAboutSection() {
         <br><br>
             We simplify the complex reality of running a business by unifying <strong>Multi-Location Inventory</strong>, <strong>Precision Financials</strong> (powered by safe-math technology), and comprehensive <strong>Staff Payroll</strong> into a single, secure interface.
             <br><br>
-            <button id="btn-view-terms" class="text-indigo-600 font-bold hover:underline text-sm flex items-center gap-1">
+            <button id="btn-view-terms" class="text-slate-600 font-bold hover:underline text-sm flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 Read Terms & Conditions
             </button>
@@ -1196,7 +1204,7 @@ window.showTermsAndConditions = function () {
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl animate-scaleIn flex flex-col max-h-[95vh] border border-slate-100 overflow-hidden">
                 <div class="px-8 py-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-4">
-                        <div class="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl shadow-sm border border-indigo-200">
+                        <div class="p-2.5 bg-slate-100 text-slate-600 rounded-xl shadow-sm border border-slate-200">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         </div>
                         <div>
@@ -1221,7 +1229,7 @@ window.showTermsAndConditions = function () {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                         Print Legal Copy
                     </button>
-                    <button type="button" id="${modalId}-accept" class="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95 text-center">
+                    <button type="button" id="${modalId}-accept" class="w-full sm:w-auto px-8 py-3.5 bg-slate-700 text-white rounded-xl text-sm font-bold hover:bg-slate-800 shadow-md shadow-slate-200 transition-all active:scale-95 text-center">
                         I Have Read & Understood
                     </button>
                 </div>
@@ -1499,7 +1507,7 @@ window.openSupportModal = function () {
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scaleIn flex flex-col overflow-hidden border border-slate-100">
                 <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                        <div class="p-2 bg-slate-100 text-slate-600 rounded-lg">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"></path></svg>
                         </div>
                         <h2 class="text-lg font-bold text-slate-800">Support & Feedback</h2>
@@ -1511,7 +1519,7 @@ window.openSupportModal = function () {
                 <div class="p-6 space-y-4 bg-white">
                     <div>
                         <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Issue Type</label>
-                        <select id="support-issue-type" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                        <select id="support-issue-type" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 outline-none bg-white">
                             <option value="General Report">General Question</option>
                             <option value="Bug Report">Report a Bug / Glitch</option>
                             <option value="Feature Request">Feature Request</option>
@@ -1520,12 +1528,12 @@ window.openSupportModal = function () {
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Details</label>
-                        <textarea id="support-issue-msg" rows="4" class="w-full border border-slate-300 p-3 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none custom-scrollbar" placeholder="Please describe your issue in detail..."></textarea>
+                        <textarea id="support-issue-msg" rows="4" class="w-full border border-slate-300 p-3 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 outline-none resize-none custom-scrollbar" placeholder="Please describe your issue in detail..."></textarea>
                     </div>
                 </div>
                 <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
                     <button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancel</button>
-                    <button id="btn-submit-support" onclick="submitSupportTicket()" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 shadow-md transition flex items-center gap-2">
+                    <button id="btn-submit-support" onclick="submitSupportTicket()" class="px-6 py-2 bg-slate-700 text-white text-sm font-bold rounded-lg hover:bg-slate-800 shadow-md transition flex items-center gap-2">
                         Submit Ticket
                     </button>
                 </div>
@@ -1584,7 +1592,7 @@ window.openChequeReviewModal = async function () {
                 </div>
                 <div id="cheque-list-container" class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white space-y-4">
                     <div class="flex flex-col items-center justify-center py-10 opacity-60">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700 mb-4"></div>
                         <p class="text-sm font-bold text-slate-500 uppercase tracking-widest">Scanning Records...</p>
                     </div>
                 </div>
@@ -1609,7 +1617,7 @@ window.openChequeReviewModal = async function () {
                     const total = parseFloat(tx.summary.total || 0).toFixed(2);
 
                     pendingHtml += `
-                        <div class="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-indigo-300 hover:bg-indigo-50/10 transition-colors">
+                        <div class="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-300 hover:bg-slate-50/10 transition-colors">
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-amber-200">Pending</span>
@@ -1622,7 +1630,7 @@ window.openChequeReviewModal = async function () {
                                 </div>
                             </div>
                             <div class="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3">
-                                <span class="text-lg font-black text-indigo-700">₹${total}</span>
+                                <span class="text-lg font-black text-slate-700">₹${total}</span>
                                 <div class="flex gap-2">
                                     <button onclick="updateChequeStatus('${tx.id}', 'BOUNCED')" class="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold transition">Bounce</button>
                                     <button onclick="updateChequeStatus('${tx.id}', 'CLEARED')" class="px-4 py-1.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg text-xs font-bold shadow-sm transition">Clear</button>
@@ -1718,7 +1726,7 @@ window.openChequeReview = async function (type = 'INCOMING') {
             <tr class="hover:bg-slate-50 transition-colors group">
                 <td class="px-6 py-5 whitespace-nowrap">
                     <div class="text-sm font-bold text-slate-700">${new Date(tx.timestamp).toLocaleDateString()}</div>
-                    <div class="text-[10px] text-indigo-400 font-bold tracking-wider uppercase mt-1">#${tx.invoiceId || 'N/A'}</div>
+                    <div class="text-[10px] text-slate-400 font-bold tracking-wider uppercase mt-1">#${tx.invoiceId || 'N/A'}</div>
                 </td>
                 <td class="px-6 py-5">
                     <div class="text-base font-black text-slate-800">${escapeHTML(partyName)}</div>
@@ -1786,7 +1794,7 @@ window.openCalendarHistory = async function (customerId, customerName, txType) {
     const modalId = 'customer-calendar-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
-    const themeColor = 'indigo';
+    const themeColor = 'slate';
 
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[260] bg-slate-900/70 flex items-center justify-center p-4 ">
@@ -1823,7 +1831,7 @@ window.openCalendarHistory = async function (customerId, customerName, txType) {
                     
                     <div id="cal-grid" class="grid grid-cols-7 grid-rows-6 gap-3 flex-1 min-h-[500px]">
                         <div class="col-span-7 row-span-6 flex flex-col items-center justify-center text-slate-400 font-bold py-20">
-                            <div class="animate-spin w-12 h-12 mb-4 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div>
+                            <div class="animate-spin w-12 h-12 mb-4 border-4 border-slate-200 border-t-slate-600 rounded-full"></div>
                             Scanning transactions...
                         </div>
                     </div>
@@ -1899,8 +1907,8 @@ window.fetchAndRenderCalendar = async function (customerId, themeColor) {
         const purchaseAmt = calendarData[dayStr]?.purchase || 0;
 
         const isToday = isCurrentMonth && day === todayDate;
-        const boxClass = isToday ? `bg-indigo-50/50 border-indigo-300 shadow-sm ring-2 ring-indigo-200` : `bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md`;
-        const dateClass = isToday ? `text-indigo-700` : `text-slate-500`;
+        const boxClass = isToday ? `bg-slate-50/50 border-slate-300 shadow-sm ring-2 ring-slate-200` : `bg-white border-slate-200 hover:border-slate-400 hover:shadow-md`;
+        const dateClass = isToday ? `text-slate-700` : `text-slate-500`;
 
         let badgesHtml = '';
         if (saleAmt > 0) {
@@ -1946,7 +1954,7 @@ document.addEventListener('input', async (e) => {
         target.value = ifscCode;
 
         if (ifscCode.length === 11) {
-            target.classList.add('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+            target.classList.add('animate-pulse', 'border-slate-400', 'bg-slate-50');
 
             try {
                 const response = await fetch(`https://ifsc.razorpay.com/${ifscCode}`);
@@ -1973,7 +1981,7 @@ document.addEventListener('input', async (e) => {
                         }
                     }
 
-                    target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                    target.classList.remove('animate-pulse', 'border-slate-400', 'bg-slate-50');
                     target.classList.add('border-green-500', 'bg-green-50');
 
                     setTimeout(() => {
@@ -1983,13 +1991,13 @@ document.addEventListener('input', async (e) => {
                         });
                     }, 2500);
                 } else {
-                    target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                    target.classList.remove('animate-pulse', 'border-slate-400', 'bg-slate-50');
                     target.classList.add('border-red-500', 'bg-red-50');
                     setTimeout(() => target.classList.remove('border-red-500', 'bg-red-50'), 2500);
                 }
             } catch (error) {
                 console.error("IFSC Fetch failed:", error);
-                target.classList.remove('animate-pulse', 'border-indigo-400', 'bg-indigo-50');
+                target.classList.remove('animate-pulse', 'border-slate-400', 'bg-slate-50');
             }
         }
     }
@@ -2034,7 +2042,7 @@ window.renderLockedScreen = function (reason) {
             </div>
             
             <div class="space-y-3">
-                <button onclick="window.open('${paymentLink}', '_blank')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg flex justify-center items-center gap-2">
+                <button onclick="window.open('${paymentLink}', '_blank')" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg flex justify-center items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                     Make Payment
                 </button>
@@ -2291,11 +2299,22 @@ window.autoFillSetupForm = async function () {
             try {
                 //console.log(`AutoFill: Querying provisioned_nodes for ID: ${fingerprint}`);
 
-                const { doc: firestoreDoc, getDoc } = await import("firebase/firestore");
+                const { doc: firestoreDoc, getDoc, collection, query, where, getDocs } = await import("firebase/firestore");
 
                 // Uses the global 'db' initialized at the top of app.js
-                const nodeDocRef = firestoreDoc(window.db, "provisioned_nodes", fingerprint);
-                const nodeSnap = await getDoc(nodeDocRef);
+                let nodeSnap = await getDoc(firestoreDoc(window.db, "provisioned_nodes", fingerprint));
+
+                // FALLBACK: If doc doesn't exist by ID, query by hardwareFingerprint field
+                if (!nodeSnap.exists()) {
+                    const nodeQuery = query(
+                        collection(window.db, "provisioned_nodes"),
+                        where("hardwareFingerprint", "==", fingerprint)
+                    );
+                    const querySnapshot = await getDocs(nodeQuery);
+                    if (!querySnapshot.empty) {
+                        nodeSnap = await getDoc(querySnapshot.docs[0].ref);
+                    }
+                }
 
                 if (nodeSnap.exists()) {
                     const storeData = nodeSnap.data();
@@ -2321,7 +2340,7 @@ window.autoFillSetupForm = async function () {
                     dataFound = true;
                     if (typeof showToast === 'function') showToast('Profile Loaded', 'Terminal details fetched securely.', 'success');
                 } else {
-                    console.log("AutoFill: No matching record found in provisioned_nodes.");
+                    console.log("AutoFill: No matching record found in provisioned_nodes (status: NOT_FOUND).");
                 }
             } catch (err) {
                 console.error("AutoFill: Tier 1 Fetch Failed. Check Rules/Network:", err);
@@ -2458,75 +2477,497 @@ window.completeStartup = async function (e) {
 };
 
 // PHASE 4 & 5: Payment Verification & License Generation
-window.btnVerifyAutomatedClick = async function (e) {
-    e.preventDefault();
+// ============================================================================
+// STATE MACHINE: IDLE -> VERIFYING -> (VERIFIED | TIMEOUT | ERROR)
+// ============================================================================
+
+// State enum
+const VERIFICATION_STATES = {
+    IDLE: 'IDLE',
+    VERIFYING: 'VERIFYING',
+    VERIFIED: 'VERIFIED',
+    TIMEOUT: 'TIMEOUT',
+    ERROR: 'ERROR'
+};
+
+// State management
+let verificationState = VERIFICATION_STATES.IDLE;
+let verificationInterval = null;
+let verificationStartTime = 0;
+let verificationAbortController = null;
+let focusListener = null;
+let visibilityListener = null;
+const VERIFICATION_TIMEOUT_MS = 180000; // 3 minutes
+const VERIFICATION_POLL_INTERVAL_MS = 3000; // 3 seconds
+const REQUEST_TIMEOUT_MS = 10000; // 10 seconds per request
+
+function _setVerificationState(newState) {
+    verificationState = newState;
+    console.log(`[Verification] State: ${verificationState}`);
+}
+
+function _updateVerificationUI() {
     const btn = document.getElementById('btn-verify-automated');
     const errorMsg = document.getElementById('license-auto-error');
+    const statusDiv = document.getElementById('license-auto-status');
+    const elapsed = Date.now() - verificationStartTime;
 
-    btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Verifying Payment...';
-    btn.disabled = true;
-    if (errorMsg) errorMsg.classList.add('hidden');
+    if (!btn) return;
+
+    switch (verificationState) {
+        case VERIFICATION_STATES.IDLE:
+            btn.innerHTML = '2. Verify Payment';
+            btn.disabled = false;
+            btn.classList.replace('bg-emerald-600', 'bg-slate-700');
+            if (errorMsg) errorMsg.classList.add('hidden');
+            if (statusDiv) statusDiv.textContent = '';
+            break;
+
+        case VERIFICATION_STATES.VERIFYING:
+            btn.innerHTML = `<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Verifying Payment... (${Math.floor(elapsed / 1000)}s / 180s)`;
+            btn.disabled = true;
+            btn.classList.replace('bg-emerald-600', 'bg-slate-700');
+            if (errorMsg) errorMsg.classList.add('hidden');
+            if (statusDiv) statusDiv.textContent = `Checking automatically... ${Math.floor(elapsed / 1000)}s elapsed`;
+            break;
+
+        case VERIFICATION_STATES.VERIFIED:
+            btn.innerHTML = 'Payment Verified ✅';
+            btn.disabled = true;
+            btn.classList.replace('bg-slate-700', 'bg-emerald-600');
+            if (errorMsg) errorMsg.classList.add('hidden');
+            if (statusDiv) statusDiv.textContent = 'Payment confirmed! Generating license...';
+            break;
+
+        case VERIFICATION_STATES.TIMEOUT:
+            btn.innerHTML = 'Retry Verification';
+            btn.disabled = false;
+            btn.classList.replace('bg-slate-700', 'bg-amber-600');
+            if (errorMsg) {
+                errorMsg.textContent = 'Verification timed out after 3 minutes. If you completed payment, click Retry Verification.';
+                errorMsg.classList.remove('hidden');
+                errorMsg.classList.add('block');
+            }
+            if (statusDiv) statusDiv.textContent = 'Timeout — manual retry available';
+            break;
+
+        case VERIFICATION_STATES.ERROR:
+            btn.innerHTML = 'Retry Verification';
+            btn.disabled = false;
+            btn.classList.replace('bg-slate-700', 'bg-red-600');
+            if (statusDiv) statusDiv.textContent = 'Error — check connection and retry';
+            break;
+    }
+}
+
+function _cleanupVerification() {
+    if (verificationInterval) {
+        clearInterval(verificationInterval);
+        verificationInterval = null;
+    }
+    if (verificationAbortController) {
+        verificationAbortController.abort();
+        verificationAbortController = null;
+    }
+    if (focusListener) {
+        window.removeEventListener('focus', focusListener);
+        focusListener = null;
+    }
+    if (visibilityListener) {
+        document.removeEventListener('visibilitychange', visibilityListener);
+        visibilityListener = null;
+    }
+}
+
+async function _verifyPaymentOnce(email, fingerprint) {
+    verificationAbortController = new AbortController();
+    const timeoutId = setTimeout(() => verificationAbortController.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-        const email = pendingSetupDetails?.fields?.email?.value?.trim() || '';
-        const fingerprint = pendingSetupDetails.fingerprint;
-
-        // Phase 4: Verify Payment via Cloud Function
+        // Send normalized payload with all accepted keys
         const response = await fetch('https://asia-south1-mifela-pos-sqlite.cloudfunctions.net/verifyNodeActivation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, node: fingerprint })
+            body: JSON.stringify({
+                email,
+                hardwareFingerprint: fingerprint,
+                hardwareId: fingerprint,
+                fingerprint: fingerprint,
+                node: fingerprint
+            }),
+            signal: verificationAbortController.signal
         });
+        clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error("Payment not detected or incomplete.");
-        const { data } = await response.json();
+        // Read raw text first for debugging 400 errors
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseErr) {
+            console.error('[Verification] Failed to parse response:', responseText);
+            throw new Error(`Invalid JSON response: ${responseText.slice(0, 200)}`);
+        }
 
-        if (data.status === 'PAID' || data.status === 'ACTIVE') {
-            pendingSetupDetails.paymentToken = data.paymentToken || 'AUTO_PROVISIONED';
+        if (!response.ok) {
+            console.error('[Verification] HTTP error:', response.status, data);
+            throw new Error(data.error || data.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
 
-            btn.innerHTML = 'Payment Verified ✅';
-            btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+        return data;
+    } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+            throw new Error('Request timeout (10s)');
+        }
+        throw err;
+    }
+}
 
-            // Show Phase 5: Cryptography Generation
-            document.getElementById('licensing-step-2').classList.remove('hidden');
-            const statusDiv = document.getElementById('license-gen-status');
-            statusDiv.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-indigo-600 rounded-full border-t-transparent inline-block"></span> Generating Hardware Cryptography...';
+async function _pollVerificationLoop(email, fingerprint) {
+    _setVerificationState(VERIFICATION_STATES.VERIFYING);
+    _updateVerificationUI();
+    verificationStartTime = Date.now();
 
-            if (!window.hashSecurely) {
-                window.hashSecurely = async function (plaintext) {
-                    const msgUint8 = new TextEncoder().encode(plaintext);
-                    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-                    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-                };
+    verificationInterval = setInterval(async () => {
+        const elapsed = Date.now() - verificationStartTime;
+
+        // Check timeout
+        if (elapsed >= VERIFICATION_TIMEOUT_MS) {
+            _cleanupVerification();
+            _setVerificationState(VERIFICATION_STATES.TIMEOUT);
+            _updateVerificationUI();
+            return;
+        }
+
+        try {
+            const data = await _verifyPaymentOnce(email, fingerprint);
+
+            if (data.verified === true) {
+                // SUCCESS: Payment verified
+                _cleanupVerification();
+                _setVerificationState(VERIFICATION_STATES.VERIFIED);
+                _updateVerificationUI();
+
+                // Proceed to license generation
+                await _continueToLicenseGeneration(data);
+                return;
             }
-            pendingSetupDetails.hashedAdminPass = await window.hashSecurely(pendingSetupDetails.fields.adminPass.value.trim());
-            pendingSetupDetails.hashedRecoveryPin = await window.hashSecurely(pendingSetupDetails.fields.recoveryPin.value.trim());
 
-            const provisionRes = await window.electronAPI.provisionSecurity({
-                email: email,
-                storeName: pendingSetupDetails.fields.storeName.value.trim().toUpperCase()
-            });
+            // Still pending (PENDING, NOT_REGISTERED) — continue polling
+            console.log(`[Verification] Poll: ${data.status} — ${data.message}`);
+            _updateVerificationUI();
 
-            if (!provisionRes.success) throw new Error(provisionRes.error || "Hardware Cryptography Generation Failed.");
-            pendingSetupDetails.publicKey = provisionRes.data.publicKey;
+            // If NOT_REGISTERED, we still poll because webhook might complete
+            if (data.status === 'NOT_REGISTERED') {
+                console.log('[Verification] Node not registered yet, continuing poll...');
+            }
 
-            statusDiv.innerHTML = '<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Hardware License Generated Successfully';
+        } catch (err) {
+            console.error('[Verification] Poll error:', err.message);
 
-            // Bind the final Start button
-            document.getElementById('btn-finalize-start').onclick = window.executeConsentAndStart;
+            // Network/timeout error — continue polling (don't give up immediately)
+            if (err.message.includes('timeout') || err.message.includes('fetch')) {
+                console.log('[Verification] Network error, will retry...');
+                _updateVerificationUI();
+                return;
+            }
+
+            // Other error — stop polling, show error
+            _cleanupVerification();
+            _setVerificationState(VERIFICATION_STATES.ERROR);
+            _updateVerificationUI();
+
+            const errorMsg = document.getElementById('license-auto-error');
+            if (errorMsg) {
+                errorMsg.textContent = err.message;
+                errorMsg.classList.remove('hidden');
+                errorMsg.classList.add('block');
+            }
+        }
+    }, VERIFICATION_POLL_INTERVAL_MS);
+
+    // Run first check immediately
+    await _runOneVerificationCheck(email, fingerprint);
+}
+
+async function _runOneVerificationCheck(email, fingerprint) {
+    try {
+        const data = await _verifyPaymentOnce(email, fingerprint);
+
+        if (data.verified === true) {
+            _cleanupVerification();
+            _setVerificationState(VERIFICATION_STATES.VERIFIED);
+            _updateVerificationUI();
+            await _continueToLicenseGeneration(data);
+        } else if (data.status === 'NOT_REGISTERED') {
+            // Node not in provisioned_nodes yet - keep polling
+            console.log('[Verification] Immediate check: Node not registered, continuing...');
+        } else if (data.status === 'PENDING') {
+            console.log('[Verification] Immediate check: Payment pending, continuing...');
         } else {
-            throw new Error("Payment is pending. Please complete checkout.");
+            console.log('[Verification] Immediate check:', data);
         }
     } catch (err) {
+        console.log('[Verification] Immediate check failed:', err.message);
+        // Will be retried by interval
+    }
+}
+
+function _startVerificationPolling() {
+    if (verificationState === VERIFICATION_STATES.VERIFYING) return; // Already running
+
+    const email = pendingSetupDetails?.fields?.email?.value?.trim() || '';
+    const fingerprint = pendingSetupDetails?.fingerprint;
+
+    if (!fingerprint || fingerprint === 'UNKNOWN_NODE') {
+        console.error('[Verification] Cannot start: missing fingerprint');
+        _setVerificationState(VERIFICATION_STATES.ERROR);
+        _updateVerificationUI();
+        return;
+    }
+
+    // Attach focus/visibility listeners for immediate re-check
+    focusListener = () => {
+        if (verificationState === VERIFICATION_STATES.VERIFYING) {
+            console.log('[Verification] Window focus — triggering immediate check');
+            _runOneVerificationCheck(email, fingerprint);
+        }
+    };
+    visibilityListener = () => {
+        if (!document.hidden && verificationState === VERIFICATION_STATES.VERIFYING) {
+            console.log('[Verification] Visibility change (visible) — triggering immediate check');
+            _runOneVerificationCheck(email, fingerprint);
+        }
+    };
+    window.addEventListener('focus', focusListener);
+    document.addEventListener('visibilitychange', visibilityListener);
+
+    // Start polling loop
+    _pollVerificationLoop(email, fingerprint);
+}
+
+window.btnVerifyAutomatedClick = async function (e) {
+    e.preventDefault();
+
+    // If already verifying, this acts as "Check Now"
+    if (verificationState === VERIFICATION_STATES.VERIFYING) {
+        const email = pendingSetupDetails?.fields?.email?.value?.trim() || '';
+        const fingerprint = pendingSetupDetails?.fingerprint;
+        await _runOneVerificationCheck(email, fingerprint);
+        return;
+    }
+
+    // If verified, do nothing
+    if (verificationState === VERIFICATION_STATES.VERIFIED) return;
+
+    // If timeout or error, restart
+    if (verificationState === VERIFICATION_STATES.TIMEOUT || verificationState === VERIFICATION_STATES.ERROR) {
+        _cleanupVerification();
+        _startVerificationPolling();
+        return;
+    }
+
+    // IDLE state: start verification
+    _startVerificationPolling();
+};
+
+// Continue to license generation after payment verified (extracted from old btnVerifyAutomatedClick)
+async function _continueToLicenseGeneration(data) {
+    const email = pendingSetupDetails?.fields?.email?.value?.trim() || '';
+    const fingerprint = pendingSetupDetails?.fingerprint;
+
+    if (!data || !data.data) {
+        console.error('[Verification] No data returned from verification');
+        return;
+    }
+
+    const { paymentToken, hardwareId, amountPaid } = data.data;
+
+    // Update UI
+    const btn = document.getElementById('btn-verify-automated');
+    const statusDiv = document.getElementById('license-gen-status');
+    const errorMsg = document.getElementById('license-auto-error');
+
+    if (btn) {
+        btn.innerHTML = 'Payment Verified ✅';
+        btn.disabled = true;
+        btn.classList.replace('bg-slate-700', 'bg-emerald-600');
+    }
+    if (errorMsg) errorMsg.classList.add('hidden');
+
+    // Show Phase 5: Cryptography Generation
+    const step2 = document.getElementById('licensing-step-2');
+    if (step2) step2.classList.remove('hidden');
+
+    if (statusDiv) statusDiv.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-slate-700 rounded-full border-t-transparent inline-block"></span> Generating Hardware Cryptography...';
+
+    // Hash passwords
+    if (!window.hashSecurely) {
+        window.hashSecurely = async function (plaintext) {
+            const msgUint8 = new TextEncoder().encode(plaintext);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        };
+    }
+
+    try {
+        pendingSetupDetails.hashedAdminPass = await window.hashSecurely(pendingSetupDetails.fields.adminPass.value.trim());
+        pendingSetupDetails.hashedRecoveryPin = await window.hashSecurely(pendingSetupDetails.fields.recoveryPin.value.trim());
+
+        pendingSetupDetails.paymentToken = paymentToken || 'AUTO_PROVISIONED';
+
+        const provisionRes = await window.electronAPI.provisionSecurity({
+            email: email,
+            storeName: pendingSetupDetails.fields.storeName.value.trim().toUpperCase()
+        });
+
+        if (!provisionRes.success) throw new Error(provisionRes.error || "Hardware Cryptography Generation Failed.");
+        pendingSetupDetails.publicKey = provisionRes.data.publicKey;
+
+        if (statusDiv) statusDiv.innerHTML = '<svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Hardware License Generated Successfully';
+
+        // Bind the final Start button
+        document.getElementById('btn-finalize-start').onclick = window.executeConsentAndStart;
+
+    } catch (err) {
+        console.error('[License Gen] Failed:', err);
+        if (statusDiv) statusDiv.innerHTML = `<span class="text-red-500">License generation failed: ${err.message}</span>`;
         if (errorMsg) {
             errorMsg.textContent = err.message;
             errorMsg.classList.remove('hidden');
             errorMsg.classList.add('block');
         }
-        btn.innerHTML = '2. Verify Payment';
+        if (btn) {
+            btn.innerHTML = 'Retry Verification';
+            btn.disabled = false;
+            btn.classList.replace('bg-emerald-600', 'bg-red-600');
+        }
+    }
+}
+
+// Bind CANCEL SETUP to cleanup verification
+function _bindCancelSetup() {
+    const btnCancel = document.getElementById('btn-cancel-licensing');
+    if (btnCancel) {
+        btnCancel.onclick = (e) => {
+            e.preventDefault();
+            _cleanupVerification();
+            _setVerificationState(VERIFICATION_STATES.IDLE);
+            _updateVerificationUI();
+            pendingSetupDetails = null;
+            const modal = document.getElementById('license-billing-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        };
+    }
+}
+
+// ============================================================================
+// PHASE 6 & 7: Consent Check & Initialize Vault (unchanged)
+// ============================================================================
+window.executeConsentAndStart = async function (e) {
+    e.preventDefault();
+
+    // Phase 6: Consent
+    const consentCheck = document.getElementById('final-consent-check');
+    if (!consentCheck || !consentCheck.checked) {
+        if (typeof showToast === 'function') showToast('Consent Required', 'You must accept the terms to initialize the vault.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-finalize-start');
+    btn.innerHTML = '<span class="animate-spin w-4 h-4 border-2 border-white rounded-full border-t-transparent mr-2 inline-block"></span> Initializing Terminal...';
+    btn.disabled = true;
+
+    try {
+        const { fields, fingerprint, publicKey, paymentToken, hashedAdminPass, hashedRecoveryPin, customAdminId } = pendingSetupDetails;
+        const { doc, setDoc } = await import("firebase/firestore");
+        const { db: fbDb } = await ensureFirebase();
+
+        // Phase 7: Start (Sync to Cloud & Save Local SQLite)
+        await setDoc(doc(fbDb, "provisioned_nodes", fingerprint), {
+            storeName: fields.storeName.value.trim().toUpperCase(),
+            ownerName: fields.ownerName.value.trim().toUpperCase(),
+            email: fields.email.value.trim().toUpperCase(),
+            contact: fields.contact.value.trim().toUpperCase(),
+            address: fields.address.value.trim().toUpperCase(),
+            state: fields.state.value.trim().toUpperCase(),
+            gstin: fields.taxId.value.trim().toUpperCase(),
+            publicKey: publicKey,
+            hardwareFingerprint: fingerprint,
+            paymentToken: paymentToken,
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString()
+        });
+
+        await window.electronAPI.saveStoreSettings('SYS_VAULT', {
+            adminId: customAdminId,
+            adminHash: hashedAdminPass,
+            recoveryHash: hashedRecoveryPin
+        });
+
+        let gstinVal = fields.taxId.value.trim().toUpperCase();
+        let panVal = gstinVal.length >= 15 ? gstinVal.substring(2, 12) : '';
+
+        await window.electronAPI.saveStoreSettings('SYS_DETAILS', {
+            storeName: fields.storeName.value.trim().toUpperCase(),
+            ownerName: fields.ownerName.value.trim().toUpperCase(),
+            email: fields.email.value.trim().toUpperCase(),
+            contact: fields.contact.value.trim().toUpperCase(),
+            address: fields.address.value.trim().toUpperCase(),
+            state: fields.state.value.trim().toUpperCase(),
+            gstin: gstinVal,
+            pan: panVal,
+            currency: document.getElementById('setup-currency')?.value || 'INR',
+            taxRate: parseFloat(document.getElementById('setup-tax-rate')?.value || 0)
+        });
+
+        localStorage.setItem('mifela_sys_initialized', 'true');
+
+        if (typeof showToast === 'function') showToast('System Ready', 'Terminal Secured & Activated.', 'success');
+
+        document.getElementById('license-billing-modal').classList.add('hidden');
+        setTimeout(() => window.showLockScreen(), 300);
+
+    } catch (error) {
+        console.error(error);
+        if (typeof showToast === 'function') showToast('Initialization Failed', error.message, 'error');
+        btn.innerHTML = '4. Initialize Terminal';
         btn.disabled = false;
     }
 };
+
+// ============================================================================
+// 🖱️ BIND MODAL BUTTONS ON DOM LOAD (updated to auto-start verification)
+// ============================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const btnOpenGateway = document.getElementById('btn-open-gateway');
+    const btnVerifyAutomated = document.getElementById('btn-verify-automated');
+    const btnCancelLicensing = document.getElementById('btn-cancel-licensing');
+
+    if (btnOpenGateway) {
+        btnOpenGateway.onclick = async (e) => {
+            e.preventDefault();
+            const email = pendingSetupDetails?.fields?.email?.value?.trim() || '';
+            const fingerprint = window._cachedFingerprint || 'UNKNOWN_NODE';
+            const gatewayUrl = `https://posgateway.mifela.com/checkout?email=${encodeURIComponent(email)}&node=${encodeURIComponent(fingerprint)}`;
+            window.open(gatewayUrl, '_blank');
+
+            // AUTO-START verification immediately when checkout opens
+            _startVerificationPolling();
+        };
+    }
+
+    if (btnVerifyAutomated) {
+        btnVerifyAutomated.onclick = window.btnVerifyAutomatedClick;
+    }
+
+    // Bind cancel to cleanup
+    _bindCancelSetup();
+});
 
 // PHASE 6 & 7: Consent Check & Initialize Vault
 window.executeConsentAndStart = async function (e) {
@@ -2727,15 +3168,15 @@ window.openSetupVerificationGate = function (setupData) {
         const html = `
         <div id="${modalId}" class="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center animate-fadeIn p-4 hidden">
             <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col transform transition-transform scale-95 duration-300 ease-out border border-slate-200">
-                <div class="bg-indigo-600 p-8 text-white text-center relative overflow-hidden">
+                <div class="bg-slate-700 p-8 text-white text-center relative overflow-hidden">
                     <div class="relative z-10">
                         <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
                             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                         </div>
                         <h2 class="text-2xl font-black tracking-tight">License Verification</h2>
-                        <p class="text-indigo-100 text-xs mt-2 font-medium uppercase tracking-widest">Mandatory Anti-Piracy Check</p>
+                        <p class="text-slate-100 text-xs mt-2 font-medium uppercase tracking-widest">Mandatory Anti-Piracy Check</p>
                     </div>
-                    <div class="absolute -bottom-16 -right-16 w-40 h-40 bg-indigo-500 rounded-full opacity-50 blur-[40px]"></div>
+                    <div class="absolute -bottom-16 -right-16 w-40 h-40 bg-slate-700 rounded-full opacity-50 blur-[40px]"></div>
                 </div>
                 
                 <div class="p-8 bg-white">
@@ -2752,9 +3193,9 @@ window.openSetupVerificationGate = function (setupData) {
                     <div class="space-y-2">
                         <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest flex justify-between">
                             <span>2. Paste Setup Token</span>
-                            <span class="text-indigo-500">Required</span>
+                            <span class="text-slate-500">Required</span>
                         </label>
-                        <input type="text" id="rp-setup-token" class="w-full border-2 border-slate-200 p-3.5 rounded-xl font-mono text-slate-800 focus:border-indigo-500 outline-none transition-colors shadow-sm text-sm" placeholder="e.g. RP-PAY-XXXXXXX" required>
+                        <input type="text" id="rp-setup-token" class="w-full border-2 border-slate-200 p-3.5 rounded-xl font-mono text-slate-800 focus:border-slate-500 outline-none transition-colors shadow-sm text-sm" placeholder="e.g. RP-PAY-XXXXXXX" required>
                     </div>
                     
                     <p id="rp-gate-error" class="text-red-500 text-xs font-bold mt-3 hidden text-center animate-shake"></p>
@@ -2762,7 +3203,7 @@ window.openSetupVerificationGate = function (setupData) {
                 
                 <div class="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
                     <button type="button" onclick="document.getElementById('${modalId}').classList.add('hidden')" class="px-6 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm rounded-xl transition-all w-1/3">Cancel</button>
-                    <button type="button" id="rp-verify-btn" class="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm uppercase tracking-wider">
+                    <button type="button" id="rp-verify-btn" class="w-2/3 bg-slate-700 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl shadow-lg shadow-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm uppercase tracking-wider">
                         Verify & Encrypt
                     </button>
                 </div>
@@ -3225,7 +3666,7 @@ function handleGatewayPaymentVerification(data) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
                 </svg>
             `;
-            statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100', 'bg-red-50', 'text-red-600', 'border-red-100');
+            statusIcon.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-100', 'bg-red-50', 'text-red-600', 'border-red-100');
             statusIcon.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-100');
         }
         if (statusTitle) statusTitle.textContent = 'Payment Verified';
@@ -3271,7 +3712,7 @@ function handleGatewayPaymentVerification(data) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             `;
-            statusIcon.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+            statusIcon.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-100');
             statusIcon.classList.add('bg-red-50', 'text-red-600', 'border-red-100');
         }
         if (statusTitle) statusTitle.textContent = 'Payment Failed';
@@ -3342,17 +3783,17 @@ window.cancelGatewayPayment = function () {
 
     if (statusIcon) {
         statusIcon.innerHTML = `
-            <div class="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div class="absolute inset-0 border-4 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
             </svg>
         `;
         statusIcon.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-100', 'bg-red-50', 'text-red-600', 'border-red-100');
-        statusIcon.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+        statusIcon.classList.add('bg-slate-50', 'text-slate-600', 'border-slate-100');
     }
 
     if (statusTitle) statusTitle.textContent = 'Awaiting Payment';
-    if (statusText) statusText.innerHTML = 'Please complete the transaction on the new tab at <br><span class="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mt-1 inline-block">posgateway.mifela.com</span>';
+    if (statusText) statusText.innerHTML = 'Please complete the transaction on the new tab at <br><span class="text-slate-600 bg-slate-50 px-2 py-0.5 rounded mt-1 inline-block">posgateway.mifela.com</span>';
 
     if (verificationStatus) {
         verificationStatus.classList.add('hidden');

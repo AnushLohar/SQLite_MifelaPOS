@@ -2,13 +2,13 @@
 
 
 
-import { 
+import {
     appId, getCurrentUserPlan, availableLocations, storeId as primaryStoreId,
     setConvenienceFee, setCurrency, userRole, getStoreId
 } from '../store/state.js';
 
 import { DOM, showModal, showToast } from '../utils/dom.js';
-import { generateMerchantId } from '../utils/ids.js'; 
+import { generateMerchantId } from '../utils/ids.js';
 import { escapeHTML } from '../utils/security.js';
 import { autoDetectPrinters } from '../utils/print.js';
 import { enforcePageSecurity } from '../utils/security.js';
@@ -17,8 +17,8 @@ import { enforcePageSecurity } from '../utils/security.js';
 // STATE VARIABLES & HELPERS
 // ==========================================
 export let isSettingsInitialized = false;
-let currentStoreId = null; 
-let activeTab = 'profile'; 
+let currentStoreId = null;
+let activeTab = 'profile';
 let currentSecurityState = {};
 let originalPhoneNumber = '';
 let recaptchaVerifier = null;
@@ -38,7 +38,7 @@ function normalizePlan(planString) {
     if (!planString) return 'free';
     const plan = planString.toLowerCase();
     if (plan === 'standard') return 'silver';
-    if (plan === 'premium') return 'platinum'; 
+    if (plan === 'premium') return 'platinum';
     return plan;
 }
 
@@ -50,11 +50,11 @@ function getProfileSettingsHTML() {
     return `
         <div class="space-y-6">
             <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-3xl -z-10 translate-x-1/3 -translate-y-1/3"></div>
+                <div class="absolute top-0 right-0 w-32 h-32 bg-SLATE-50 rounded-full blur-3xl -z-10 translate-x-1/3 -translate-y-1/3"></div>
                 
                 <div class="relative group">
-                    <div class="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 p-1 shadow-md">
-                        <div class="w-full h-full rounded-full border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-inner bg-indigo-500" id="profile-avatar-initial">
+                    <div class="w-24 h-24 rounded-full bg-gradient-to-br from-SLATE-500 to-violet-600 p-1 shadow-md">
+                        <div class="w-full h-full rounded-full border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-inner bg-SLATE-500" id="profile-avatar-initial">
                             U
                         </div>
                     </div>
@@ -64,7 +64,7 @@ function getProfileSettingsHTML() {
                 <div class="flex-1 text-center sm:text-left mt-2 sm:mt-0">
                     <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight" id="profile-display-name-header">User Name</h2>
                     <p class="text-sm font-medium text-slate-500 mt-1 flex items-center justify-center sm:justify-start gap-2">
-                        <span id="profile-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">Admin</span>
+                        <span id="profile-role-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-SLATE-100 text-SLATE-700 border border-SLATE-200">Admin</span>
                     </p>
                 </div>
             </div>
@@ -79,18 +79,18 @@ function getProfileSettingsHTML() {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-1.5 md:col-span-2">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Full Name <span class="text-red-500">*</span></label>
-                            <input type="text" id="profile-name-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Your Name" required>
+                            <input type="text" id="profile-name-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Your Name" required>
                         </div>
                         
                         <div class="space-y-1.5">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Designation / Role</label>
-                            <input type="text" id="profile-designation-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="e.g. Store Owner">
+                            <input type="text" id="profile-designation-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="e.g. Store Owner">
                         </div>
                         
                         <div class="space-y-1.5">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Preferred Language</label>
                             <div class="relative">
-                                <select id="profile-lang-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner appearance-none cursor-pointer pr-10">
+                                <select id="profile-lang-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner appearance-none cursor-pointer pr-10">
                                     <option value="en">English</option>
                                     <option value="hi">Hindi</option>
                                     <option value="mr">Marathi</option>
@@ -104,12 +104,12 @@ function getProfileSettingsHTML() {
 
                         <div class="space-y-1.5">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Email Address</label>
-                            <input type="email" id="profile-email-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Email">
+                            <input type="email" id="profile-email-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Email">
                         </div>
 
                         <div class="space-y-1.5">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Phone Number</label>
-                            <input type="tel" id="profile-phone-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Phone">
+                            <input type="tel" id="profile-phone-input" class="auto-save-profile w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm font-medium bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Phone">
                         </div>
                     </div>
                 </div>
@@ -126,15 +126,15 @@ function getProfileSettingsHTML() {
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div class="space-y-1.5">
                                 <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Current Password</label>
-                                <input type="password" id="current-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-slate-50" placeholder="Current Password">
+                                <input type="password" id="current-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm bg-slate-50" placeholder="Current Password">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">New Password</label>
-                                <input type="password" id="new-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-slate-50" placeholder="New Password" minlength="4">
+                                <input type="password" id="new-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm bg-slate-50" placeholder="New Password" minlength="4">
                             </div>
                             <div class="space-y-1.5">
                                 <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Confirm Password</label>
-                                <input type="password" id="confirm-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-slate-50" placeholder="Confirm Password" minlength="4">
+                                <input type="password" id="confirm-password" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm bg-slate-50" placeholder="Confirm Password" minlength="4">
                             </div>
                         </div>
                         <button type="submit" id="btn-change-password" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-bold transition-all active:scale-95 shadow-md">Update App Password</button>
@@ -146,20 +146,20 @@ function getProfileSettingsHTML() {
 }
 
 function getSystemSettingsHTML() {
-    const inputClass = "auto-save-store block w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all bg-white hover:border-slate-400 placeholder-slate-300 shadow-sm";     
-    
+    const inputClass = "auto-save-store block w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-4 focus:ring-SLATE-500/10 focus:border-SLATE-600 transition-all bg-white hover:border-slate-400 placeholder-slate-300 shadow-sm";
+
     // Read memory BEFORE drawing the HTML
-    let printConfig = { 
-        silent: true, 
-        barcodePrinter: '', 
-        receiptPrinter: '', 
+    let printConfig = {
+        silent: true,
+        barcodePrinter: '',
+        receiptPrinter: '',
         invoicePrinter: '',
         pageSize: '58mm' // For receipts
     };
-    try { 
+    try {
         const saved = localStorage.getItem('mifela_printer_settings');
-        if (saved) printConfig = { ...printConfig, ...JSON.parse(saved) }; 
-    } catch(e) {}
+        if (saved) printConfig = { ...printConfig, ...JSON.parse(saved) };
+    } catch (e) { }
 
     return `
         <div id="settings-recaptcha-container" class="hidden"></div>
@@ -177,7 +177,7 @@ function getSystemSettingsHTML() {
 
                         <div>
                             <h3 class="font-bold text-gray-900 text-lg flex items-center gap-3">
-                                <span class="p-2 bg-indigo-100 text-indigo-600 rounded-lg shadow-sm">
+                                <span class="p-2 bg-SLATE-100 text-SLATE-600 rounded-lg shadow-sm">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                                 </span>
                                 Store Profile
@@ -189,34 +189,34 @@ function getSystemSettingsHTML() {
                     <div class="p-8">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                             <div class="md:col-span-2 group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Store Name <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Store Name <span class="text-red-500">*</span></label>
                                 <input type="text" id="setting-store-name" class="${inputClass}" placeholder="e.g. My Awesome Store" required>
                             </div>
                             
                             <div class="group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Contact Phone <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Contact Phone <span class="text-red-500">*</span></label>
                                 <div class="relative">
     <input type="tel" id="setting-store-phone" class="${inputClass}" placeholder="919999999999" required>
 </div>
                             </div>
                             
                             <div class="group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Support Email</label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Support Email</label>
                                 <input type="email" id="setting-store-email" class="${inputClass}" placeholder="support@store.com">
                             </div>
 
                             <div class="md:col-span-2 group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Physical Address <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Physical Address <span class="text-red-500">*</span></label>
                                 <textarea id="setting-store-address" rows="2" class="${inputClass} resize-none" placeholder="Enter full store address" required></textarea>
                             </div>
 
                             <div class="group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">State <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">State <span class="text-red-500">*</span></label>
                                 <input type="text" id="setting-store-state" class="${inputClass}" placeholder="e.g. Maharashtra" required>
                             </div>
 
                             <div class="group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Dealer Type</label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Dealer Type</label>
                                 <div class="relative">
                                     <select id="setting-store-type" class="${inputClass} appearance-none cursor-pointer pr-10">
                                         <option value="regular">Regular</option>
@@ -230,12 +230,12 @@ function getSystemSettingsHTML() {
                             </div>
                             
                             <div class="md:col-span-2 group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Tax ID / GSTIN <span class="text-red-500">*</span></label>
-                                <input type="text" id="setting-store-tax-id" class="${inputClass} uppercase tracking-widest font-mono border-l-4 border-l-indigo-500" placeholder="GSTIN or Tax ID" required>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">Tax ID / GSTIN <span class="text-red-500">*</span></label>
+                                <input type="text" id="setting-store-tax-id" class="${inputClass} uppercase tracking-widest font-mono border-l-4 border-l-SLATE-500" placeholder="GSTIN or Tax ID" required>
                             </div>
 
                             <div class="group">
-                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">PAN NO</label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 group-focus-within:text-SLATE-600 transition-colors">PAN NO</label>
                                 <input type="text" id="setting-store-pan" class="${inputClass} uppercase tracking-widest font-mono" placeholder="ABCDE1234F">
                             </div>
                         
@@ -531,7 +531,7 @@ function getSystemSettingsHTML() {
         </div>
 
         <div class="pt-4 border-t border-slate-100">
-            <button type="button" id="btn-test-print" class="w-full px-6 py-3 bg-white text-indigo-600 border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 font-bold rounded-xl shadow-sm transition-all transform active:scale-95 flex items-center justify-center gap-2">
+            <button type="button" id="btn-test-print" class="w-full px-6 py-3 bg-white text-SLATE-600 border border-gray-200 hover:border-SLATE-400 hover:bg-SLATE-50 font-bold rounded-xl shadow-sm transition-all transform active:scale-95 flex items-center justify-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 Print Test Page (Receipt Printer)
             </button>
@@ -545,11 +545,11 @@ function getSystemSettingsHTML() {
         <!-- 🚀 THE FIX: Dynamic Release Notes & Version Display -->
         <div id="settings-version-container" class="bg-slate-50 rounded-2xl shadow-inner border border-slate-200 overflow-hidden mt-6 flex flex-col relative">
             <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <svg class="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+                <svg class="w-32 h-32 text-SLATE-900" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
             </div>
             <div class="p-6 flex flex-col items-center text-center border-b border-slate-200 bg-white relative z-10">
-                <div class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-3 border border-indigo-200 shadow-sm">
-                    <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
+                <div class="w-12 h-12 bg-SLATE-100 rounded-full flex items-center justify-center mb-3 border border-SLATE-200 shadow-sm">
+                    <svg class="w-6 h-6 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">Mifela POS</h3>
                 <p id="app-current-version-text" class="text-[10px] text-slate-500 font-mono mt-1 font-bold uppercase tracking-widest">Version: 1.0.169</p>
@@ -574,7 +574,7 @@ export function populateSystemUI(data) {
         data.email = data.email || data.storeEmail || sysDetails.email || '';
         data.address = data.address || sysDetails.address || '';
         data.state = data.state || sysDetails.state || '';
-        
+
         data.taxId = data.taxId || data.gstin || sysDetails.gstin || '';
         data.pan = data.pan || sysDetails.pan || '';
 
@@ -582,16 +582,16 @@ export function populateSystemUI(data) {
         if (!data.pan && data.taxId && data.taxId.length >= 15) {
             data.pan = data.taxId.substring(2, 12);
         }
-        
+
         data.currency = data.currency || sysDetails.currency || 'INR';
         data.taxRate = data.taxRate !== undefined ? data.taxRate : (sysDetails.taxRate || 0);
-    } catch(e) {
+    } catch (e) {
         console.warn("Failed to parse sys details fallback");
     }
 
-    const setVal = (id, val) => { 
-        const el = document.getElementById(id); 
-        if (el) el.value = val !== undefined ? val : ''; 
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val !== undefined ? val : '';
     };
 
     originalPhoneNumber = data.phone;
@@ -604,11 +604,11 @@ export function populateSystemUI(data) {
     setVal('setting-store-tax-id', data.taxId);
     setVal('setting-store-pan', data.pan);
     setVal('setting-store-logo', data.logoUrl);
-    
+
     const previewImg = document.getElementById('logo-preview-img');
     const placeholder = document.getElementById('logo-upload-placeholder');
-    const removeBtn = document.getElementById('remove-logo-btn'); 
-    
+    const removeBtn = document.getElementById('remove-logo-btn');
+
     if (previewImg && placeholder) {
         if (data.logoUrl && (data.logoUrl.startsWith('http') || data.logoUrl.startsWith('data:image'))) {
             previewImg.src = data.logoUrl;
@@ -622,19 +622,19 @@ export function populateSystemUI(data) {
             if (removeBtn) removeBtn.classList.add('hidden');
         }
     }
-    
+
     setVal('setting-store-tagline', data.tagline);
     setVal('setting-store-footer', data.footer);
     setVal('setting-store-website', data.website);
     setVal('currency-select', data.currency);
     setVal('default-tax-rate', data.taxRate);
-    setVal('setting-convenience-fee', data.convenienceFee || 0); 
+    setVal('setting-convenience-fee', data.convenienceFee || 0);
     setVal('setting-store-type', data.dealerType || 'regular');
     setVal('setting-invoice-prefix', data.invoicePrefix);
     setVal('setting-invoice-terms', data.invoiceTerms);
-    setVal('setting-store-upi', data.upiId);  
+    setVal('setting-store-upi', data.upiId);
     setVal('setting-store-tnc', data.tnc);
-    setVal('setting-theme-color', data.themeColor || '#4f46e5'); 
+    setVal('setting-theme-color', data.themeColor || '#4f46e5');
     setVal('setting-loyalty-earn', data.loyaltyEarnRatio || 100);
     setVal('setting-loyalty-value', data.loyaltyTokenValue || 1);
 
@@ -652,7 +652,7 @@ export function populateSystemUI(data) {
         panel.style.opacity = e.target.checked ? '1' : '0.4';
         panel.style.pointerEvents = e.target.checked ? 'auto' : 'none';
     });
-    
+
     if (data.bankDetails) {
         setVal('setting-bank-name', data.bankDetails.bankName);
         setVal('setting-bank-branch', data.bankDetails.branch);
@@ -670,13 +670,13 @@ export function populateSystemUI(data) {
     unlockInput('setting-store-tagline');
     unlockInput('setting-store-footer');
     unlockInput('setting-store-website');
-    unlockInput('setting-invoice-prefix'); 
-    unlockInput('setting-invoice-terms');  
-    unlockInput('setting-theme-color');    
+    unlockInput('setting-invoice-prefix');
+    unlockInput('setting-invoice-terms');
+    unlockInput('setting-theme-color');
 
     currentSecurityState = data.security || {};
     organizeDynamicSections();
-    loadVersionAndUpdates(); 
+    loadVersionAndUpdates();
 
     const secToggle = document.getElementById('sec-enable-toggle');
     if (secToggle) {
@@ -696,30 +696,30 @@ export async function loadSettingsPage(targetView = 'settings') {
 
     // 1. Build shell ONLY if it doesn't exist
     if (!document.getElementById('settings-content-wrapper')) {
-        renderSettingsShell(); 
+        renderSettingsShell();
         bindEvents();
     }
-    
+
     // 2. Fetch data once
     const storeId = currentStoreId || (typeof getStoreId === 'function' ? getStoreId() : 'main');
-    currentStoreId = storeId; 
-    
+    currentStoreId = storeId;
+
     try {
         let storeData = {};
-        
+
         // Try to load from the SQLite settings table via dbAPI
         if (window.dbAPI && window.dbAPI.getStoreSettings) {
-             const sqliteSettings = await window.dbAPI.getStoreSettings(storeId);
-             if (sqliteSettings) storeData = sqliteSettings;
+            const sqliteSettings = await window.dbAPI.getStoreSettings(storeId);
+            if (sqliteSettings) storeData = sqliteSettings;
         } else {
-             // Fallback to local storage if API isn't ready
-             const localStore = localStorage.getItem(`mifela_settings_${storeId}`);
-             if (localStore) storeData = JSON.parse(localStore);
+            // Fallback to local storage if API isn't ready
+            const localStore = localStorage.getItem(`mifela_settings_${storeId}`);
+            if (localStore) storeData = JSON.parse(localStore);
         }
 
         populateSystemUI(storeData);
         populateProfileUI();
-        
+
         const loyaltyToggle = document.getElementById('setting-loyalty-enabled');
         if (loyaltyToggle) {
             loyaltyToggle.checked = !!storeData.loyaltyEnabled;
@@ -727,7 +727,7 @@ export async function loadSettingsPage(targetView = 'settings') {
     } catch (e) {
         console.error("Error loading offline settings:", e);
     }
-    
+
     // 3. Set tab and show
     activeTab = targetView;
     switchView(targetView);
@@ -736,7 +736,7 @@ export async function loadSettingsPage(targetView = 'settings') {
 function renderSettingsShell() {
     const container = document.getElementById('settings');
     if (!container) return;
-    
+
     container.innerHTML = `
         <div id="settings-content-wrapper" class="w-full">
             
@@ -748,7 +748,7 @@ function renderSettingsShell() {
                 
                 <div class="flex items-center gap-3 relative">
                     <!-- Unified Top Right Save Button -->
-                    <button id="unified-save-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 flex items-center gap-2">
+                    <button id="unified-save-btn" class="hidden bg-SLATE-600 hover:bg-SLATE-700 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                         Save Changes
                     </button>
@@ -771,11 +771,11 @@ async function loadVersionAndUpdates() {
     const versionEl = document.getElementById('app-current-version-text');
     const badgeEl = document.getElementById('latest-version-badge');
     const notesEl = document.getElementById('release-notes-content');
-    
+
     // 1. Fetch Current Installed Version
-    let currentVersion = '1.0.169'; 
+    let currentVersion = '1.0.169';
     if (window.electronAPI && typeof window.electronAPI.getVersion === 'function') {
-        try { currentVersion = await window.electronAPI.getVersion(); } catch (e) {}
+        try { currentVersion = await window.electronAPI.getVersion(); } catch (e) { }
     }
     if (versionEl) versionEl.textContent = `VERSION: ${currentVersion}`;
 
@@ -788,7 +788,7 @@ async function loadVersionAndUpdates() {
             if (isLatest) {
                 badgeEl.className = 'bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold border border-emerald-200';
             } else {
-                badgeEl.className = 'bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold border border-indigo-200';
+                badgeEl.className = 'bg-SLATE-100 text-SLATE-700 px-2 py-0.5 rounded text-[10px] font-mono font-bold border border-SLATE-200';
             }
         }
         if (notesEl) {
@@ -812,13 +812,13 @@ async function loadVersionAndUpdates() {
         renderNotes(window.__mifela_update_info);
     } else {
         window.onUpdateInfoReceived = renderNotes;
-        window.electronAPI.updater.check(); 
+        window.electronAPI.updater.check();
     }
 }
 
 async function resolveStoreContext(user) {
     const pStoreId = typeof getStoreId === 'function' ? getStoreId() : primaryStoreId;
-    
+
     const locs = typeof getAvailableLocations === 'function' ? getAvailableLocations() : (availableLocations || []);
 
     if (locs && locs.length > 0) {
@@ -833,7 +833,7 @@ async function resolveStoreContext(user) {
 function refreshAllViews() {
     // Hardcode to 'main' since we are a single offline instance now
     const storeId = typeof getStoreId === 'function' ? getStoreId() : 'main';
-    
+
     if (window.dbAPI && window.dbAPI.getStoreSettings) {
         window.dbAPI.getStoreSettings(storeId).then(sqliteSettings => {
             populateSystemUI(sqliteSettings || {});
@@ -849,7 +849,7 @@ function refreshAllViews() {
 
 // --- REPLACE bindEvents IN src/components/settings.js ---
 
-function bindEvents() {
+async function bindEvents() {
     // 1. LINK TOP-RIGHT HEADER BUTTONS
     const headerProfileBtn = document.getElementById('profile-btn');
     if (headerProfileBtn) {
@@ -857,7 +857,7 @@ function bindEvents() {
             e.preventDefault();
             await flushSettingsChanges();
             if (typeof window.showView === 'function') window.showView('settings');
-            switchView('profile'); 
+            switchView('profile');
         };
     }
 
@@ -867,7 +867,7 @@ function bindEvents() {
             e.preventDefault();
             await flushSettingsChanges();
             if (typeof window.showView === 'function') window.showView('settings');
-            switchView('store'); 
+            switchView('store');
         };
     }
 
@@ -884,7 +884,7 @@ function bindEvents() {
     if (wrapper) {
         wrapper.addEventListener('focusout', (e) => {
             if (e.relatedTarget && e.relatedTarget.id === 'unified-save-btn') return;
-            
+
             if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
                 setTimeout(() => {
                     if (isProfileDirty || isStoreDirty) {
@@ -905,24 +905,24 @@ function bindEvents() {
             }
         };
     }
-    
+
     // Auto-save tagging
     const storeForm = document.getElementById('store-settings-form');
     if (storeForm) {
         const markStoreDirty = () => { isStoreDirty = true; updateSaveIndicator('store', 'Unsaved changes', 'amber'); };
-        
-        storeForm.addEventListener('input', (e) => { 
-            if (e.target.classList.contains('auto-save-store')) markStoreDirty(); 
+
+        storeForm.addEventListener('input', (e) => {
+            if (e.target.classList.contains('auto-save-store')) markStoreDirty();
         });
-        
-        storeForm.addEventListener('change', (e) => { 
+
+        storeForm.addEventListener('change', (e) => {
             if (e.target.classList.contains('auto-save-store')) {
-                markStoreDirty(); 
+                markStoreDirty();
                 // Force immediate save when toggles/checkboxes are clicked
                 if (e.target.type === 'checkbox' || e.target.type === 'radio' || e.target.tagName === 'SELECT') {
                     flushSettingsChanges();
                 }
-            } 
+            }
         });
     }
 
@@ -939,11 +939,19 @@ function bindEvents() {
             e.target.value = val;
             if (val.length >= 15 && !storePanInput.value) {
                 storePanInput.value = val.substring(2, 12);
-                storePanInput.classList.add('bg-indigo-50', 'transition-colors');
-                setTimeout(() => storePanInput.classList.remove('bg-indigo-50'), 800);
+                storePanInput.classList.add('bg-SLATE-50', 'transition-colors');
+                setTimeout(() => storePanInput.classList.remove('bg-SLATE-50'), 800);
                 storePanInput.dispatchEvent(new Event('input', { bubbles: true })); // Triggers Auto-Save
             }
         });
+    }
+
+    // Initialize GSTIN Auto-Fill for store settings
+    try {
+        const { attachGstinAutoFill, GSTIN_FIELD_MAPS } = await import('../utils/gstinAutoFill.js');
+        attachGstinAutoFill(GSTIN_FIELD_MAPS.storeSettings);
+    } catch (e) {
+        console.warn('GSTIN AutoFill for store settings failed:', e);
     }
 
     // Drag & Drop Logo Image Compressor
@@ -968,10 +976,10 @@ function bindEvents() {
             });
         });
 
-        fileInput.addEventListener('change', function() {
+        fileInput.addEventListener('change', function () {
             const file = this.files[0];
             if (!file) return;
-            
+
             if (!file.type.match('image.*')) {
                 if (typeof showToast === 'function') showToast('Invalid File', 'Please select an image file (PNG, JPG)', 'error');
                 return;
@@ -997,7 +1005,7 @@ function bindEvents() {
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
-                    
+
                     ctx.fillStyle = "#FFFFFF";
                     ctx.fillRect(0, 0, width, height);
                     ctx.drawImage(img, 0, 0, width, height);
@@ -1007,14 +1015,14 @@ function bindEvents() {
                     previewImg.src = compressedDataUrl;
                     previewImg.classList.remove('hidden');
                     placeholder.classList.add('hidden');
-                    
+
                     const removeBtn = document.getElementById('remove-logo-btn');
                     if (removeBtn) removeBtn.classList.remove('hidden');
-                    
+
                     urlInput.value = compressedDataUrl;
-                    isStoreDirty = true; 
-                    updateSaveIndicator('store', 'Unsaved changes', 'amber'); 
-                    flushSettingsChanges(); 
+                    isStoreDirty = true;
+                    updateSaveIndicator('store', 'Unsaved changes', 'amber');
+                    flushSettingsChanges();
                 };
                 img.src = e.target.result;
             };
@@ -1041,18 +1049,18 @@ function bindEvents() {
         if (removeLogoBtn) {
             removeLogoBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                e.stopPropagation(); 
-                
+                e.stopPropagation();
+
                 previewImg.src = '';
                 previewImg.classList.add('hidden');
                 removeLogoBtn.classList.add('hidden');
                 placeholder.classList.remove('hidden');
-                
+
                 urlInput.value = '';
                 fileInput.value = '';
                 isStoreDirty = true;
                 updateSaveIndicator('store', 'Unsaved changes', 'amber');
-                flushSettingsChanges(); 
+                flushSettingsChanges();
             });
         }
     }
@@ -1066,23 +1074,23 @@ function switchView(viewName) {
     const storeView = document.getElementById('store-view');
     const viewTitle = document.getElementById('settings-view-title');
 
-    const showView = (el) => { 
-        el?.classList.remove('hidden'); 
-        setTimeout(() => el?.classList.remove('opacity-0', 'translate-y-2'), 10); 
+    const showView = (el) => {
+        el?.classList.remove('hidden');
+        setTimeout(() => el?.classList.remove('opacity-0', 'translate-y-2'), 10);
     };
-    const hideView = (el) => { 
-        el?.classList.add('opacity-0', 'translate-y-2'); 
-        el?.classList.add('hidden'); 
+    const hideView = (el) => {
+        el?.classList.add('opacity-0', 'translate-y-2');
+        el?.classList.add('hidden');
     };
 
     if (viewName === 'profile') {
-        showView(profileView); 
+        showView(profileView);
         hideView(storeView);
-        if(viewTitle) viewTitle.textContent = "My Profile";
+        if (viewTitle) viewTitle.textContent = "My Profile";
     } else {
-        hideView(profileView); 
+        hideView(profileView);
         showView(storeView);
-        if(viewTitle) viewTitle.textContent = "Store Configuration";
+        if (viewTitle) viewTitle.textContent = "Store Configuration";
     }
 }
 
@@ -1093,21 +1101,21 @@ function switchView(viewName) {
 function updateSaveIndicator(target, text, color) {
     const ind = document.getElementById(`${target}-save-indicator`);
     const unifiedBtn = document.getElementById('unified-save-btn');
-    
+
     // Whenever a setting goes "dirty", surface the unified save button
     if (color === 'amber' && unifiedBtn) {
         unifiedBtn.classList.remove('hidden');
     }
 
     if (!ind) return;
-    
+
     let bg = 'bg-emerald-100', textCol = 'text-emerald-700', dot = 'bg-emerald-500', dotAnim = '';
     if (color === 'amber') { bg = 'bg-amber-100'; textCol = 'text-amber-700'; dot = 'bg-amber-500'; dotAnim = 'animate-pulse'; }
     if (color === 'blue') { bg = 'bg-blue-100'; textCol = 'text-blue-700'; dot = 'bg-blue-500'; dotAnim = 'animate-pulse'; }
 
     ind.className = `absolute top-0 right-0 px-4 py-1 text-[10px] font-bold tracking-widest rounded-bl-xl transition-opacity duration-300 flex items-center gap-1.5 ${bg} ${textCol} opacity-100 z-50`;
     ind.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dot} ${dotAnim}"></span> ${text}`;
-    
+
     if (color === 'emerald') {
         setTimeout(() => {
             if (ind.textContent.includes('Saved')) ind.classList.replace('opacity-100', 'opacity-0');
@@ -1121,11 +1129,11 @@ function updateSaveIndicator(target, text, color) {
 
 async function populateProfileUI() {
     const nameInput = document.getElementById('profile-name-input');
-    const desigInput = document.getElementById('profile-designation-input'); 
-    const langInput = document.getElementById('profile-lang-input'); 
-    const emailInput = document.getElementById('profile-email-input'); 
-    const phoneInput = document.getElementById('profile-phone-input'); 
-    
+    const desigInput = document.getElementById('profile-designation-input');
+    const langInput = document.getElementById('profile-lang-input');
+    const emailInput = document.getElementById('profile-email-input');
+    const phoneInput = document.getElementById('profile-phone-input');
+
     const headerName = document.getElementById('profile-display-name-header');
     const headerAvatar = document.getElementById('profile-avatar-initial');
     const roleBadge = document.getElementById('profile-role-badge');
@@ -1133,14 +1141,14 @@ async function populateProfileUI() {
     let displayName = 'Admin User';
     let displayEmail = '';
     let displayPhone = '';
-    
+
     try {
         const localProfile = JSON.parse(localStorage.getItem('mifela_staff_profile') || '{}');
-        
+
         if (localProfile.name) displayName = localProfile.name;
         if (localProfile.email) displayEmail = localProfile.email;
         if (localProfile.phone) displayPhone = localProfile.phone;
-        
+
         if (desigInput && localProfile.designation) desigInput.value = localProfile.designation;
         if (langInput && localProfile.language) langInput.value = localProfile.language;
     } catch (e) {
@@ -1150,7 +1158,7 @@ async function populateProfileUI() {
     if (nameInput) nameInput.value = displayName;
     if (emailInput) emailInput.value = displayEmail;
     if (phoneInput) phoneInput.value = displayPhone;
-    
+
     if (headerName) headerName.textContent = escapeHTML(displayName);
     if (headerAvatar) headerAvatar.textContent = escapeHTML(displayName.charAt(0).toUpperCase());
 
@@ -1162,16 +1170,16 @@ async function populateProfileUI() {
             const currPass = document.getElementById('current-password').value;
             const pass1 = document.getElementById('new-password').value;
             const pass2 = document.getElementById('confirm-password').value;
-            
+
             const savedAppPassword = localStorage.getItem('mifela_app_password') || '';
-            
+
             // If they have a password set, verify it first
             if (savedAppPassword && currPass !== savedAppPassword) {
                 return showModal('Error', 'Current password is incorrect.', 'error');
             }
-            
+
             if (pass1 !== pass2) return showModal('Error', 'New passwords do not match.', 'error');
-            
+
             localStorage.setItem('mifela_app_password', pass1);
             showToast('Success', 'App Security Password updated!', 'success');
             passForm.reset();
@@ -1180,7 +1188,7 @@ async function populateProfileUI() {
 }
 
 async function handleSaveProfile(e) {
-    if(e) e.preventDefault();
+    if (e) e.preventDefault();
 
     const nameInput = document.getElementById('profile-name-input');
     if (!nameInput) return;
@@ -1190,11 +1198,11 @@ async function handleSaveProfile(e) {
         showToast('Error', 'Name cannot be empty', 'error');
         return;
     }
-    
-    const newDesig = document.getElementById('profile-designation-input')?.value.trim() || ''; 
-    const newLang = document.getElementById('profile-lang-input')?.value || 'en'; 
-    const newEmail = document.getElementById('profile-email-input')?.value.trim() || ''; 
-    const newPhone = document.getElementById('profile-phone-input')?.value.trim() || ''; 
+
+    const newDesig = document.getElementById('profile-designation-input')?.value.trim() || '';
+    const newLang = document.getElementById('profile-lang-input')?.value || 'en';
+    const newEmail = document.getElementById('profile-email-input')?.value.trim() || '';
+    const newPhone = document.getElementById('profile-phone-input')?.value.trim() || '';
 
     try {
         // 🚀 THE FIX: Save directly to Local Storage
@@ -1206,9 +1214,9 @@ async function handleSaveProfile(e) {
             phone: newPhone,
             role: 'admin'
         };
-        
+
         localStorage.setItem('mifela_staff_profile', JSON.stringify(profileData));
-        
+
         const headerName = document.getElementById('profile-display-name-header');
         const headerAvatar = document.getElementById('profile-avatar-initial');
         if (headerName) headerName.textContent = escapeHTML(newName);
@@ -1235,28 +1243,28 @@ export async function flushSettingsChanges() {
     }
     if (isStoreDirty) {
         updateSaveIndicator('store', 'Saving...', 'blue');
-        promises.push(handleSaveStore().then(() => { 
-            isStoreDirty = false; 
-            updateSaveIndicator('store', 'Saved', 'emerald'); 
+        promises.push(handleSaveStore().then(() => {
+            isStoreDirty = false;
+            updateSaveIndicator('store', 'Saved', 'emerald');
         }));
     }
-    
+
     // 🚀 THE FIX: Removed isWaDirty WhatsApp logic
-    
+
     if (promises.length > 0) {
         await Promise.all(promises);
-        
+
         if (unifiedBtn) {
             unifiedBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Saved!`;
-            unifiedBtn.classList.replace('bg-indigo-600', 'bg-emerald-500');
-            unifiedBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-emerald-600');
-            
+            unifiedBtn.classList.replace('bg-SLATE-600', 'bg-emerald-500');
+            unifiedBtn.classList.replace('hover:bg-SLATE-700', 'hover:bg-emerald-600');
+
             setTimeout(() => {
                 if (!isProfileDirty && !isStoreDirty) {
                     unifiedBtn.classList.add('hidden');
                     unifiedBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg> Save Changes`;
-                    unifiedBtn.classList.replace('bg-emerald-500', 'bg-indigo-600');
-                    unifiedBtn.classList.replace('hover:bg-emerald-600', 'hover:bg-indigo-700');
+                    unifiedBtn.classList.replace('bg-emerald-500', 'bg-SLATE-600');
+                    unifiedBtn.classList.replace('hover:bg-emerald-600', 'hover:bg-SLATE-700');
                 }
             }, 2000);
         }
@@ -1270,7 +1278,7 @@ export async function handleSaveStore(arg) {
 
     const settingsSection = document.getElementById('settings');
     const getVal = (id) => settingsSection.querySelector('#' + id)?.value?.trim() || '';
-    
+
     // Prevent silent aborts if the user hasn't filled out the store name yet
     let sName = getVal('setting-store-name');
     if (!sName) {
@@ -1282,13 +1290,13 @@ export async function handleSaveStore(arg) {
     let sPhone = getVal('setting-store-phone');
     const sEmail = getVal('setting-store-email');
     const sAddr = getVal('setting-store-address');
-    
+
     // 🚀 THE FIX: Force uppercase and fallback PAN extraction on manual save
     const sTax = getVal('setting-store-tax-id').toUpperCase();
     const sState = getVal('setting-store-state');
-    
+
     let sPan = getVal('setting-store-pan').toUpperCase();
-    
+
     if (!sPan && sTax.length >= 15) {
         sPan = sTax.substring(2, 12);
         const panInput = document.getElementById('setting-store-pan');
@@ -1300,32 +1308,32 @@ export async function handleSaveStore(arg) {
     const sWeb = getVal('setting-store-website');
     const sFoot = getVal('setting-store-footer');
     const sType = getVal('setting-store-type');
-    
+
     const sUpi = getVal('setting-store-upi');
     const sTnc = getVal('setting-store-tnc');
-    
+
     const razorpayKeyId = getVal('setting-razorpay-key');
     const razorpayKeySecret = getVal('setting-razorpay-secret');
-    
+
     const bankDetails = {
         bankName: getVal('setting-bank-name'),
         branch: getVal('setting-bank-branch'),
         accountNumber: getVal('setting-bank-acc'),
         ifsc: getVal('setting-bank-ifsc')
-    };    
-    
-    const digits = sPhone.replace(/\D/g, ''); 
+    };
+
+    const digits = sPhone.replace(/\D/g, '');
     sPhone = digits.startsWith('91') && digits.length === 12 ? `+${digits}` : `+91${digits.slice(-10)}`;
     const taxRate = parseFloat(document.getElementById('default-tax-rate')?.value || 0);
-    const convenienceFee = parseFloat(document.getElementById('setting-convenience-fee')?.value || 0); 
+    const convenienceFee = parseFloat(document.getElementById('setting-convenience-fee')?.value || 0);
     const currency = document.getElementById('currency-select')?.value || 'INR';
     const loyaltyEnabled = document.getElementById('setting-loyalty-enabled')?.checked || false;
     const loyaltyEarnRatio = parseFloat(getVal('setting-loyalty-earn')) || 100;
     const loyaltyTokenValue = parseFloat(getVal('setting-loyalty-value')) || 1;
-    
-    await proceedWithStoreSave(null, targetStoreId, { 
+
+    await proceedWithStoreSave(null, targetStoreId, {
         sName, sPhone, sEmail, sAddr, sTax, sPan, sTag, sWeb, sFoot, sState, sType, bankDetails, taxRate, convenienceFee, currency, sLogo, razorpayKeyId, razorpayKeySecret,
-        sUpi, sTnc, loyaltyEnabled, loyaltyEarnRatio, loyaltyTokenValue 
+        sUpi, sTnc, loyaltyEnabled, loyaltyEarnRatio, loyaltyTokenValue
     });
 }
 
@@ -1339,8 +1347,8 @@ async function proceedWithStoreSave(btn, targetStoreId, data) {
             address: data.sAddr,
             state: data.sState,
             taxId: data.sTax,
-            pan: data.sPan,       
-            logoUrl: data.sLogo,  
+            pan: data.sPan,
+            logoUrl: data.sLogo,
             tagline: data.sTag,
             website: data.sWeb,
             footer: data.sFoot,
@@ -1364,13 +1372,13 @@ async function proceedWithStoreSave(btn, targetStoreId, data) {
         if (window.dbAPI && window.dbAPI.saveStoreSettings) {
             await window.dbAPI.saveStoreSettings(targetStoreId, mergedSettings);
         }
-        
+
         // Backup to localStorage for fast synchronous reads in other tabs
         localStorage.setItem(`mifela_settings_${targetStoreId}`, JSON.stringify(mergedSettings));
 
         const dashStoreName = document.getElementById('dashboard-store-name');
         if (dashStoreName) dashStoreName.textContent = escapeHTML(data.sName);
-        
+
         const locSelector = document.getElementById('location-selector');
         if (locSelector && locSelector.options[locSelector.selectedIndex]) {
             let newLabel = data.sName;
@@ -1391,18 +1399,18 @@ function renderMerchantId(merchantId) {
     const container = document.getElementById('merchant-id-container');
     if (container && merchantId) {
         container.innerHTML = `
-            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-1 shadow-lg mt-8">
+            <div class="bg-gradient-to-br from-SLATE-500 to-purple-600 rounded-2xl p-1 shadow-lg mt-8">
                 <div class="bg-white rounded-xl p-6 relative overflow-hidden">
                     <div class="absolute top-0 right-0 p-4 opacity-10">
-                        <svg class="w-24 h-24 text-indigo-900" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/></svg>
+                        <svg class="w-24 h-24 text-SLATE-900" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/></svg>
                     </div>
                     <div class="flex justify-between items-center mb-4 relative z-10">
-                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest">Public Merchant ID</p>
+                        <p class="text-xs font-bold text-SLATE-500 uppercase tracking-widest">Public Merchant ID</p>
                         <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200">ACTIVE</span>
                     </div>
                     <div class="flex flex-col sm:flex-row justify-between items-center gap-4 relative z-10">
                         <span class="text-2xl font-mono font-bold text-gray-900 tracking-wider select-all">${merchantId}</span>
-                        <button type="button" class="text-xs bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-colors flex items-center gap-2" 
+                        <button type="button" class="text-xs bg-SLATE-50 text-SLATE-700 px-4 py-2 rounded-lg font-bold hover:bg-SLATE-100 transition-colors flex items-center gap-2" 
                             onclick="navigator.clipboard.writeText('${merchantId}');">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                             Copy ID
@@ -1422,7 +1430,7 @@ function organizeDynamicSections() {
 function injectEssentialsSection() {
     const container = document.getElementById('settings-essentials-container');
     if (!container) return;
-    
+
     container.innerHTML = `
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -1432,7 +1440,7 @@ function injectEssentialsSection() {
                 Feedback & Support
             </h3>
             <div class="space-y-4">
-                <textarea id="settings-feedback-text" rows="3" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium resize-none bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Report a bug or request a feature..."></textarea>
+                <textarea id="settings-feedback-text" rows="3" class="w-full border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-SLATE-500 outline-none text-sm font-medium resize-none bg-slate-50 hover:bg-white transition-all shadow-inner" placeholder="Report a bug or request a feature..."></textarea>
                 <button type="button" id="send-settings-feedback-btn" class="w-full bg-amber-50 text-amber-700 border border-amber-100 py-3 rounded-xl text-sm font-bold hover:bg-amber-100 transition-colors shadow-sm">
                     Submit Report
                 </button>
@@ -1446,20 +1454,20 @@ function injectEssentialsSection() {
 async function handleSendFeedback() {
     const textInput = document.getElementById('settings-feedback-text');
     const text = textInput.value.trim();
-    
-    if (!text) { 
-        showToast('Required', 'Please enter some text before submitting.', 'warning'); 
-        return; 
+
+    if (!text) {
+        showToast('Required', 'Please enter some text before submitting.', 'warning');
+        return;
     }
-    
+
     const btn = document.getElementById('send-settings-feedback-btn');
     const originalText = btn.textContent;
     btn.innerHTML = `<span class="animate-pulse">Sending...</span>`;
     btn.disabled = true;
-    
+
     try {
         const user = auth.currentUser;
-        
+
         await addDoc(collection(db, `artifacts/${appId}/feedback`), {
             type: 'General Report',
             message: text,
@@ -1470,8 +1478,8 @@ async function handleSendFeedback() {
         });
 
         showToast('Thank You', 'Your feedback has been sent to Mifela HQ.', 'success');
-        textInput.value = ''; 
-        
+        textInput.value = '';
+
     } catch (error) {
         console.error("Feedback Error:", error);
         showToast('Error', 'Failed to send feedback: ' + error.message, 'error');
@@ -1495,19 +1503,19 @@ async function renderSecuritySection(security) {
     if (!container) return;
 
     if (userRole !== 'admin' && userRole !== 'store_manager') {
-        container.innerHTML = ''; 
+        container.innerHTML = '';
         return;
     }
 
     const currentIp = await getCurrentIP();
-    const isEnabled = !!security.enabled; 
-    const isStrict = security.strictMode !== false; 
+    const isEnabled = !!security.enabled;
+    const isStrict = security.strictMode !== false;
     const authorizedIp = security.authorizedIp || (security.ipMap ? security.ipMap['main'] : null) || 'Not Set';
     const isMatched = currentIp === authorizedIp;
 
     let statusBadge = '';
     if (isEnabled) {
-        statusBadge = isMatched 
+        statusBadge = isMatched
             ? `<div class="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-xs font-bold border border-emerald-200"><div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div> Authorized</div>`
             : `<div class="flex items-center gap-2 text-amber-700 bg-amber-50 px-3 py-1 rounded-full text-xs font-bold border border-amber-200"><div class="w-2 h-2 bg-amber-500 rounded-full"></div> Mismatch</div>`;
     } else {
@@ -1518,7 +1526,7 @@ async function renderSecuritySection(security) {
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-8 overflow-hidden transition-all hover:shadow-md">
             <div class="px-6 py-5 bg-white border-b border-gray-100 flex justify-between items-center">
                 <h3 class="font-bold text-gray-800 flex items-center gap-3">
-                    <span class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <span class="p-2 bg-SLATE-50 text-SLATE-600 rounded-lg">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                     </span>
                     <div>
@@ -1551,7 +1559,7 @@ async function renderSecuritySection(security) {
                                 <span class="font-mono text-xl ${isMatched ? 'text-gray-800' : 'text-amber-600'} font-bold tracking-tight">
                                     ${authorizedIp === 'Not Set' ? '<span class="text-gray-300 italic">Not Set</span>' : authorizedIp}
                                 </span>
-                                <button type="button" id="sec-update-ip-btn" class="ml-auto text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800 px-3 py-1.5 rounded-lg font-bold transition-colors border border-indigo-100">
+                                <button type="button" id="sec-update-ip-btn" class="ml-auto text-xs bg-SLATE-50 text-SLATE-600 hover:bg-SLATE-100 hover:text-SLATE-800 px-3 py-1.5 rounded-lg font-bold transition-colors border border-SLATE-100">
                                     Authorize Current
                                 </button>
                             </div>
@@ -1560,12 +1568,12 @@ async function renderSecuritySection(security) {
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label class="flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 cursor-pointer transition-all h-full shadow-sm group">
+                    <label class="flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-SLATE-300 cursor-pointer transition-all h-full shadow-sm group">
                         <div class="pt-0.5">
-                            <input type="checkbox" id="sec-strict-mode" class="auto-save-store h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300" ${isStrict ? 'checked' : ''}>
+                            <input type="checkbox" id="sec-strict-mode" class="auto-save-store h-5 w-5 text-SLATE-600 rounded focus:ring-SLATE-500 border-gray-300" ${isStrict ? 'checked' : ''}>
                         </div>
                         <div>
-                            <span class="font-bold text-sm text-gray-800 block group-hover:text-indigo-700 transition-colors">Strict Mode</span>
+                            <span class="font-bold text-sm text-gray-800 block group-hover:text-SLATE-700 transition-colors">Strict Mode</span>
                             <span class="text-xs text-gray-500 block mt-0.5 leading-relaxed">Block login/clock-in completely if IP doesn't match.</span>
                         </div>
                     </label>
@@ -1576,14 +1584,14 @@ async function renderSecuritySection(security) {
     `;
 
     document.getElementById('sec-enable-toggle')?.addEventListener('change', (e) => {
-    currentSecurityState.enabled = e.target.checked;
-    const panel = document.getElementById('sec-details-panel'); 
-    if (panel) panel.classList.toggle('hidden', !e.target.checked);
-});
-    
+        currentSecurityState.enabled = e.target.checked;
+        const panel = document.getElementById('sec-details-panel');
+        if (panel) panel.classList.toggle('hidden', !e.target.checked);
+    });
+
     document.getElementById('sec-update-ip-btn')?.addEventListener('click', async () => {
         const ip = await getCurrentIP();
-        if(ip) {
+        if (ip) {
             currentSecurityState.authorizedIp = ip;
             await handleSaveStore();
             showToast('Success', 'IP Authorized for this location', 'success');
@@ -1612,17 +1620,17 @@ export async function initializeUserIfNeeded(user) {
         let profileData = {};
         if (profileSnap.exists()) {
             profileData = profileSnap.data();
-            
+
             if (profileData.role !== 'admin') {
                 if (profileData.assignedLocationId && profileData.storeId !== profileData.assignedLocationId) {
                     try {
                         await updateDoc(profileRef, { storeId: profileData.assignedLocationId });
                         window.location.reload();
-                        await new Promise(() => {});
+                        await new Promise(() => { });
                         return 'RELOADING';
                     } catch (e) {
                         alert("Permission Error: Your account was assigned to a branch incorrectly, preventing access.\n\nPlease ask your Admin to log in to their account once to automatically fix this issue.");
-                        await new Promise(() => {}); 
+                        await new Promise(() => { });
                     }
                 }
                 if (profileData.storeId || profileData.assignedLocationId) {
@@ -1634,55 +1642,55 @@ export async function initializeUserIfNeeded(user) {
                         const storesQ = query(collection(db, `artifacts/${getAppId()}/stores`), where("ownerId", "==", user.uid));
                         const storesSnap = await getDocs(storesQ);
                         const ownedStoreIds = storesSnap.docs.map(d => d.id);
-                        
+
                         if (ownedStoreIds.length > 0) {
                             const staffQ = query(collection(db, 'userProfiles'), where("role", "in", ["store_manager", "cashier", "accountant"]));
                             const staffSnap = await getDocs(staffQ);
-                            
+
                             staffSnap.forEach(async (staffDoc) => {
                                 const sData = staffDoc.data();
                                 if (sData.assignedLocationId && sData.storeId !== sData.assignedLocationId) {
                                     if (ownedStoreIds.includes(sData.assignedLocationId) || ownedStoreIds.includes(sData.storeId)) {
                                         try {
                                             await updateDoc(staffDoc.ref, { storeId: sData.assignedLocationId });
-                                        } catch(err) {}
+                                        } catch (err) { }
                                     }
                                 }
                             });
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }, 2500);
             }
         }
 
         const q = query(collection(db, `artifacts/${getAppId()}/stores`), where("ownerId", "==", user.uid));
         const snapshot = await getDocs(q);
-        
-        if (!snapshot.empty) {
-             const hasIncompleteStore = snapshot.docs.some(doc => {
-                 const data = doc.data();
-                 const hasName = data.storeName && data.storeName.trim().length > 2;
-                 const hasAddress = data.address && data.address.trim().length > 4;
-                 const hasTaxId = data.taxId && data.taxId.trim().length > 4;
-                 return !(hasName && hasAddress && hasTaxId); 
-             });
 
-             if (hasIncompleteStore) {
-                 return 'SETUP_REQUIRED'; 
-             } else {
-                 return 'READY';
-             }
+        if (!snapshot.empty) {
+            const hasIncompleteStore = snapshot.docs.some(doc => {
+                const data = doc.data();
+                const hasName = data.storeName && data.storeName.trim().length > 2;
+                const hasAddress = data.address && data.address.trim().length > 4;
+                const hasTaxId = data.taxId && data.taxId.trim().length > 4;
+                return !(hasName && hasAddress && hasTaxId);
+            });
+
+            if (hasIncompleteStore) {
+                return 'SETUP_REQUIRED';
+            } else {
+                return 'READY';
+            }
         } else {
             return 'SETUP_REQUIRED';
         }
-    } catch (e) { 
-        return 'ERROR'; 
+    } catch (e) {
+        return 'ERROR';
     }
 }
 
 export async function createInitialStore(user, storeDetails) {
     if (!user || !storeDetails) throw new Error("Missing Data");
-    
+
     let finalPhone = storeDetails.phone || '';
     if (finalPhone && !finalPhone.startsWith('+')) {
         finalPhone = '+91' + finalPhone;
@@ -1695,11 +1703,11 @@ export async function createInitialStore(user, storeDetails) {
             throw new Error("This phone number is already registered to another store.");
         }
     }
-    
-    storeDetails.phone = finalPhone; 
+
+    storeDetails.phone = finalPhone;
 
     const userProfileRef = doc(db, 'userProfiles', user.uid);
-    const newMerchantId = generateMerchantId(finalPhone); 
+    const newMerchantId = generateMerchantId(finalPhone);
     const storesRef = collection(db, `artifacts/${getAppId()}/stores`);
     const newStoreRef = doc(storesRef);
     const newStoreId = newStoreRef.id;
@@ -1730,7 +1738,7 @@ export async function createInitialStore(user, storeDetails) {
             ownerId: user.uid,
             state: newStoreData.state,
             gstin: newStoreData.taxId,
-            pan: storeDetails.pan || '',      
+            pan: storeDetails.pan || '',
             phone: newStoreData.phone,
             email: newStoreData.email
         });
@@ -1742,7 +1750,7 @@ export async function createInitialStore(user, storeDetails) {
             address: newStoreData.address,
             state: newStoreData.state,
             taxId: newStoreData.taxId,
-            pan: storeDetails.pan || '',      
+            pan: storeDetails.pan || '',
             currency: newStoreData.currency,
             taxRate: newStoreData.taxRate,
             razorpayKeyId: storeDetails.razorpayKeyId || '',
@@ -1752,41 +1760,41 @@ export async function createInitialStore(user, storeDetails) {
         });
 
         await setDoc(userProfileRef, {
-            role: "admin", 
-            storeId: newStoreId, 
-            email: user.email || storeDetails.email || '', 
-            name: storeDetails.adminName || user.displayName || "Admin", 
+            role: "admin",
+            storeId: newStoreId,
+            email: user.email || storeDetails.email || '',
+            name: storeDetails.adminName || user.displayName || "Admin",
             status: "Active"
         }, { merge: true });
-        
+
         return newStoreId;
     } catch (e) {
         throw e;
     }
 }
 
-export function populateSettingsUI(settings, user, activeView) { 
+export function populateSettingsUI(settings, user, activeView) {
     const settingsSection = document.getElementById('settings');
     const isVisible = settingsSection && !settingsSection.classList.contains('hidden');
     const shellExists = !!document.getElementById('settings-content-wrapper');
-    
+
     if (isVisible && shellExists) {
         refreshAllViews(user);
     } else {
         const viewToLoad = (activeView === 'settings') ? 'store' : activeView;
-        loadSettingsPage(viewToLoad || 'profile'); 
+        loadSettingsPage(viewToLoad || 'profile');
     }
 }
 
-export async function handleSaveProfileStore(e) { 
-    if(e) e.preventDefault(); 
-    await handleSaveProfile(); 
-    await handleSaveStore('main'); 
+export async function handleSaveProfileStore(e) {
+    if (e) e.preventDefault();
+    await handleSaveProfile();
+    await handleSaveStore('main');
 }
 
-export async function handleSaveSettings(e) { 
-    if(e) e.preventDefault(); 
-    await handleSaveStore('main'); 
+export async function handleSaveSettings(e) {
+    if (e) e.preventDefault();
+    await handleSaveStore('main');
 }
 export function setupSettingsListeners() { bindEvents(); }
 
@@ -1794,38 +1802,38 @@ export function setupSettingsListeners() { bindEvents(); }
 document.addEventListener('click', async (e) => {
     const profileBtn = e.target.closest('#profile-btn');
     const settingsBtn = e.target.closest('#settings-btn');
-    const navLink = e.target.closest('a') || e.target.closest('[data-view]'); 
-    
+    const navLink = e.target.closest('a') || e.target.closest('[data-view]');
+
     if (profileBtn || settingsBtn) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Add toast alert if there are unsaved changes
         if (isProfileDirty || isStoreDirty || isWaDirty) {
             showToast('Auto-Saved', 'Unsaved changes were saved before switching views.', 'info');
         }
         await flushSettingsChanges();
-        
+
         document.querySelectorAll('.view-section').forEach(el => {
             el.classList.remove('active', 'block');
             el.classList.add('hidden');
         });
-        
+
         const settingsSection = document.getElementById('settings');
         if (settingsSection) {
             settingsSection.classList.remove('hidden');
             settingsSection.classList.add('active', 'block');
         }
-        
+
         if (profileBtn) loadSettingsPage('profile');
         else loadSettingsPage('store');
-        
+
     } else if (navLink && !navLink.closest('#settings')) {
         // Add toast alert if navigating completely away from settings
         if (isProfileDirty || isStoreDirty || isWaDirty) {
             showToast('Auto-Saved', 'Unsaved changes were saved securely before leaving.', 'info');
         }
-        flushSettingsChanges(); 
+        flushSettingsChanges();
     }
 });
 
@@ -1857,13 +1865,13 @@ export async function loadWhatsAppSettings() {
     try {
         const secretsRef = doc(db, `artifacts/${getAppId()}/stores/${storeId}/settings/secrets`);
         const snap = await getDoc(secretsRef);
-        
-        let mode = 'managed'; 
+
+        let mode = 'managed';
 
         if (snap.exists()) {
             const data = snap.data();
             if (data.wa_mode) mode = data.wa_mode;
-            
+
             if (data.wa_phone_id) document.getElementById('custom_wa_phone_id').value = data.wa_phone_id;
             if (data.wa_token) document.getElementById('custom_wa_token').value = data.wa_token;
         }
@@ -1892,13 +1900,13 @@ export async function loadWhatsAppSettings() {
 }
 
 async function saveWhatsAppSettings(e) {
-    if(e) e.preventDefault();
+    if (e) e.preventDefault();
     const storeId = currentStoreId || (typeof getStoreId === 'function' ? getStoreId() : primaryStoreId);
     if (!storeId) return;
 
     const selectedRadio = document.querySelector('input[name="wa_mode_toggle"]:checked');
     const selectedMode = selectedRadio ? selectedRadio.value : 'managed';
-    
+
     const settingsData = {
         wa_mode: selectedMode,
         updatedAt: new Date().toISOString()
@@ -1907,9 +1915,9 @@ async function saveWhatsAppSettings(e) {
     if (selectedMode === 'custom') {
         const phoneId = document.getElementById('custom_wa_phone_id').value.trim();
         const token = document.getElementById('custom_wa_token').value.trim();
-        
+
         if (!phoneId || !token) return;
-        
+
         settingsData.wa_phone_id = phoneId;
         settingsData.wa_token = token;
     }

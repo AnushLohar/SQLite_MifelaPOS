@@ -1,20 +1,22 @@
 // src/components/inventory.js
 
 
-import { escapeHTML } from '../utils/security.js'; 
-import { safeMath } from '../utils/math.js'; 
+import { escapeHTML } from '../utils/security.js';
+import { safeMath } from '../utils/math.js';
 import { savePosImage } from '../utils/imageDB.js';
-import { generateMerchantId } from '../utils/ids.js'; 
-import { initProductionUI } from './production.js'; 
+import { generateMerchantId } from '../utils/ids.js';
+import { initProductionUI } from './production.js';
 import { openManualBulkUpload } from './bulkUpload.js';
-import { DOM, showModal, showToast } from '../utils/dom.js'; 
-import { exportInventoryToSpreadsheet } from '../utils/export.js'; 
+import { DOM, showModal, showToast } from '../utils/dom.js';
+import { exportInventoryToSpreadsheet } from '../utils/export.js';
+import { PrinterManager } from '../printing/PrinterEngine.js';
+import { renderPageState, tableStateRow } from '../utils/uiStates.js';
 
-import { 
-    getStoreId, getUserId, appId, getCurrencySymbol, getEditingProductId, 
-    setEditingProductId, getCurrencyCode, getCurrentUserPlan, 
-    getCurrentProductCount, setCurrentProductCount, PLAN_LIMITS, 
-    getCurrentLocationId, getAvailableLocations, getUserRole, 
+import {
+    getStoreId, getUserId, appId, getCurrencySymbol, getEditingProductId,
+    setEditingProductId, getCurrencyCode, getCurrentUserPlan,
+    getCurrentProductCount, setCurrentProductCount, PLAN_LIMITS,
+    getCurrentLocationId, getAvailableLocations, getUserRole,
     setCurrentLocation, getUserAssignedLocationId, invalidateProductCache, AppState
 } from '../store/state.js';
 
@@ -37,7 +39,7 @@ export async function refreshLocalInventoryCache() {
 
         // Update the global cache variable
         localProductsCache = canAccessAllLocations ? products : products.filter(d => getNormalizedLoc(d.locationId) === normAssignedLoc);
-        
+
         // Save to local storage for fast initial loads
         localStorage.setItem(getCacheKey(), JSON.stringify(localProductsCache));
 
@@ -45,11 +47,11 @@ export async function refreshLocalInventoryCache() {
         if (DOM.inventory.table) {
             renderInventoryTable();
             if (typeof updateInventoryCountDisplay === 'function') updateInventoryCountDisplay();
-            if (typeof updateProductDatalist === 'function') updateProductDatalist(); 
+            if (typeof updateProductDatalist === 'function') updateProductDatalist();
             if (typeof updateBundleDatalist === 'function') updateBundleDatalist();
         }
-    } catch (e) { 
-        console.error("Local UI Sync failed:", e); 
+    } catch (e) {
+        console.error("Local UI Sync failed:", e);
     }
 }
 function doc(dbOrCol, pathOrId) {
@@ -69,7 +71,7 @@ function doc(dbOrCol, pathOrId) {
     else if (colStr.includes('transactions')) col = 'transactions';
     else if (colStr.includes('customers') || colStr.includes('directory_merchants')) col = 'customers';
 
-    const id = idStr || `AUTO-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const id = idStr || `AUTO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     return { col, id };
 }
 
@@ -82,7 +84,7 @@ function writeBatch() {
         async commit() {
             if (window.dbAPI && window.dbAPI.executeBatch) {
                 await window.dbAPI.executeBatch(this.ops);
-                
+
                 // 🚀 THE FIX: Dynamically announce which databases were altered
                 const alteredCols = new Set(this.ops.map(op => op.col));
                 if (alteredCols.has('products')) {
@@ -138,25 +140,25 @@ const orderBy = () => null;
 const collection = () => 'dummy_collection'; // 🚀 THE FIX: Mocked collection
 const addDoc = async () => ({ id: `LOG-${Date.now()}` }); // 🚀 THE FIX: Mocked addDoc
 const getCountFromServer = async () => ({ data: () => ({ count: localProductsCache.length }) });
-const getDocs = async () => ({ empty: true, docs: [] }); 
+const getDocs = async () => ({ empty: true, docs: [] });
 
 const db = {}; // Dummy db object to satisfy writeBatch(db)
 
 const PRODUCTS_PER_PAGE = 50;
 window.currentInventoryPage = 1;
-window.changeInventoryPage = function(delta) {
+window.changeInventoryPage = function (delta) {
     window.currentInventoryPage += delta;
     renderInventoryTable();
 };
 
 // --- State & Cache ---
-let localProductsCache = []; 
-let localDealersCache = []; 
+let localProductsCache = [];
+let localDealersCache = [];
 let hsnDirectoryCache = [];
 let productToAdjust = null;
 let activityListenerUnsubscribe = null;
 let inventoryListenerUnsubscribe = null;
-let isListenersAttached = false; 
+let isListenersAttached = false;
 
 // --- BUNDLE STATE ---
 let bundleComponents = []; // Array of { id, name, qty, cost }
@@ -176,7 +178,7 @@ function getNormalizedLoc(locId) {
 // 🚀 HYBRID FEFO/FIFO BATCH SORTING HELPER
 function sortBatchesFefoFifo(batches) {
     if (!Array.isArray(batches)) return [];
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTime = today.getTime();
@@ -184,56 +186,56 @@ function sortBatchesFefoFifo(batches) {
     return [...batches].sort((a, b) => {
         const hasExpA = Boolean(a.expirationDate);
         const hasExpB = Boolean(b.expirationDate);
-        
+
         const timeA = hasExpA ? new Date(a.expirationDate).getTime() : Infinity;
         const timeB = hasExpB ? new Date(b.expirationDate).getTime() : Infinity;
-        
+
         const isExpA = timeA < todayTime;
         const isExpB = timeB < todayTime;
-        
+
         // 1. 🛑 EXPIRED STOCK QUARANTINE: Push expired batches to the absolute bottom!
         if (isExpA && !isExpB) return 1;
         if (!isExpA && isExpB) return -1;
-        
+
         // 2. If both are valid (or both expired), sort by earliest expiry first (FEFO)
         if (hasExpA && hasExpB) {
             return timeA - timeB;
         }
-        
+
         // 3. Items with expiry take precedence over items without expiry
         if (hasExpA) return -1;
         if (hasExpB) return 1;
-        
+
         // 4. Fallback to FIFO (oldest timestamp first)
         return (a.timestamp || 0) - (b.timestamp || 0);
     });
 }
 
-window.prepareNewBatch = function() {
+window.prepareNewBatch = function () {
     const stockInput = document.getElementById('stockLevel') || document.getElementById('stock') || document.querySelector('input[name="stock"]');
-    
+
     if (stockInput && typeof stockInput.dataset === 'object') {
         stockInput.dataset.baseStock = stockInput.value || 0;
         delete stockInput.dataset.editingBatchIndex;
     }
-    
+
     ['prod-cases', 'prod-pieces', 'prod-free-qty'].forEach(id => {
         const el = document.getElementById(id);
-        if(el) el.value = '0';
+        if (el) el.value = '0';
     });
-    
+
     // 🚀 THE FIX: Aggressively clear ALL batch-specific pricing, dates, and supplier info.
     // Keep Name, SKU, Barcode, and HSN completely intact.
     const fieldsToClear = [
-        'expirationDate', 'packagedDate', 'prod-batch', 'prod-invoice', 
+        'expirationDate', 'packagedDate', 'prod-batch', 'prod-invoice',
         'prod-dealer', 'prod-dealer-id', 'prod-dealer-phone', 'prod-gstin', 'prod-dealer-pan', 'prod-dealer-state',
-        'price', 'cost', 'prod-mrp', 'prod-base-rate', 'prod-net-amt', 'prod-taxable-amt', 
+        'price', 'cost', 'prod-mrp', 'prod-base-rate', 'prod-net-amt', 'prod-taxable-amt',
         'prod-cgst', 'prod-sgst', 'prod-sch-disc', 'prod-rs-disc'
     ];
 
     fieldsToClear.forEach(id => {
         const el = document.getElementById(id) || document.querySelector(`input[name="${id}"]`);
-        if(el) {
+        if (el) {
             el.value = '';
             el.disabled = false; // 🚀 Unlock fields so a different dealer can be entered
             el.classList.remove('bg-gray-100', 'bg-gray-50', 'cursor-not-allowed', 'text-gray-500');
@@ -244,18 +246,18 @@ window.prepareNewBatch = function() {
     if (typeof activeDealerState !== 'undefined') {
         activeDealerState = { id: null, phone: '', name: '' };
     }
-    
+
     // Default the Purchase Date to today for the new batch
     const prodDate = document.getElementById('prod-date');
     if (prodDate) prodDate.value = new Date().toISOString().split('T')[0];
-    
+
     const pcsEl = document.getElementById('prod-pieces');
     if (pcsEl) {
         pcsEl.focus();
-        pcsEl.classList.add('ring-4', 'ring-indigo-300');
-        setTimeout(() => pcsEl.classList.remove('ring-4', 'ring-indigo-300'), 1000);
+        pcsEl.classList.add('ring-4', 'ring-SLATE-300');
+        setTimeout(() => pcsEl.classList.remove('ring-4', 'ring-SLATE-300'), 1000);
     }
-    
+
     if (typeof window.calculateInvoiceBreakdown === 'function') {
         window.calculateInvoiceBreakdown('prod-pieces');
     }
@@ -267,24 +269,24 @@ window.prepareNewBatch = function() {
         addBatchBtn.classList.add('opacity-50', 'cursor-not-allowed');
         addBatchBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Adding...`;
     }
-    
+
     if (typeof showToast === 'function') showToast("Ready", "Enter new batch quantities, pricing, and supplier details.", "info");
 };
-window.loadBatchToForm = function(index) {
+window.loadBatchToForm = function (index) {
     if (!window._tempBatchList || !window._tempBatchList[index]) return;
     const b = window._tempBatchList[index];
-    
+
     const stockInput = document.getElementById('stockLevel') || document.getElementById('stock') || document.querySelector('input[name="stock"]');
-    
+
     // Move root product lookup to the top
     const currentProductId = typeof getEditingProductId === 'function' ? getEditingProductId() : null;
-    const rootProduct = (typeof localProductsCache !== 'undefined' && currentProductId) 
+    const rootProduct = (typeof localProductsCache !== 'undefined' && currentProductId)
         ? localProductsCache.find(p => p.id === currentProductId) || {} : {};
 
     if (stockInput) {
         const currentTotal = parseFloat(stockInput.value) || 0;
         stockInput.dataset.baseStock = Math.max(0, currentTotal - (parseFloat(b.qty) || 0));
-        
+
         // 🚀 THE FIX: Match exact batch from root product instead of using transient visual table index
         if (rootProduct.batches) {
             const realIndex = rootProduct.batches.findIndex(orig => orig.timestamp === b.timestamp && orig.batchNo === b.batchNo);
@@ -297,7 +299,7 @@ window.loadBatchToForm = function(index) {
             stockInput.dataset.editingBatchIndex = index; // Fallback
         }
     }
-    
+
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
 
     setEl('prod-cases', b.cases !== undefined ? b.cases : '0');
@@ -306,24 +308,24 @@ window.loadBatchToForm = function(index) {
     setEl('prod-upc', b.upc || '1');
 
     setEl('prod-batch', b.batchNo === 'LEGACY-STOCK' ? '' : (b.batchNo || ''));
-    
+
     // 🚀 BATCH ISOLATION: Load Pricing directly from the batch!
     const priceInput = document.getElementById('price');
     if (priceInput) priceInput.value = (parseFloat(b.price !== undefined ? b.price : rootProduct.price) || 0).toFixed(2);
     setEl('prod-mrp', (parseFloat(b.mrp !== undefined ? b.mrp : rootProduct.mrp) || 0).toFixed(2));
-    
+
     setEl('prod-date', b.date || rootProduct.purchaseDate || (rootProduct.createdAt ? rootProduct.createdAt.split('T')[0] : ''));
     setEl('expirationDate', b.expirationDate || rootProduct.expirationDate || '');
-    
+
     const packagedInput = document.getElementById('packagedDate') || document.querySelector('input[name="packaged"]');
     if (packagedInput) packagedInput.value = b.packagedDate || rootProduct.packagedDate || '';
-    
+
     if (b.sl !== undefined || rootProduct.sl !== undefined) setEl('prod-sl', b.sl || rootProduct.sl || '');
-    
+
     // Safely map Dealer Name
     let resolvedDealerName = b.dealerName || rootProduct.dealerName || '';
     let resolvedDealerId = b.dealerId || b.supplierId || rootProduct.dealerId || '';
-    
+
     if (resolvedDealerName.startsWith('MERCH-')) {
         resolvedDealerId = resolvedDealerName;
         resolvedDealerName = '';
@@ -336,10 +338,10 @@ window.loadBatchToForm = function(index) {
             resolvedDealerName = cachedDealer.name || cachedDealer.storeName;
         }
     }
-    
+
     setEl('prod-dealer', resolvedDealerName);
     setEl('prod-dealer-id', resolvedDealerId);
-    
+
     let resolvedPhone = b.dealerPhone || rootProduct.dealerPhone || (cachedDealer ? cachedDealer.phone : '');
     setEl('prod-dealer-phone', resolvedPhone.replace(/^\+?91/, ''));
 
@@ -357,16 +359,16 @@ window.loadBatchToForm = function(index) {
         setEl('prod-base-rate', savedBaseRate.toFixed(2));
         setEl('gst-slab', b.gstSlab || rootProduct.gstSlab || 0);
         setEl('prod-cess', b.cess || rootProduct.cess || 0);
-        
+
         setEl('prod-sch-disc', b.rawSchDisc !== undefined ? parseFloat(b.rawSchDisc).toFixed(2) : parseFloat(b.schDisc || 0).toFixed(2));
         setEl('prod-rs-disc', b.rawRsDisc !== undefined ? parseFloat(b.rawRsDisc).toFixed(2) : parseFloat(b.rsDisc || 0).toFixed(2));
-        
+
         const schToggle = document.getElementById('prod-sch-disc-type-toggle');
         if (schToggle) schToggle.checked = b.isSchPercent || false;
-        
+
         const rsToggle = document.getElementById('prod-rs-disc-type-toggle');
         if (rsToggle) rsToggle.checked = b.isRsPercent || false;
-        
+
         const taxIncToggle = document.getElementById('tax-inclusive-toggle');
         if (taxIncToggle) taxIncToggle.checked = b.isTaxInclusive || false;
 
@@ -378,10 +380,10 @@ window.loadBatchToForm = function(index) {
         const gst = parseFloat(b.gstSlab || rootProduct.gstSlab || gstEl?.value) || 0;
         const cess = parseFloat(b.cess || rootProduct.cess || cessEl?.value) || 0;
         const taxMultiplier = 1 + (gst / 100) + (cess / 100);
-        
+
         const baseRate = cost / taxMultiplier;
         const netAmt = cost * qty;
-        
+
         setEl('prod-base-rate', baseRate.toFixed(2));
         setEl('prod-net-amt', netAmt.toFixed(2));
         setEl('prod-sch-disc', '0');
@@ -389,9 +391,9 @@ window.loadBatchToForm = function(index) {
     }
 
     if (typeof window.calculateInvoiceBreakdown === 'function') {
-        window.calculateInvoiceBreakdown('prod-net-amt'); 
+        window.calculateInvoiceBreakdown('prod-net-amt');
     }
-    
+
     // 🚀 THE FIX: Re-enable the Add Batch button when viewing an existing batch
     const addBatchBtn = document.querySelector('button[onclick="window.prepareNewBatch()"]');
     if (addBatchBtn) {
@@ -399,7 +401,7 @@ window.loadBatchToForm = function(index) {
         addBatchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         addBatchBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add New Batch`;
     }
-    
+
     if (typeof showToast === 'function') showToast('Batch Loaded', `Editing Batch: ${b.batchNo || 'Legacy'}`, 'success');
     document.getElementById('inventory-form-title')?.scrollIntoView({ behavior: 'smooth' });
 };
@@ -408,12 +410,12 @@ window.loadBatchToForm = function(index) {
 // =========================================================
 
 export async function loadInventoryPage() {
-    if (!DOM.inventory.table) return; 
-    
+    if (!DOM.inventory.table) return;
+
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
     const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
     let currentLoc = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
-    const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
+    const canAccessAllLocations = (role === 'admin' || role === 'accountant');
 
     if (!canAccessAllLocations && currentLoc !== assignedLoc) {
         if (typeof setCurrentLocation === 'function') setCurrentLocation(assignedLoc);
@@ -424,7 +426,7 @@ export async function loadInventoryPage() {
     const productsRef = getProductsRef();
     if (!storeId || !productsRef) {
         console.warn("Inventory DB not ready, retrying...");
-        setTimeout(loadInventoryPage, 500); 
+        setTimeout(loadInventoryPage, 500);
         return;
     }
 
@@ -434,25 +436,25 @@ export async function loadInventoryPage() {
     }
 
     injectInventoryCopyright();
-    injectImportButton(); 
-    injectExpiredStockButton(); 
+    injectImportButton();
+    injectExpiredStockButton();
     injectProductCountDisplay();
-    injectFreeQtyField(); 
+    injectFreeQtyField();
     injectPaymentFields();
     injectExtraDealerFields();
-    injectLocationDropdown(); 
-    injectBatchRegistry(); 
+    injectLocationDropdown();
+    injectBatchRegistry();
     injectLocationFilterDropdown();
     injectTaxInclusiveToggle();
-    injectPurchaseDiscountToggles(); 
+    injectPurchaseDiscountToggles();
     injectDiscountCalculator();
-    
-    
+
+
     injectB2BPricingButton();
 
     const dealerLabel = document.querySelector('label[for="prod-dealer"]');
     if (dealerLabel) dealerLabel.textContent = "Store Name";
-    
+
     const invSection = document.getElementById('inventory');
     if (invSection) {
         const ths = invSection.querySelectorAll('th');
@@ -474,14 +476,14 @@ export async function loadInventoryPage() {
     } else {
         DOM.inventory.table.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading...</td></tr>`;
     }
-    
+
     try {
-        updateProductDatalist(); 
+        updateProductDatalist();
         updateBundleDatalist();
-        await loadDealerDropdowns(); 
-        
+        await loadDealerDropdowns();
+
         if (DOM.inventory.inputs.gst && DOM.inventory.inputs.gst.options.length <= 1) {
-             DOM.inventory.inputs.gst.innerHTML = `
+            DOM.inventory.inputs.gst.innerHTML = `
                 <option value="0">0% (Exempt)</option>
                 <option value="5">5%</option>
                 <option value="12">12%</option>
@@ -489,7 +491,7 @@ export async function loadInventoryPage() {
                 <option value="28">28%</option>
              `;
         }
-        if (!getEditingProductId()) resetForm(); 
+        if (!getEditingProductId()) resetForm();
     } catch (error) {
         console.error("Error initializing inventory view:", error);
     }
@@ -500,9 +502,9 @@ export async function loadInventoryPage() {
     // 🚀 INJECT MANUFACTURING SUB-TABS (IN-HEADER UI)
     // =========================================================================
     const inventorySectionDiv = document.getElementById('inventory');
-    
+
     if (inventorySectionDiv && !document.getElementById('inventory-mode-toggle')) {
-        
+
         // 1. SURGICAL FINDER: Locate the exact white Title Box (Header)
         let headerBox = inventorySectionDiv.querySelector('header');
         if (!headerBox) {
@@ -517,15 +519,15 @@ export async function loadInventoryPage() {
 
             const toggleContainer = document.createElement('div');
             toggleContainer.id = 'inventory-mode-toggle';
-            
+
             // Compact, colorful pill container
             toggleContainer.className = "bg-slate-100/80 p-1 rounded-xl flex gap-1 shadow-inner border border-slate-200/60 w-full sm:w-auto mt-2 sm:mt-0 shrink-0";
-            
+
             const retailIcon = `<svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>`;
             const mfgIcon = `<svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>`;
 
             // DYNAMIC COLOR STATES
-            const getRetailActive = () => "py-2 px-4 rounded-lg text-sm font-black transition-all duration-300 bg-white text-indigo-600 shadow-[0_2px_8px_-2px_rgba(79,70,229,0.3)] ring-1 ring-indigo-100 flex items-center justify-center gap-2 transform scale-[1.02] z-10 tracking-wide";
+            const getRetailActive = () => "py-2 px-4 rounded-lg text-sm font-black transition-all duration-300 bg-white text-SLATE-600 shadow-[0_2px_8px_-2px_rgba(79,70,229,0.3)] ring-1 ring-SLATE-100 flex items-center justify-center gap-2 transform scale-[1.02] z-10 tracking-wide";
             const getMfgActive = () => "py-2 px-4 rounded-lg text-sm font-black transition-all duration-300 bg-white text-purple-600 shadow-[0_2px_8px_-2px_rgba(147,51,234,0.3)] ring-1 ring-purple-100 flex items-center justify-center gap-2 transform scale-[1.02] z-10 tracking-wide";
             const inactiveClass = "py-2 px-4 rounded-lg text-sm font-bold transition-all duration-300 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 flex items-center justify-center gap-2 transform scale-100";
 
@@ -533,21 +535,21 @@ export async function loadInventoryPage() {
                 <button id="tab-retail-stock" class="${getRetailActive()}">${retailIcon} Retail & Standard</button>
                 <button id="tab-manufacturing" class="${inactiveClass}">${mfgIcon} Manufacturing</button>
             `;
-            
+
             // Inject directly into the white header box
             headerBox.appendChild(toggleContainer);
 
             // 2. Wrap and prepare main content
             const productForm = document.getElementById('product-form') || DOM.inventory.form;
             let mainContentWrapper = productForm;
-            
+
             while (mainContentWrapper && mainContentWrapper.parentElement !== inventorySectionDiv && mainContentWrapper.parentElement !== document.body) {
                 mainContentWrapper = mainContentWrapper.parentElement;
             }
-            
+
             if (mainContentWrapper) {
                 mainContentWrapper.id = 'inventory-main-content';
-                
+
                 let productionContent = document.getElementById('production-main-content');
                 if (!productionContent) {
                     productionContent = document.createElement('div');
@@ -560,20 +562,20 @@ export async function loadInventoryPage() {
                 document.getElementById('tab-retail-stock').onclick = (e) => {
                     e.target.closest('button').className = getRetailActive();
                     document.getElementById('tab-manufacturing').className = inactiveClass;
-                    
+
                     mainContentWrapper.classList.remove('hidden');
                     productionContent.classList.add('hidden');
-                    
-                    renderInventoryTable(); 
+
+                    renderInventoryTable();
                 };
 
                 document.getElementById('tab-manufacturing').onclick = (e) => {
                     e.target.closest('button').className = getMfgActive();
                     document.getElementById('tab-retail-stock').className = inactiveClass;
-                    
+
                     mainContentWrapper.classList.add('hidden');
                     productionContent.classList.remove('hidden');
-                    
+
                     initProductionUI(productionContent);
                 };
             }
@@ -606,15 +608,15 @@ function injectImportButton() {
 
     const btn = document.createElement('button');
     btn.id = 'bulk-import-btn';
-    
-    // 🚀 COLOR: Soft Indigo
-    btn.className = "px-4 py-2 text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap";
+
+    // 🚀 COLOR: Soft SLATE
+    btn.className = "px-4 py-2 text-sm font-bold text-SLATE-700 bg-SLATE-50 border border-SLATE-200 rounded-xl hover:bg-SLATE-100 hover:border-SLATE-300 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap";
     btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> Bulk Upload`;
-    btn.onclick = window.openImportDialog; 
+    btn.onclick = window.openImportDialog;
 
     const actionContainer = document.getElementById('inventory-action-buttons');
     if (actionContainer) {
-        actionContainer.insertBefore(btn, actionContainer.firstChild); 
+        actionContainer.insertBefore(btn, actionContainer.firstChild);
     }
 }
 
@@ -623,21 +625,21 @@ function injectImportButton() {
 function injectExpiredStockButton() {
     const actionContainer = document.getElementById('inventory-action-buttons');
     if (actionContainer && !document.getElementById('manage-expired-btn')) {
-        
+
         // 1. Manage Expired Button 🚀 COLOR: Soft Red
         const expBtn = document.createElement('button');
         expBtn.id = 'manage-expired-btn';
         expBtn.className = "px-4 py-2 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 hover:border-red-300 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap";
         expBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Manage Expired`;
-        expBtn.onclick = openExpiredStockModal; 
+        expBtn.onclick = openExpiredStockModal;
         actionContainer.appendChild(expBtn);
-        
+
         // 2. Merge Duplicates Button 🚀 COLOR: Soft Amber/Orange
         const mergeBtn = document.createElement('button');
         mergeBtn.id = 'merge-inventory-btn';
         mergeBtn.className = "px-4 py-2 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 hover:border-amber-300 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap";
         mergeBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg> Merge Duplicates`;
-        mergeBtn.onclick = mergeDuplicateInventoryItems; 
+        mergeBtn.onclick = mergeDuplicateInventoryItems;
         actionContainer.appendChild(mergeBtn);
     }
 }
@@ -647,7 +649,7 @@ function injectProductCountDisplay() {
     if (target && !document.getElementById('inventory-count-display')) {
         const div = document.createElement('div');
         div.id = 'inventory-count-display';
-        div.className = "bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200 text-sm font-bold flex items-center whitespace-nowrap shadow-sm";
+        div.className = "bg-SLATE-50 text-SLATE-700 px-3 py-1.5 rounded-lg border border-SLATE-200 text-sm font-bold flex items-center whitespace-nowrap shadow-sm";
         div.innerHTML = `Items: <span id="product-count-value" class="ml-1">...</span>`;
         target.appendChild(div);
     }
@@ -658,7 +660,7 @@ function injectPoCatalogCheckbox() {
 
     const form = DOM.inventory.form;
     const saveBtn = DOM.inventory.saveBtn;
-    
+
     if (form && saveBtn) {
         const container = document.createElement('div');
         container.id = 'prod-visibility-container';
@@ -675,7 +677,7 @@ function injectPoCatalogCheckbox() {
             </div>
             <div class="flex items-start gap-3 bg-white p-3 rounded-lg border border-gray-100 shadow-sm transition-colors">
                 <div class="flex items-center h-5 mt-0.5">
-                    <input type="checkbox" id="prod-in-po-catalog" class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" checked>
+                    <input type="checkbox" id="prod-in-po-catalog" class="w-5 h-5 text-SLATE-600 border-gray-300 rounded focus:ring-SLATE-500 cursor-pointer" checked>
                 </div>
                 <div class="text-sm flex-1">
                     <label for="prod-in-po-catalog" class="font-black text-gray-800 cursor-pointer select-none flex items-center gap-2">📦 Show in B2B Orders</label>
@@ -683,7 +685,7 @@ function injectPoCatalogCheckbox() {
                 </div>
             </div>
         `;
-        
+
         const btnRow = saveBtn.closest('div.flex') || saveBtn.parentElement;
         if (btnRow && form.contains(btnRow)) form.insertBefore(container, btnRow);
         else form.appendChild(container);
@@ -695,12 +697,12 @@ function injectPoCatalogCheckbox() {
                 if (e.target.id === 'productType' || e.target.name === 'productType') {
                     const permitRetail = document.getElementById('prod-permit-retail');
                     const inPo = document.getElementById('prod-in-po-catalog');
-                    
+
                     if (e.target.value === 'raw_material') {
                         if (permitRetail) permitRetail.checked = false;
-                        if (inPo) inPo.checked = true; 
+                        if (inPo) inPo.checked = true;
                     } else if (e.target.value === 'non_gst') {
-                        if (permitRetail) permitRetail.checked = true; 
+                        if (permitRetail) permitRetail.checked = true;
                         if (inPo) inPo.checked = false;
                     } else {
                         if (permitRetail) permitRetail.checked = true;
@@ -719,7 +721,7 @@ function updateInventoryCountDisplay() {
     if (countEl) {
         const count = localProductsCache.length;
         let plan = (typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free') || 'free';
-        
+
         if (plan === 'standard') plan = 'silver';
         if (plan === 'premium') plan = 'platinum';
 
@@ -727,14 +729,14 @@ function updateInventoryCountDisplay() {
         const planConfig = (typeof PLAN_LIMITS !== 'undefined' && PLAN_LIMITS[plan]) ? PLAN_LIMITS[plan] : { max_products: Infinity };
         const limitVal = planConfig.max_products || Infinity;
         const limitDisplay = limitVal === Infinity ? '∞' : limitVal;
-        
+
         countEl.textContent = `${count} / ${limitDisplay}`;
-        
+
         const container = document.getElementById('inventory-count-display');
         if (limitVal !== Infinity && count >= limitVal) {
             if (container) container.className = "bg-red-100 text-red-700 px-4 py-2 rounded-md border border-red-300 text-sm font-bold flex items-center whitespace-nowrap shadow-sm";
         } else {
-             if (container) container.className = "bg-indigo-50 text-indigo-700 px-4 py-2 rounded-md border border-indigo-200 text-sm font-bold flex items-center whitespace-nowrap shadow-sm";
+            if (container) container.className = "bg-SLATE-50 text-SLATE-700 px-4 py-2 rounded-md border border-SLATE-200 text-sm font-bold flex items-center whitespace-nowrap shadow-sm";
         }
         if (typeof setCurrentProductCount === 'function') setCurrentProductCount(count);
     }
@@ -742,11 +744,11 @@ function updateInventoryCountDisplay() {
 
 // 🚀 THE FIX: Disable Multi-Location logic entirely by returning early
 function injectLocationDropdown() {
-    return; 
+    return;
 }
 
 function injectLocationFilterDropdown() {
-    return; 
+    return;
 }
 
 // --- IMPORT CSV LOGIC ---
@@ -763,28 +765,28 @@ function openImportModal() {
                     
                     
                     <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <svg class="w-6 h-6 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Bulk Import Products
                     </h3>
                     <p class="text-sm text-gray-500 mb-6">Upload an Excel/CSV file to quickly add multiple products to your inventory.</p>
                     
-                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6">
-                        <h4 class="font-bold text-indigo-800 text-sm mb-2">Step 1: Download Template</h4>
-                        <p class="text-xs text-indigo-600 mb-3">Ensure your data matches our format. Download the template, fill it in, and save it as a .CSV file.</p>
-                        <button id="download-template-btn" class="text-sm bg-white border border-indigo-200 text-indigo-700 font-bold py-1.5 px-4 rounded shadow-sm hover:bg-indigo-50 transition">Download Template</button>
+                    <div class="bg-SLATE-50 border border-SLATE-100 rounded-xl p-4 mb-6">
+                        <h4 class="font-bold text-SLATE-800 text-sm mb-2">Step 1: Download Template</h4>
+                        <p class="text-xs text-SLATE-600 mb-3">Ensure your data matches our format. Download the template, fill it in, and save it as a .CSV file.</p>
+                        <button id="download-template-btn" class="text-sm bg-white border border-SLATE-200 text-SLATE-700 font-bold py-1.5 px-4 rounded shadow-sm hover:bg-SLATE-50 transition">Download Template</button>
                     </div>
                     
                     <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition cursor-pointer" id="drop-zone-import">
                         <h4 class="font-bold text-gray-700 text-sm mb-1">Step 2: Upload CSV File</h4>
                         <p class="text-xs text-gray-400 mb-4">Drag and drop your file here, or click to browse.</p>
                         <input type="file" id="csv-file-input" accept=".csv" class="hidden" />
-                        <button onclick="document.getElementById('csv-file-input').click()" class="bg-indigo-600 text-white text-sm font-bold py-2 px-6 rounded-lg shadow hover:bg-indigo-700 transition">Select File</button>
+                        <button onclick="document.getElementById('csv-file-input').click()" class="bg-SLATE-600 text-white text-sm font-bold py-2 px-6 rounded-lg shadow hover:bg-SLATE-700 transition">Select File</button>
                         <p id="csv-file-name" class="text-xs text-green-600 font-bold mt-3 hidden"></p>
                     </div>
                     
                     <div class="mt-6 flex justify-end gap-3 border-t pt-4">
                         <button id="cancel-import-btn" class="px-5 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition">Cancel</button>
-                        <button id="process-import-btn" disabled class="px-6 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-bold shadow-md transition flex items-center gap-2">
+                        <button id="process-import-btn" disabled class="px-6 py-2 text-sm text-white bg-SLATE-600 hover:bg-SLATE-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-bold shadow-md transition flex items-center gap-2">
                             Upload Data
                         </button>
                     </div>
@@ -793,7 +795,7 @@ function openImportModal() {
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         document.body.classList.add('overflow-hidden');
-        
+
         modal = document.getElementById('bulk-import-modal');
         const closeMod = () => {
             modal.classList.add('hidden');
@@ -808,7 +810,7 @@ function openImportModal() {
         document.getElementById('close-import-btn').onclick = closeMod;
         document.getElementById('cancel-import-btn').onclick = closeMod;
         document.getElementById('download-template-btn').onclick = downloadImportTemplate;
-        
+
         const fileInput = document.getElementById('csv-file-input');
         const processBtn = document.getElementById('process-import-btn');
         const nameDisplay = document.getElementById('csv-file-name');
@@ -823,7 +825,7 @@ function openImportModal() {
 
         processBtn.onclick = () => processCSVUpload(fileInput.files[0], processBtn, closeMod);
     }
-    
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     document.body.classList.add('overflow-hidden');
@@ -831,20 +833,20 @@ function openImportModal() {
 
 function downloadImportTemplate() {
     const headers = [
-        "Product Name (Required)", 
-        "SKU/Code (Required)", 
-        "Barcode", 
-        "Selling Price (Required)", 
-        "Unit Cost (Required)", 
-        "Opening Stock", 
-        "Free Qty (FOC)", 
-        "Low Stock Alert", 
-        "Unit (e.g. units, kgs)", 
-        "GST Slab % (e.g. 0, 5, 12, 18, 28)", 
-        "Store Name", 
+        "Product Name (Required)",
+        "SKU/Code (Required)",
+        "Barcode",
+        "Selling Price (Required)",
+        "Unit Cost (Required)",
+        "Opening Stock",
+        "Free Qty (FOC)",
+        "Low Stock Alert",
+        "Unit (e.g. units, kgs)",
+        "GST Slab % (e.g. 0, 5, 12, 18, 28)",
+        "Store Name",
         "Store Phone"
     ];
-    
+
     const sampleRow = [
         "Premium Coffee Beans", "COF-001", "8901234567890", "450.00", "280.00", "50", "5", "10", "units", "5", "Local Distributor", "9876543210"
     ];
@@ -861,154 +863,154 @@ function downloadImportTemplate() {
 }
 
 // 🚀 THE UNIFIED SPREADSHEET ENGINE (Handles both .csv and .xlsx!)
-window.handleSpreadsheetUpload = async function(input) {
+window.handleSpreadsheetUpload = async function (input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    
+
     if (typeof XLSX === 'undefined') {
-        if(typeof showToast === 'function') showToast("Library Missing", "Please ensure you have an active internet connection to load the Excel parser.", "error");
+        if (typeof showToast === 'function') showToast("Library Missing", "Please ensure you have an active internet connection to load the Excel parser.", "error");
         else alert("Please include the SheetJS library in your index.html to read Excel/CSV files.");
         return;
     }
 
     const modal = document.getElementById('import-choice-modal');
     if (modal) modal.remove();
-    
-    if(typeof showToast === 'function') showToast("Processing", "Reading spreadsheet...", "info");
+
+    if (typeof showToast === 'function') showToast("Processing", "Reading spreadsheet...", "info");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
+            const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            
+
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-            
+
             if (!jsonData || jsonData.length === 0) throw new Error("Spreadsheet is empty.");
 
             const formattedItems = [];
             let errors = 0;
 
             jsonData.forEach(row => {
-            const getCol = (possibleNames, exclude = []) => {
-                let key = Object.keys(row).find(k => possibleNames.some(p => k.trim().toLowerCase() === p.toLowerCase()));
-                if (!key) {
-                    key = Object.keys(row).find(k => 
-                        possibleNames.some(p => k.toLowerCase().includes(p.toLowerCase())) &&
-                        !exclude.some(e => k.toLowerCase().includes(e.toLowerCase()))
-                    );
+                const getCol = (possibleNames, exclude = []) => {
+                    let key = Object.keys(row).find(k => possibleNames.some(p => k.trim().toLowerCase() === p.toLowerCase()));
+                    if (!key) {
+                        key = Object.keys(row).find(k =>
+                            possibleNames.some(p => k.toLowerCase().includes(p.toLowerCase())) &&
+                            !exclude.some(e => k.toLowerCase().includes(e.toLowerCase()))
+                        );
+                    }
+                    return key ? row[key] : "";
+                };
+
+                const name = getCol(["Product Name", "Item Name", "Name"]);
+                const sku = getCol(["SKU", "Code"]);
+                const price = parseFloat(getCol(["Selling Price", "MRP", "Price"]));
+
+                // 🚀 THE FIX: Make cost mutable using 'let'
+                let cost = parseFloat(getCol(["Unit Cost", "Cost", "Purchase Price"])) || 0;
+
+                const paidStock = parseFloat(getCol(["Opening Stock", "Stock", "Qty", "Quantity", "Opening"])) || 0;
+                const freeQty = parseFloat(getCol(["Free Qty", "Free", "FOC"])) || 0;
+                const totalStock = paidStock + freeQty;
+
+                const gst = parseFloat(getCol(["GST", "Tax", "Slab"])) || 0;
+                const cess = parseFloat(getCol(["Cess"])) || 0;
+                const rawType = String(getCol(["Item Type", "Type", "Category"]) || "").toLowerCase();
+
+                let itemType = 'standard';
+                let permitRetail = true;
+                let inPoCatalog = true;
+
+                if (rawType.includes('raw')) {
+                    itemType = 'raw_material';
+                    permitRetail = false;
+                } else if (rawType.includes('mfg') || rawType.includes('manufactured') || rawType.includes('home') || rawType.includes('finished')) {
+                    itemType = 'homemade';
+                    inPoCatalog = false;
                 }
-                return key ? row[key] : "";
-            };
 
-            const name = getCol(["Product Name", "Item Name", "Name"]);
-            const sku = getCol(["SKU", "Code"]);
-            const price = parseFloat(getCol(["Selling Price", "MRP", "Price"]));
-            
-            // 🚀 THE FIX: Make cost mutable using 'let'
-            let cost = parseFloat(getCol(["Unit Cost", "Cost", "Purchase Price"])) || 0;
-            
-            const paidStock = parseFloat(getCol(["Opening Stock", "Stock", "Qty", "Quantity", "Opening"])) || 0;
-            const freeQty = parseFloat(getCol(["Free Qty", "Free", "FOC"])) || 0;
-            const totalStock = paidStock + freeQty; 
-            
-            const gst = parseFloat(getCol(["GST", "Tax", "Slab"])) || 0;
-            const cess = parseFloat(getCol(["Cess"])) || 0;
-            const rawType = String(getCol(["Item Type", "Type", "Category"]) || "").toLowerCase();
+                if (!name || isNaN(price)) {
+                    errors++;
+                    return;
+                }
 
-            let itemType = 'standard';
-            let permitRetail = true;
-            let inPoCatalog = true;
+                // ========================================================================
+                // 🚀 THE FIX: Forward & Reverse Math Reconciliation Engine
+                // ========================================================================
+                const finalGst = itemType === 'homemade' ? 0 : gst;
+                const finalCess = itemType === 'homemade' ? 0 : cess;
+                const taxMultiplier = 1 + (finalGst / 100) + (finalCess / 100);
 
-            if (rawType.includes('raw')) {
-                itemType = 'raw_material';
-                permitRetail = false;
-            } else if (rawType.includes('mfg') || rawType.includes('manufactured') || rawType.includes('home') || rawType.includes('finished')) {
-                itemType = 'homemade';
-                inPoCatalog = false;
-            }
-            
-            if (!name || isNaN(price)) {
-                errors++;
-                return;
-            }
+                let finalNetAmt = 0;
+                let finalTaxableAmt = 0;
+                let finalBaseRate = 0;
 
-            // ========================================================================
-            // 🚀 THE FIX: Forward & Reverse Math Reconciliation Engine
-            // ========================================================================
-            const finalGst = itemType === 'homemade' ? 0 : gst;
-            const finalCess = itemType === 'homemade' ? 0 : cess;
-            const taxMultiplier = 1 + (finalGst / 100) + (finalCess / 100);
-            
-            let finalNetAmt = 0;
-            let finalTaxableAmt = 0;
-            let finalBaseRate = 0;
-            
-            const rawTotalVal = parseFloat(getCol(["Total Value", "Total Value (Auto)", "Net Amount", "Total"]));
-            const calcQty = paidStock > 0 ? paidStock : 1;
+                const rawTotalVal = parseFloat(getCol(["Total Value", "Total Value (Auto)", "Net Amount", "Total"]));
+                const calcQty = paidStock > 0 ? paidStock : 1;
 
-            if (!isNaN(rawTotalVal) && rawTotalVal > 0) {
-                // REVERSE MATH: User provided the final Total Value. Trust it completely to avoid mismatches.
-                finalNetAmt = rawTotalVal;
-                finalTaxableAmt = finalNetAmt / taxMultiplier;
-                finalBaseRate = finalTaxableAmt / calcQty;
-                cost = finalNetAmt / calcQty; // Align inclusive unit cost to match the total
-            } else {
-                // FORWARD MATH: Fallback to Unit Cost (Treated as Exclusive Base Rate)
-                finalBaseRate = cost;
-                finalTaxableAmt = finalBaseRate * paidStock;
-                finalNetAmt = finalTaxableAmt * taxMultiplier;
-                cost = finalNetAmt / calcQty; // Update to final inclusive cost for UI rendering
-            }
+                if (!isNaN(rawTotalVal) && rawTotalVal > 0) {
+                    // REVERSE MATH: User provided the final Total Value. Trust it completely to avoid mismatches.
+                    finalNetAmt = rawTotalVal;
+                    finalTaxableAmt = finalNetAmt / taxMultiplier;
+                    finalBaseRate = finalTaxableAmt / calcQty;
+                    cost = finalNetAmt / calcQty; // Align inclusive unit cost to match the total
+                } else {
+                    // FORWARD MATH: Fallback to Unit Cost (Treated as Exclusive Base Rate)
+                    finalBaseRate = cost;
+                    finalTaxableAmt = finalBaseRate * paidStock;
+                    finalNetAmt = finalTaxableAmt * taxMultiplier;
+                    cost = finalNetAmt / calcQty; // Update to final inclusive cost for UI rendering
+                }
 
-            formattedItems.push({
-                name: String(name),
-                sku: String(sku || `SKU${Date.now().toString().slice(-5)}${Math.floor(Math.random()*1000)}`),
-                barcode: String(getCol(["Barcode", "UPC", "EAN"]) || ""),
-                price: price,
-                cost: cost,
-                mrp: parseFloat(getCol(["MRP"])) || price,
-                
-                stockLevel: totalStock, 
-                freeQty: freeQty,       
-                pieces: paidStock,      
-                cases: 0,
-                
-                unit: String(getCol(["Unit", "UOM"], ["cost", "price"]) || "units"),
-                
-                baseRate: finalBaseRate, 
-                netAmt: finalNetAmt, 
-                taxableAmt: finalTaxableAmt,
-                gstSlab: finalGst, 
-                cess: finalCess,
-                hsn: String(getCol(["HSN", "SAC"]) || ""),
-                batch: String(getCol(["Batch"]) || ""),
-                expirationDate: String(getCol(["Expiry Date", "Expiry", "Expiration", "Exp"]) || ""),
-                dealerName: String(getCol(["Supplier Name", "Store Name", "Dealer Name", "Supplier", "Vendor"]) || ""),
-                dealerPhone: String(getCol(["Supplier Phone", "Store Phone", "Dealer Phone", "Phone"]) || ""),
-                dealerGstin: String(getCol(["Supplier GSTIN", "Dealer GSTIN", "GSTIN"]) || ""),
-                supplierInvoice: String(getCol(["Supplier Invoice No", "Invoice No", "Bill No", "Invoice"]) || ""),
-                type: itemType,
-                inPoCatalog: inPoCatalog,
-                permitRetail: permitRetail
+                formattedItems.push({
+                    name: String(name),
+                    sku: String(sku || `SKU${Date.now().toString().slice(-5)}${Math.floor(Math.random() * 1000)}`),
+                    barcode: String(getCol(["Barcode", "UPC", "EAN"]) || ""),
+                    price: price,
+                    cost: cost,
+                    mrp: parseFloat(getCol(["MRP"])) || price,
+
+                    stockLevel: totalStock,
+                    freeQty: freeQty,
+                    pieces: paidStock,
+                    cases: 0,
+
+                    unit: String(getCol(["Unit", "UOM"], ["cost", "price"]) || "units"),
+
+                    baseRate: finalBaseRate,
+                    netAmt: finalNetAmt,
+                    taxableAmt: finalTaxableAmt,
+                    gstSlab: finalGst,
+                    cess: finalCess,
+                    hsn: String(getCol(["HSN", "SAC"]) || ""),
+                    batch: String(getCol(["Batch"]) || ""),
+                    expirationDate: String(getCol(["Expiry Date", "Expiry", "Expiration", "Exp"]) || ""),
+                    dealerName: String(getCol(["Supplier Name", "Store Name", "Dealer Name", "Supplier", "Vendor"]) || ""),
+                    dealerPhone: String(getCol(["Supplier Phone", "Store Phone", "Dealer Phone", "Phone"]) || ""),
+                    dealerGstin: String(getCol(["Supplier GSTIN", "Dealer GSTIN", "GSTIN"]) || ""),
+                    supplierInvoice: String(getCol(["Supplier Invoice No", "Invoice No", "Bill No", "Invoice"]) || ""),
+                    type: itemType,
+                    inPoCatalog: inPoCatalog,
+                    permitRetail: permitRetail
+                });
             });
-        });
 
             if (formattedItems.length === 0) throw new Error("No valid products found. Ensure 'Product Name' and 'Selling Price' columns are filled.");
 
             await processScannedBulkUpload(formattedItems);
-            
+
             if (errors > 0) {
-                if(typeof showToast === 'function') showToast("Import Warning", `Imported ${formattedItems.length} items. Skipped ${errors} invalid rows.`, "warning");
+                if (typeof showToast === 'function') showToast("Import Warning", `Imported ${formattedItems.length} items. Skipped ${errors} invalid rows.`, "warning");
             } else {
-                if(typeof showToast === 'function') showToast("Import Success", `Successfully imported ${formattedItems.length} items!`, "success");
+                if (typeof showToast === 'function') showToast("Import Success", `Successfully imported ${formattedItems.length} items!`, "success");
             }
-            
+
         } catch (err) {
             console.error(err);
-            if(typeof showModal === 'function') showModal("Import Failed", err.message, "error");
+            if (typeof showModal === 'function') showModal("Import Failed", err.message, "error");
             else alert(`Import Failed: ${err.message}`);
         }
     };
@@ -1016,26 +1018,26 @@ window.handleSpreadsheetUpload = async function(input) {
 };
 
 
-window.downloadSpreadsheetTemplate = function() {
+window.downloadSpreadsheetTemplate = function () {
     if (typeof XLSX === 'undefined') {
         alert("Library loading. Please ensure you are connected to the internet.");
-        return; 
+        return;
     }
 
     const headers = [
         "Product Name (Required)", "SKU/Code (Required)", "Barcode",
-        "Item Type (Standard/Raw/Mfg)", "Selling Price (Required)", "Unit Cost (Required)", 
-        "Opening Stock", "Free Qty (FOC)", "Low Stock Alert", "Unit (e.g. units, kgs)", 
-        "GST Slab %", "Cess %", "HSN Code", "Batch Number", "Expiry Date (YYYY-MM-DD)", 
+        "Item Type (Standard/Raw/Mfg)", "Selling Price (Required)", "Unit Cost (Required)",
+        "Opening Stock", "Free Qty (FOC)", "Low Stock Alert", "Unit (e.g. units, kgs)",
+        "GST Slab %", "Cess %", "HSN Code", "Batch Number", "Expiry Date (YYYY-MM-DD)",
         "Supplier Name", "Supplier Phone", "Supplier GSTIN", "Supplier Invoice No",
         "Total Value (Auto)"
     ];
 
     const sampleRow = [
-        "Premium Coffee Beans", "COF-001", "8901234567890", 
-        "Standard", 450.00, 280.00, 
-        50, 5, 10, "units", 
-        5, 0, "0901", "B123", "2026-12-31", 
+        "Premium Coffee Beans", "COF-001", "8901234567890",
+        "Standard", 450.00, 280.00,
+        50, 5, 10, "units",
+        5, 0, "0901", "B123", "2026-12-31",
         "Local Distributor", "9876543210", "27XXXXX1234X1ZX", "INV-001",
         0
     ];
@@ -1045,12 +1047,12 @@ window.downloadSpreadsheetTemplate = function() {
     // Apply auto-calculation formula (Unit Cost * Opening Stock -> F2 * G2)
     ws['T2'] = { t: 'n', f: 'F2*G2' };
 
-    const wscols = [ {wch: 25}, {wch: 20}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 12}, {wch: 10}, {wch: 12}, {wch: 15}, {wch: 22}, {wch: 20}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 20} ];
+    const wscols = [{ wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 22 }, { wch: 20 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 20 }];
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventory Template");
-    
+
     XLSX.writeFile(wb, "Mifela_Inventory_Template.xlsx");
 };
 
@@ -1061,7 +1063,7 @@ async function openExpiredStockModal() {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayTime = new Date(todayStr).getTime();
     const currencySymbol = getCurrencySymbol();
-    
+
     const expiredBatchesList = [];
 
     localProductsCache.forEach(p => {
@@ -1156,13 +1158,13 @@ async function openExpiredStockModal() {
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         modal = document.getElementById('expired-stock-modal');
-        
+
         document.getElementById('close-expired-btn').onclick = () => {
             // 🚀 THE FIX: Destructive close. Don't hide it, destroy it.
             modal.remove();
             document.body.classList.remove('overflow-hidden');
         };
-        
+
         document.getElementById('select-all-expired').onchange = (e) => {
             document.querySelectorAll('.expired-item-check').forEach(cb => cb.checked = e.target.checked);
         };
@@ -1172,7 +1174,7 @@ async function openExpiredStockModal() {
 
     const tbody = document.getElementById('expired-list-body');
     tbody.innerHTML = '';
-    
+
     expiredBatchesList.forEach(item => {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-red-50/40 transition-colors";
@@ -1183,7 +1185,7 @@ async function openExpiredStockModal() {
                 <span class="text-[9px] text-slate-500 uppercase tracking-widest bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mt-1 inline-block">${escapeHTML(item.batchNo)}</span>
             </td>
             <td class="px-4 py-3 text-red-600 font-black text-center">${item.expirationDate}</td>
-            <td class="px-4 py-3 text-center font-black text-indigo-700 text-lg">${item.qty}</td>
+            <td class="px-4 py-3 text-center font-black text-SLATE-700 text-lg">${item.qty}</td>
             <td class="px-4 py-3 text-right font-mono text-slate-600">${currencySymbol}${item.cost.toFixed(2)}</td>
             <td class="px-4 py-3 text-xs font-bold text-slate-500 truncate text-right">${escapeHTML(item.dealerName)}</td>
         `;
@@ -1210,7 +1212,7 @@ function promptForRefundAmount(defaultAmount) {
                 <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
                     <h3 class="text-xl font-black text-slate-800 mb-2">Enter Refund Amount</h3>
                     <p class="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Total value: ${currencySymbol}${defaultAmount}</p>
-                    <input type="number" id="custom-refund-input" value="${defaultAmount}" class="w-full border-2 border-indigo-200 bg-indigo-50 p-3 rounded-xl mb-4 text-2xl font-black text-indigo-700 outline-none focus:border-indigo-500 transition-colors text-center" step="0.01" min="0">
+                    <input type="number" id="custom-refund-input" value="${defaultAmount}" class="w-full border-2 border-SLATE-200 bg-SLATE-50 p-3 rounded-xl mb-4 text-2xl font-black text-SLATE-700 outline-none focus:border-SLATE-500 transition-colors text-center" step="0.01" min="0">
                     <div class="flex justify-end gap-3">
                         <button id="custom-refund-cancel" class="px-5 py-2.5 bg-slate-100 rounded-xl text-slate-600 font-bold hover:bg-slate-200 transition-colors">Cancel</button>
                         <button id="custom-refund-confirm" class="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold shadow-md shadow-green-200 transition-colors">Confirm</button>
@@ -1222,7 +1224,7 @@ function promptForRefundAmount(defaultAmount) {
 
         const modal = document.getElementById(modalId);
         const input = document.getElementById('custom-refund-input');
-        
+
         input.focus();
         input.select();
 
@@ -1263,7 +1265,7 @@ async function processExpiredStock() {
 
     if (action === 'return') {
         const result = await promptForRefundAmount(totalCostOfSelected.toFixed(2));
-        if (result === null) return; 
+        if (result === null) return;
         customRefundAmount = result;
     }
 
@@ -1272,7 +1274,7 @@ async function processExpiredStock() {
         const btn = document.getElementById('process-expired-btn');
         btn.disabled = true;
         btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Processing...`;
-        
+
         const batch = writeBatch(db);
         const now = new Date();
         const productsRef = getProductsRef();
@@ -1287,16 +1289,16 @@ async function processExpiredStock() {
             const qty = parseFloat(cb.dataset.qty);
             const cost = parseFloat(cb.dataset.cost) || 0;
             const gst = parseFloat(cb.dataset.gst) || 0;
-            
+
             if (!updatesByProduct[pId]) updatesByProduct[pId] = [];
             updatesByProduct[pId].push({ bIndex, qty, cost, gst });
-            
+
             const pName = localProductsCache.find(p => p.id === pId)?.name || 'Expired Item';
 
             itemsList.push({
                 id: pId,
-                name: `${pName} (Expired Scrap)`, 
-                quantity: -qty, 
+                name: `${pName} (Expired Scrap)`,
+                quantity: -qty,
                 cost: cost,
                 price: 0,
                 taxRate: gst
@@ -1309,13 +1311,13 @@ async function processExpiredStock() {
         for (const pId in updatesByProduct) {
             const prod = localProductsCache.find(p => p.id === pId);
             if (!prod) continue;
-            
+
             let newBatches = prod.batches ? [...prod.batches] : [];
             let legacyStockWipe = false;
 
             updatesByProduct[pId].forEach(update => {
                 if (update.bIndex >= 0 && newBatches[update.bIndex]) {
-                    newBatches[update.bIndex].qty = 0; 
+                    newBatches[update.bIndex].qty = 0;
                 } else if (update.bIndex === -1) {
                     legacyStockWipe = true;
                 }
@@ -1325,7 +1327,7 @@ async function processExpiredStock() {
 
             let totalActiveStockCalc = 0;
             let totalActiveVal = 0;
-            
+
             newBatches.forEach(b => {
                 const isExpired = b.expirationDate && new Date(b.expirationDate).getTime() < todayTimeForWac;
                 if (!isExpired) {
@@ -1342,14 +1344,14 @@ async function processExpiredStock() {
 
             const updatePayload = {
                 batches: newBatches,
-                stockLevel: totalActiveStockCalc, 
+                stockLevel: totalActiveStockCalc,
                 cost: newWac,
                 updatedAt: serverTimestamp()
             };
 
             if (legacyStockWipe && totalActiveStockCalc === 0) {
-                 updatePayload.stockLevel = 0;
-                 updatePayload.cost = 0;
+                updatePayload.stockLevel = 0;
+                updatePayload.cost = 0;
             }
 
             const productRef = doc(productsRef, pId);
@@ -1357,17 +1359,17 @@ async function processExpiredStock() {
         }
 
         const transactionsRef = getTransactionsRef();
-        const txRef = doc(transactionsRef); 
-        
+        const txRef = doc(transactionsRef);
+
         let transactionTotal = 0;
         let transactionProfit = 0;
         const txLocationId = getNormalizedLoc(getCurrentLocationId());
 
         if (action === 'scrap') {
             transactionTotal = 0;
-            transactionProfit = -totalCostOfSelected; 
+            transactionProfit = -totalCostOfSelected;
         } else {
-            transactionTotal = customRefundAmount; 
+            transactionTotal = customRefundAmount;
             transactionProfit = isMathReady ? safeMath.subtract(customRefundAmount, totalCostOfSelected) : (customRefundAmount - totalCostOfSelected);
         }
 
@@ -1378,8 +1380,8 @@ async function processExpiredStock() {
             timestamp: now,
             type: action === 'scrap' ? 'LOSS' : 'REFUND',
             summary: {
-                total: transactionTotal, 
-                profit: transactionProfit, 
+                total: transactionTotal,
+                profit: transactionProfit,
                 paymentMethod: 'ADJUSTMENT',
                 reason: `Expired Stock - ${action.toUpperCase()}`,
                 itemCount: totalQtyRemoved
@@ -1392,12 +1394,12 @@ async function processExpiredStock() {
         try {
             await batch.commit();
             showModal('Success', 'Dead stock removed from active database.', 'success');
-            
+
             document.getElementById('expired-stock-modal').classList.add('hidden');
             document.getElementById('expired-stock-modal').classList.remove('flex');
             document.body.classList.remove('overflow-hidden');
-            
-            renderInventoryTable(); 
+
+            renderInventoryTable();
             updateInventoryCountDisplay();
         } catch (e) {
             console.error("Batch clearance failed:", e);
@@ -1419,7 +1421,7 @@ function getFormData() {
     const typeSelect = document.getElementById('productType');
     let productType = typeSelect ? typeSelect.value : 'standard';
 
-const rawName = (i.name?.value || document.getElementById('prod-name')?.value || '').trim();
+    const rawName = (i.name?.value || document.getElementById('prod-name')?.value || '').trim();
     if (!rawName) return { error: "Product Name is strictly mandatory." };
 
     const priceRaw = (i.price?.value || document.getElementById('price')?.value || '').trim();
@@ -1435,13 +1437,13 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
     if (productType === 'standard') {
         const hsnRaw = document.getElementById('prod-hsn')?.value.trim() || '';
         if (!hsnRaw) return { error: "HSN Code is mandatory for GST Products. Please fetch it via AI or enter it manually." };
-        
+
         const gstinRaw = document.getElementById('prod-gstin')?.value.trim() || '';
         if (!gstinRaw || gstinRaw.length < 15) return { error: "A valid 15-character Supplier GSTIN is mandatory for standard GST items." };
 
         const invoiceRaw = document.getElementById('prod-invoice')?.value.trim() || '';
         if (!invoiceRaw) return { error: "Supplier Invoice No. is mandatory to track GST inward supply." };
-        
+
         const stateRaw = document.getElementById('prod-dealer-state')?.value.trim() || '';
         if (!stateRaw) return { error: "Supplier State is mandatory to determine IGST vs CGST/SGST." };
     }
@@ -1452,12 +1454,12 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
     const safeInt = (id) => secureInt(document.getElementById(id)?.value);
     const safeStr = (id) => document.getElementById(id)?.value?.trim() || '';
 
-    const formattedName = typeof capitalizeName === 'function' 
-        ? capitalizeName(rawName) 
+    const formattedName = typeof capitalizeName === 'function'
+        ? capitalizeName(rawName)
         : rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
     let lowStock = parseInt(i.lowStock?.value, 10);
     if (isNaN(lowStock) || lowStock < 0) lowStock = 10;
-    
+
     let gst = secureFloat(i.gst ? i.gst.value : 0);
     if (gst < 0) gst = 0;
 
@@ -1466,7 +1468,7 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
 
     const stock = secureFloat(i.stock?.value);
     const price = secureFloat(i.price?.value);
-    
+
     // 🚀 THE FIX: Calculate Cost dynamically in the background!
     // (This allows you to safely delete the "Final Unit Cost" HTML element entirely if you want)
     const netAmtCalc = safeFloat('prod-net-amt');
@@ -1475,7 +1477,7 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
     const pcsCalc = safeInt('prod-pieces');
     const freeCalc = safeInt('prod-free-qty');
     const totalPhysicalQty = (casesCalc * upcCalc) + pcsCalc + freeCalc;
-    
+
     const cost = totalPhysicalQty > 0 ? (netAmtCalc / totalPhysicalQty) : secureFloat(i.cost?.value);
 
     if (!formattedName) return null;
@@ -1485,10 +1487,10 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
 
     // 5. Target Location Setup
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
-    const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
-    
+    const canAccessAllLocations = (role === 'admin' || role === 'accountant');
+
     const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
-    let safeLocation = typeof getNormalizedLoc === 'function' ? getNormalizedLoc(assignedLoc) : 'main'; 
+    let safeLocation = typeof getNormalizedLoc === 'function' ? getNormalizedLoc(assignedLoc) : 'main';
 
     if (canAccessAllLocations) {
         const locDropdown = document.getElementById('inv-form-location');
@@ -1503,7 +1505,7 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
     const upcForMath = safeInt('prod-upc') || 1;
     const totalQtyForMath = (casesForMath * upcForMath) + piecesForMath;
     const calcQtyForMath = totalQtyForMath > 0 ? totalQtyForMath : 1;
-    
+
     const baseRateForMath = safeFloat('prod-base-rate');
     const lineTotalBeforeDisc = baseRateForMath * calcQtyForMath;
 
@@ -1519,22 +1521,22 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         sku: i.sku?.value.trim() || '',
         barcode: i.barcode?.value.trim() || '',
         price: price,
-        cost: cost, 
+        cost: cost,
         stockLevel: stock,
         lowStockThreshold: lowStock,
-        unit: i.unit ? i.unit.value : 'units', 
+        unit: i.unit ? i.unit.value : 'units',
         type: productType,
         bundleComponents: productType === 'bundle' ? (typeof bundleComponents !== 'undefined' ? bundleComponents : []) : [],
-        
+
         sl: safeStr('prod-sl'),
         hsn: safeStr('prod-hsn'),
         batch: safeStr('prod-batch'),
-        upc: safeInt('prod-upc') || 1, 
-        
-        baseRate: baseRateForMath, 
+        upc: safeInt('prod-upc') || 1,
+
+        baseRate: baseRateForMath,
         mrp: safeFloat('prod-mrp'),
-        schDisc: finalSchDisc,  
-        rsDisc: finalRsDisc,    
+        schDisc: finalSchDisc,
+        rsDisc: finalRsDisc,
 
         // 🚀 NEW: EXACT UI STATE MEMORY FOR FLAWLESS RETRIEVAL
         rawSchDisc: safeFloat('prod-sch-disc'),
@@ -1542,24 +1544,24 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         rawRsDisc: safeFloat('prod-rs-disc'),
         isRsPercent: isRsPercent,
         isTaxInclusive: document.getElementById('tax-inclusive-toggle')?.checked || false,
-        
+
         taxableAmt: safeFloat('prod-taxable-amt'),
         cgstAmt: safeFloat('prod-cgst'),
         sgstAmt: safeFloat('prod-sgst'),
         netAmt: safeFloat('prod-net-amt'),
-        
+
         cases: safeInt('prod-cases'),
         pieces: safeInt('prod-pieces'),
-        freeQty: safeInt('prod-free-qty'), 
+        freeQty: safeInt('prod-free-qty'),
 
         packagedDate: i.packaged?.value || document.getElementById('packagedDate')?.value || null,
         expirationDate: document.getElementById('expirationDate')?.value || null,
         bestBeforeMonths: i.bestBefore ? parseInt(i.bestBefore.value) : 0,
         gstSlab: gst,
         cess: cess,
-        
+
         purchaseDate: safeStr('prod-date'),
-        locationId: safeLocation, 
+        locationId: safeLocation,
         inPoCatalog: document.getElementById('prod-in-po-catalog')?.checked ?? true,
         permitRetail: document.getElementById('prod-permit-retail')?.checked ?? true
     };
@@ -1572,18 +1574,18 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         d.dealerId = 'BUNDLE_INTERNAL';
         d.paymentMethod = 'SYSTEM';
         d.chequeDetails = null;
-    } 
+    }
     else if (productType === 'homemade' || productType === 'manufactured' || productType === 'non_gst' || productType === 'raw_material') {
         // 🚀 THE FIX: Non-GST / Homemade / Local items. Make dealer optional, no strict validation.
         let dealerName = i.dealer ? i.dealer.value.trim() : '';
         let dealerPhone = safeStr('prod-dealer-phone');
-        let gstinVal = safeStr('prod-gstin'); 
+        let gstinVal = safeStr('prod-gstin');
         let dealerState = safeStr('prod-dealer-state'); // 🚀 NEW: Grab State
-        
+
         if (!dealerName) {
             return { error: "Dealer / Store Name is strictly mandatory to track inventory sourcing." };
         }
-        
+
         d.dealerName = dealerName || 'Local / Homemade';
         d.dealerPhone = dealerPhone || '';
         d.dealerId = safeStr('prod-dealer-id') || 'INTERNAL_MFG';
@@ -1592,10 +1594,10 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         d.supplierInvoice = safeStr('prod-invoice');
         d.dealerState = dealerState; // 🚀 Passes to the DB
         d.cess = 0;
-        
+
         const paymentMethod = safeStr('prod-payment-method') || 'CASH';
         d.paymentMethod = paymentMethod;
-        
+
         if (paymentMethod === 'CHEQUE') {
             const bank = safeStr('prod-cheque-bank');
             const chequeNo = safeStr('prod-cheque-no');
@@ -1604,12 +1606,12 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         } else {
             d.chequeDetails = null;
         }
-        
+
         // Blank out strict compliance fields
         d.gstin = '';
         d.dealerPan = '';
         d.supplierInvoice = '';
-    } 
+    }
     else {
         // Standard & Raw Material: Supplier Validation IS Strictly Required
         let dealerName = i.dealer ? i.dealer.value.trim() : '';
@@ -1620,7 +1622,7 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         if (!dealerName) {
             return { error: "Dealer / Store Name is strictly mandatory to track inventory sourcing." };
         }
-        
+
         const phoneDigits = dealerPhone.replace(/\D/g, '');
         if (!dealerPhone || phoneDigits.length < 10) {
             return { error: "A valid 10-digit Dealer Phone Number is strictly mandatory." };
@@ -1630,7 +1632,7 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
         if (!gstinVal || gstinVal.length < 15) {
             return { error: "A valid 15-character Supplier GSTIN is strictly mandatory for standard GST products." };
         }
-        
+
         d.dealerName = dealerName;
         d.dealerPhone = dealerPhone;
         d.dealerId = safeStr('prod-dealer-id');
@@ -1640,12 +1642,12 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
 
         const paymentMethod = safeStr('prod-payment-method') || 'CASH';
         d.paymentMethod = paymentMethod;
-        
+
         if (paymentMethod === 'CHEQUE') {
             const bank = safeStr('prod-cheque-bank');
             const chequeNo = safeStr('prod-cheque-no');
             const clearanceDate = safeStr('prod-cheque-date');
-            
+
             if (!bank || !chequeNo || !clearanceDate) {
                 return { error: "Bank Name, Cheque Number, and Clearance Date are mandatory for Cheque payments." };
             }
@@ -1668,19 +1670,19 @@ const rawName = (i.name?.value || document.getElementById('prod-name')?.value ||
 
 export async function handleProductSubmit(e) {
     e.preventDefault();
-    let currentEditingId = getEditingProductId(); 
+    let currentEditingId = getEditingProductId();
     const currentUserPlan = getCurrentUserPlan();
 
-    if(DOM.inventory.saveBtn) { 
-        DOM.inventory.saveBtn.disabled = true; 
-        DOM.inventory.saveBtn.textContent = 'Checking...'; 
+    if (DOM.inventory.saveBtn) {
+        DOM.inventory.saveBtn.disabled = true;
+        DOM.inventory.saveBtn.textContent = 'Checking...';
     }
 
     try {
-        const data = getFormData(); 
+        const data = getFormData();
         if (!data || data.error) {
             showModal('Error', data?.error || 'Please fill all required fields.', 'message');
-            if(DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
+            if (DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
             return;
         }
 
@@ -1691,28 +1693,28 @@ export async function handleProductSubmit(e) {
             const transactionsRef = getTransactionsRef();
             const qTxSupp = query(transactionsRef, where('supplierInvoice', '==', data.supplierInvoice), limit(1));
             const txSnap = await getDocs(qTxSupp);
-            
+
             if (!txSnap.empty) {
                 const existingInvoice = txSnap.docs[0].data();
-                const isProductAlreadyInInvoice = existingInvoice.items?.some(item => 
-                    (item.name || '').trim().toLowerCase() === data.name.trim().toLowerCase() || 
+                const isProductAlreadyInInvoice = existingInvoice.items?.some(item =>
+                    (item.name || '').trim().toLowerCase() === data.name.trim().toLowerCase() ||
                     (item.sku && data.sku && item.sku === data.sku)
                 );
 
                 if (isProductAlreadyInInvoice) {
                     const confirmAdd = confirm(`⚠️ Duplicate Item in Invoice!\n\n"${data.name}" has already been added to Supplier Invoice "${data.supplierInvoice}".\n\nClick OK if you intentionally want to ADD this as a separate batch, or Cancel to stop and edit the existing entry.`);
-                    
+
                     if (!confirmAdd) {
-                        if(DOM.inventory.saveBtn) { 
-                            DOM.inventory.saveBtn.disabled = false; 
-                            DOM.inventory.saveBtn.textContent = 'Save Product'; 
+                        if (DOM.inventory.saveBtn) {
+                            DOM.inventory.saveBtn.disabled = false;
+                            DOM.inventory.saveBtn.textContent = 'Save Product';
                         }
                         return; // Stop the save process entirely
                     }
                 }
             }
         }
-        
+
         if (!currentEditingId && data.type !== 'bundle') {
             const match = localProductsCache.find(p => {
                 const sameLocation = getNormalizedLoc(p.locationId) === getNormalizedLoc(data.locationId);
@@ -1725,11 +1727,11 @@ export async function handleProductSubmit(e) {
                 currentEditingId = match.id; // Hijack the ID
                 const incomingStock = parseFloat(data.stockLevel) || 0;
                 const oldStock = parseFloat(match.stockLevel || 0);
-                
-                data.stockLevel = oldStock + incomingStock; 
-                data.sku = match.sku; 
+
+                data.stockLevel = oldStock + incomingStock;
+                data.sku = match.sku;
                 if (!data.barcode || data.barcode === data.sku) data.barcode = match.barcode;
-                
+
                 if (typeof showToast === 'function') showToast("Auto-Merged!", `Stacked into existing product: ${match.name}`, "success");
             }
         }
@@ -1737,12 +1739,12 @@ export async function handleProductSubmit(e) {
         const newSku = data.sku;
         const newBarcode = data.barcode;
 
-        if (!newSku) { 
-            showModal('Error', 'SKU required', 'message'); 
-            if(DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
-            return; 
+        if (!newSku) {
+            showModal('Error', 'SKU required', 'message');
+            if (DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
+            return;
         }
-        
+
         // ====================================================================
         // 🚀 THE INVENTORY GUARD
         // ====================================================================
@@ -1750,8 +1752,8 @@ export async function handleProductSubmit(e) {
             // 🚀 THE FIX: Define 'plan' before attempting to check it!
             const currentPlanStr = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
             const plan = (currentPlanStr || 'free').toLowerCase();
-            
-            
+
+
 
             try {
                 // We use our offline getCountFromServer mock here
@@ -1760,11 +1762,11 @@ export async function handleProductSubmit(e) {
 
                 if (currentCount >= skuLimit) {
                     showModal('SKU Limit Reached', `Your current plan allows up to ${skuLimit} products. You currently have ${currentCount}.`, 'warning');
-                    if(DOM.inventory.saveBtn) { 
-                        DOM.inventory.saveBtn.disabled = false; 
-                        DOM.inventory.saveBtn.textContent = 'Save Product'; 
+                    if (DOM.inventory.saveBtn) {
+                        DOM.inventory.saveBtn.disabled = false;
+                        DOM.inventory.saveBtn.textContent = 'Save Product';
                     }
-                    return; 
+                    return;
                 }
             } catch (error) {
                 console.error("Failed to verify product count:", error);
@@ -1779,9 +1781,9 @@ export async function handleProductSubmit(e) {
             });
 
             if (duplicate) {
-                 showModal('Error', `Duplicate SKU/Barcode found in this location (${data.locationId}).\nProduct: ${escapeHTML(duplicate.name)}`, 'error');
-                 if(DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
-                 return;
+                showModal('Error', `Duplicate SKU/Barcode found in this location (${data.locationId}).\nProduct: ${escapeHTML(duplicate.name)}`, 'error');
+                if (DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
+                return;
             }
         }
 
@@ -1801,11 +1803,11 @@ export async function handleProductSubmit(e) {
                 // Flag conflict ONLY if both exist but do not match
                 return incomingPhone && cachedPhone && incomingPhone !== cachedPhone;
             });
-            
+
             if (localConflict) {
-               showModal('Mismatch Error', `The Store ID and Phone Number do not match our local records for <b>${escapeHTML(localConflict.name)}</b>.<br>ID: ${localConflict.id}<br>Phone: ${localConflict.phone}<br><br><i>To update the phone number, please go to Settings > Directory.</i>`, 'error');
-               if(DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
-               return;
+                showModal('Mismatch Error', `The Store ID and Phone Number do not match our local records for <b>${escapeHTML(localConflict.name)}</b>.<br>ID: ${localConflict.id}<br>Phone: ${localConflict.phone}<br><br><i>To update the phone number, please go to Settings > Directory.</i>`, 'error');
+                if (DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
+                return;
             }
         }
 
@@ -1814,16 +1816,16 @@ export async function handleProductSubmit(e) {
 
         if (productType === 'bundle' && bundleComponents.length === 0) {
             showModal('Error', "A bundle must have at least one component.", 'error');
-            if(DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
+            if (DOM.inventory.saveBtn) { DOM.inventory.saveBtn.disabled = false; DOM.inventory.saveBtn.textContent = 'Save Product'; }
             return;
         }
-        
+
         data.type = productType;
         data.bundleComponents = productType === 'bundle' ? bundleComponents : [];
 
         if (!currentEditingId) data.createdAt = new Date().toISOString();
         data.updatedAt = serverTimestamp();
-        
+
         if (data.dealerId) {
             const dealerInfo = localDealersCache.find(d => d.id === data.dealerId);
             if (dealerInfo) {
@@ -1841,10 +1843,10 @@ export async function handleProductSubmit(e) {
         const customersRef = getCustomersRef();
 
         const isInternalPlaceholder = data.dealerId === 'INTERNAL_MFG' || data.dealerName === 'Internal Manufacturing' || data.dealerName === 'Local / Homemade';
-        
+
         if (data.type !== 'bundle' && data.type !== 'homemade' && data.dealerName && customersRef) {
             let rawPhone = data.dealerPhone ? String(data.dealerPhone).replace(/\D/g, '') : '';
-            
+
             if (rawPhone.length >= 10) {
                 let normalizedPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
                 let hash = 0x811c9dc5;
@@ -1853,43 +1855,43 @@ export async function handleProductSubmit(e) {
                     hash = (hash * 0x01000193) >>> 0;
                 }
                 const generatedId = `MERCH-${hash.toString(36).toUpperCase().padStart(6, '0')}`;
-                
+
                 // 🚀 B2B / D2C Strict Tagging
                 data.dealerId = data.dealerId || generatedId;
                 const isB2B = data.gstin && data.gstin.trim().length >= 15;
                 const tradeType = isB2B ? 'B2B' : 'D2C';
-                
+
                 const dealerRef = doc(customersRef, data.dealerId);
                 batch.set(dealerRef, {
                     id: data.dealerId,
-                    name: data.dealerName, 
+                    name: data.dealerName,
                     type: 'dealer',
                     tradeType: tradeType,
                     phone: `+${normalizedPhone}`,
                     gstin: data.gstin || '',
-                    pan: data.dealerPan || '',      
+                    pan: data.dealerPan || '',
                     state: data.dealerState || '', // 🚀 Captures newly typed State
-                    locationId: data.locationId, 
+                    locationId: data.locationId,
                     updatedAt: serverTimestamp()
-                }, { merge: true }); 
+                }, { merge: true });
 
                 const currentAppId = typeof window !== 'undefined' && window.__app_id ? window.__app_id : appId;
                 const globalDirRef = doc(db, `artifacts/${currentAppId}/directory_merchants/${data.dealerId}`);
                 batch.set(globalDirRef, {
                     merchantId: data.dealerId,
-                    name: data.dealerName, 
+                    name: data.dealerName,
                     storeName: data.dealerName,
                     type: 'dealer',
                     tradeType: tradeType,
                     phone: `+${normalizedPhone}`,
                     gstin: data.gstin || '',
-                    pan: data.dealerPan || '',      
+                    pan: data.dealerPan || '',
                     state: data.dealerState || '', // 🚀 Captures newly typed State Globally
                     updatedAt: serverTimestamp()
                 }, { merge: true });
 
             } else if (!data.dealerId) {
-                data.dealerId = `DUMMY-MERCH-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random()*1000)}`;
+                data.dealerId = `DUMMY-MERCH-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
             }
         }
 
@@ -1900,7 +1902,7 @@ export async function handleProductSubmit(e) {
         const processTransactionGrouping = async (itemQuantity, docIdToLog, isEditMode) => {
             if (itemQuantity <= 0) return;
             const totalCost = isMathReady ? safeMath.multiply(itemQuantity, data.cost) : (itemQuantity * data.cost);
-            
+
             const newItemObj = {
                 id: docIdToLog,
                 name: data.name,
@@ -1910,7 +1912,7 @@ export async function handleProductSubmit(e) {
                 price: data.price,
                 taxRate: data.gstSlab || 0,
                 cessRate: data.cess || 0,
-                isOms: (data.gstin && String(data.gstin).substring(0, 2) !== '27') 
+                isOms: (data.gstin && String(data.gstin).substring(0, 2) !== '27')
             };
 
             let txGrouped = false;
@@ -1930,7 +1932,7 @@ export async function handleProductSubmit(e) {
                 const existingTxDoc = txSnap.docs[0];
                 const txRef = doc(transactionsRef, existingTxDoc.id);
                 const existingData = existingTxDoc.data();
-                
+
                 batch.update(txRef, {
                     items: [...(existingData.items || []), newItemObj],
                     'summary.total': (existingData.summary?.total || 0) - totalCost,
@@ -1952,7 +1954,7 @@ export async function handleProductSubmit(e) {
                     invoiceId: finalInvoiceId,
                     supplierInvoice: data.supplierInvoice || '',
                     storeId: storeId,
-                    locationId: data.locationId, 
+                    locationId: data.locationId,
                     timestamp: new Date(),
                     type: 'PURCHASE',
                     customer: {
@@ -1962,9 +1964,9 @@ export async function handleProductSubmit(e) {
                         state: data.gstin ? String(data.gstin).substring(0, 2) : ''
                     },
                     summary: {
-                        total: -totalCost, 
-                        profit: 0, 
-                        paymentMethod: data.paymentMethod || 'CASH', 
+                        total: -totalCost,
+                        profit: 0,
+                        paymentMethod: data.paymentMethod || 'CASH',
                         chequeDetails: data.chequeDetails || null,
                         reason: isEditMode ? 'Stock Update (Edit Form)' : 'Initial Stock',
                         itemCount: itemQuantity
@@ -1978,21 +1980,21 @@ export async function handleProductSubmit(e) {
 
         if (currentEditingId) {
             const docRef = doc(productsRef, currentEditingId);
-            const { locationId, stockLevel, ...updateFields } = data; 
-            
+            const { locationId, stockLevel, ...updateFields } = data;
+
             const oldProduct = localProductsCache.find(p => p.id === currentEditingId);
             const oldStock = oldProduct ? parseFloat(oldProduct.stockLevel || 0) : 0;
             const newStock = parseFloat(data.stockLevel);
             const stockDiff = newStock - oldStock;
 
             const finalUpdateData = { ...updateFields };
-        const editingBatchIndex = document.getElementById('stockLevel')?.dataset?.editingBatchIndex;
-        
-        let currentBatches = oldProduct ? (oldProduct.batches ? [...oldProduct.batches] : []) : [];
-        // 🚀 BUGFIX: DO NOT SORT HERE! 'editingBatchIndex' targets the exact index of the UNSORTED array.
-        
-        if (currentBatches.length === 0 && oldStock > 0) {
-            currentBatches.push({
+            const editingBatchIndex = document.getElementById('stockLevel')?.dataset?.editingBatchIndex;
+
+            let currentBatches = oldProduct ? (oldProduct.batches ? [...oldProduct.batches] : []) : [];
+            // 🚀 BUGFIX: DO NOT SORT HERE! 'editingBatchIndex' targets the exact index of the UNSORTED array.
+
+            if (currentBatches.length === 0 && oldStock > 0) {
+                currentBatches.push({
                     batchNo: 'LEGACY-STOCK',
                     date: oldProduct.purchaseDate || (oldProduct.createdAt ? oldProduct.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
                     qty: oldStock,
@@ -2000,7 +2002,7 @@ export async function handleProductSubmit(e) {
                     expirationDate: oldProduct.expirationDate || '',
                     packagedDate: oldProduct.packagedDate || '',
                     timestamp: oldProduct.createdAt ? new Date(oldProduct.createdAt).getTime() : new Date().getTime(),
-                    
+
                     // 🚀 THE FIX: Permanently save root context into the DB batch
                     supplierId: oldProduct.dealerId || 'Manual/Mfg',
                     dealerId: oldProduct.dealerId || '',
@@ -2023,7 +2025,7 @@ export async function handleProductSubmit(e) {
                 const targetBatch = currentBatches[editingBatchIndex];
                 const oldBatchQty = parseFloat(targetBatch.qty) || 0;
                 const newBatchQty = (parseInt(data.cases) * parseInt(data.upc)) + parseInt(data.pieces) + parseInt(data.freeQty);
-                
+
                 targetBatch.qty = newBatchQty;
                 targetBatch.cost = parseFloat(data.cost) || 0;
                 targetBatch.price = parseFloat(data.price) || 0; // 🚀 ADDED
@@ -2033,7 +2035,7 @@ export async function handleProductSubmit(e) {
                 targetBatch.cess = parseFloat(data.cess) || 0;
                 targetBatch.schDisc = parseFloat(data.schDisc) || 0;
                 targetBatch.rsDisc = parseFloat(data.rsDisc) || 0;
-                
+
                 targetBatch.rawSchDisc = data.rawSchDisc || 0;
                 targetBatch.isSchPercent = data.isSchPercent || false;
                 targetBatch.rawRsDisc = data.rawRsDisc || 0;
@@ -2049,10 +2051,10 @@ export async function handleProductSubmit(e) {
                 targetBatch.unit = data.unit || 'units';
                 targetBatch.batchNo = data.batch || '';
                 targetBatch.expirationDate = data.expirationDate || null;
-                targetBatch.packagedDate = data.packagedDate || null; 
+                targetBatch.packagedDate = data.packagedDate || null;
                 targetBatch.date = data.purchaseDate || '';
                 targetBatch.sl = data.sl || ''; // 🚀 Invoice Serial
-                
+
                 // Update Supplier Context accurately for edited batch
                 targetBatch.supplierId = data.dealerId || '';
                 targetBatch.dealerId = data.dealerId || '';
@@ -2064,52 +2066,52 @@ export async function handleProductSubmit(e) {
                 targetBatch.supplierInvoice = data.supplierInvoice || '';
 
                 currentBatches = currentBatches.filter(b => parseFloat(b.qty) > 0);
-                
+
                 currentBatches = sortBatchesFefoFifo(currentBatches);
-                
+
                 const todayStrForWac = new Date().toISOString().split('T')[0];
                 const todayTimeForWac = new Date(todayStrForWac).getTime();
 
                 let totalActiveStockCalc = 0;
                 let totalActiveVal = 0;
-                
+
                 currentBatches.forEach(b => {
                     const isExpired = b.expirationDate && new Date(b.expirationDate).getTime() < todayTimeForWac;
-                    
+
                     if (!isExpired) {
                         const q = parseFloat(b.qty);
                         totalActiveStockCalc += q;
                         totalActiveVal += (q * parseFloat(b.cost));
                     }
                 });
-                
-                finalUpdateData.stockLevel = increment(stockDiff); 
+
+                finalUpdateData.stockLevel = increment(stockDiff);
                 finalUpdateData.cost = totalActiveStockCalc > 0 ? (totalActiveVal / totalActiveStockCalc) : 0;
                 finalUpdateData.batches = currentBatches;
-                
+
                 const diff = newBatchQty - oldBatchQty;
                 if (diff !== 0) {
                     await processTransactionGrouping(Math.abs(diff), currentEditingId, true);
                 }
-                
+
                 delete document.getElementById('stockLevel').dataset.editingBatchIndex;
                 logInventoryChange('UPDATE', data.name, `Updated Batch ${targetBatch.batchNo}.`);
-                
+
             } else if (stockDiff !== 0) {
                 finalUpdateData.stockLevel = increment(stockDiff);
                 currentBatches = sortBatchesFefoFifo(currentBatches);
-                
+
                 if (stockDiff > 0) {
                     currentBatches.push({
                         batchNo: data.batch || `B-${Date.now().toString().slice(-6)}`,
                         date: data.purchaseDate || new Date().toISOString().split('T')[0],
                         qty: stockDiff, // (or data.stockLevel for the initial batch)
-                        cost: data.cost, 
+                        cost: data.cost,
                         price: data.price, // 🚀 ADDED
                         mrp: data.mrp,     // 🚀 ADDED
                         supplierId: data.dealerId || 'Manual/Mfg',
                         expirationDate: data.expirationDate || '',
-                        packagedDate: data.packagedDate || null, 
+                        packagedDate: data.packagedDate || null,
                         timestamp: new Date().getTime(),
                         baseRate: data.baseRate || 0,
                         gstSlab: data.gstSlab || 0,
@@ -2117,7 +2119,7 @@ export async function handleProductSubmit(e) {
                         sl: data.sl || '', // 🚀 ADDED
                         schDisc: data.schDisc || 0,
                         rsDisc: data.rsDisc || 0,
-                        
+
                         rawSchDisc: data.rawSchDisc || 0,
                         isSchPercent: data.isSchPercent || false,
                         rawRsDisc: data.rawRsDisc || 0,
@@ -2131,7 +2133,7 @@ export async function handleProductSubmit(e) {
                         freeQty: data.freeQty || 0,
                         upc: data.upc || 1,
                         unit: data.unit || 'units',
-                        
+
                         dealerId: data.dealerId || '',
                         dealerName: data.dealerName || '',
                         dealerPhone: data.dealerPhone || '',
@@ -2152,14 +2154,14 @@ export async function handleProductSubmit(e) {
                             qtyToRemove = 0;
                         }
                     }
-                    currentBatches = currentBatches.filter(b => b.qty > 0); 
+                    currentBatches = currentBatches.filter(b => b.qty > 0);
                 }
 
                 // 🚀 THE FIX: Same exclusion logic for manual stock additions/deductions
                 const todayStrForWac2 = new Date().toISOString().split('T')[0];
                 const todayTimeForWac2 = new Date().setHours(0, 0, 0, 0);
 
-                let newWac = data.cost; 
+                let newWac = data.cost;
                 if (currentBatches.length > 0) {
                     let totalVal = 0, totalQ = 0;
                     currentBatches.forEach(b => {
@@ -2171,12 +2173,12 @@ export async function handleProductSubmit(e) {
                     });
                     if (totalQ > 0) newWac = totalVal / totalQ;
                 }
-                
+
                 finalUpdateData.batches = currentBatches;
-                finalUpdateData.cost = newWac; 
+                finalUpdateData.cost = newWac;
                 // 🚀 THE FIX: Also ensure the main stockLevel property reflects the active stock
-                finalUpdateData.stockLevel = currentBatches.filter(b => !(b.expirationDate && new Date(b.expirationDate).getTime() < todayTimeForWac2)).reduce((sum, b) => sum + parseFloat(b.qty), 0); 
-                
+                finalUpdateData.stockLevel = currentBatches.filter(b => !(b.expirationDate && new Date(b.expirationDate).getTime() < todayTimeForWac2)).reduce((sum, b) => sum + parseFloat(b.qty), 0);
+
                 await processTransactionGrouping(Math.abs(stockDiff), currentEditingId, true);
                 logInventoryChange('UPDATE', data.name, `Stock changed by ${stockDiff > 0 ? '+' : ''}${stockDiff}`);
             } else {
@@ -2189,72 +2191,72 @@ export async function handleProductSubmit(e) {
             const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
             if (role === 'admin' || role === 'accountant') finalUpdateData.locationId = locationId;
 
-            batch.set(docRef, finalUpdateData, { merge: true }); 
+            batch.set(docRef, finalUpdateData, { merge: true });
             logInventoryChange('UPDATE', data.name, `Updated details. Stock change: ${stockDiff > 0 ? '+' : ''}${stockDiff}`);
 
         } else {
             const newDocRef = doc(productsRef);
-            
-            if (data.stockLevel > 0) {
-                 data.batches = [{
-                     batchNo: data.batch || `B-${Date.now().toString().slice(-6)}`,
-                     date: data.purchaseDate || new Date().toISOString().split('T')[0],
-                     // 🚀 THE FIX: Use data.stockLevel for new products, not stockDiff!
-                     qty: parseFloat(data.stockLevel) || 0, 
-                     cost: data.cost, 
-                     price: data.price, 
-                     mrp: data.mrp,     
-                     supplierId: data.dealerId || 'Manual/Mfg',
-                     expirationDate: data.expirationDate || '',
-                     packagedDate: data.packagedDate || null, 
-                     timestamp: new Date().getTime(),
-                     baseRate: data.baseRate || 0,
-                     gstSlab: data.gstSlab || 0,
-                     cess: data.cess || 0,
-                     sl: data.sl || '', 
-                     schDisc: data.schDisc || 0,
-                     rsDisc: data.rsDisc || 0,
-                     
-                     rawSchDisc: data.rawSchDisc || 0,
-                     isSchPercent: data.isSchPercent || false,
-                     rawRsDisc: data.rawRsDisc || 0,
-                     isRsPercent: data.isRsPercent || false,
-                     isTaxInclusive: data.isTaxInclusive || false,
 
-                     taxableAmt: data.taxableAmt || 0,
-                     netAmt: data.netAmt || 0,
-                     cases: data.cases || 0,
-                     pieces: data.pieces || 0,
-                     freeQty: data.freeQty || 0,
-                     upc: data.upc || 1,
-                     unit: data.unit || 'units',
-                     
-                     dealerId: data.dealerId || '',
-                     dealerName: data.dealerName || '',
-                     dealerPhone: data.dealerPhone || '',
-                     dealerGstin: data.gstin || '',
-                     dealerPan: data.dealerPan || '',
-                     dealerState: data.dealerState || '', 
-                     supplierInvoice: data.supplierInvoice || ''
-                 }];
+            if (data.stockLevel > 0) {
+                data.batches = [{
+                    batchNo: data.batch || `B-${Date.now().toString().slice(-6)}`,
+                    date: data.purchaseDate || new Date().toISOString().split('T')[0],
+                    // 🚀 THE FIX: Use data.stockLevel for new products, not stockDiff!
+                    qty: parseFloat(data.stockLevel) || 0,
+                    cost: data.cost,
+                    price: data.price,
+                    mrp: data.mrp,
+                    supplierId: data.dealerId || 'Manual/Mfg',
+                    expirationDate: data.expirationDate || '',
+                    packagedDate: data.packagedDate || null,
+                    timestamp: new Date().getTime(),
+                    baseRate: data.baseRate || 0,
+                    gstSlab: data.gstSlab || 0,
+                    cess: data.cess || 0,
+                    sl: data.sl || '',
+                    schDisc: data.schDisc || 0,
+                    rsDisc: data.rsDisc || 0,
+
+                    rawSchDisc: data.rawSchDisc || 0,
+                    isSchPercent: data.isSchPercent || false,
+                    rawRsDisc: data.rawRsDisc || 0,
+                    isRsPercent: data.isRsPercent || false,
+                    isTaxInclusive: data.isTaxInclusive || false,
+
+                    taxableAmt: data.taxableAmt || 0,
+                    netAmt: data.netAmt || 0,
+                    cases: data.cases || 0,
+                    pieces: data.pieces || 0,
+                    freeQty: data.freeQty || 0,
+                    upc: data.upc || 1,
+                    unit: data.unit || 'units',
+
+                    dealerId: data.dealerId || '',
+                    dealerName: data.dealerName || '',
+                    dealerPhone: data.dealerPhone || '',
+                    dealerGstin: data.gstin || '',
+                    dealerPan: data.dealerPan || '',
+                    dealerState: data.dealerState || '',
+                    supplierInvoice: data.supplierInvoice || ''
+                }];
             }
-            
+
             batch.set(newDocRef, data);
-            
+
             if (data.stockLevel > 0) {
                 await processTransactionGrouping(data.stockLevel, newDocRef.id, false);
             }
-            
+
             logInventoryChange('CREATE', data.name, `SKU: ${data.sku}, Stock: ${data.stockLevel}`);
         }
-        
+
         await batch.commit();
 
         if (typeof invalidateProductCache === 'function') invalidateProductCache();
         showModal('Success', 'Product saved successfully!', 'success');
-        resetForm(); 
+        resetForm();
         if (data.dealerName) await loadDealerDropdowns();
-        
+
     } catch (error) {
         console.error("Error saving:", error);
         showModal('Error', 'Failed to save: ' + error.message, 'error');
@@ -2265,9 +2267,9 @@ export async function handleProductSubmit(e) {
             saveBtnNode.disabled = false;
             saveBtnNode.textContent = 'Save Product / Update Stock';
         }
-        if(DOM.inventory.saveBtn) { 
-            DOM.inventory.saveBtn.disabled = false; 
-            DOM.inventory.saveBtn.textContent = 'Save Product / Update Stock'; 
+        if (DOM.inventory.saveBtn) {
+            DOM.inventory.saveBtn.disabled = false;
+            DOM.inventory.saveBtn.textContent = 'Save Product / Update Stock';
         }
     }
 }
@@ -2310,7 +2312,7 @@ function updateHsnSuggestionsDatalist() {
 function updateProductDatalist() {
     if (!DOM.datalists.product || !localProductsCache) return;
     DOM.datalists.product.innerHTML = '';
-    
+
     const locFilterDropdown = document.getElementById('inv-table-location-filter');
     const filterLocation = locFilterDropdown ? locFilterDropdown.value : 'all';
 
@@ -2323,7 +2325,7 @@ function updateProductDatalist() {
     const frag = document.createDocumentFragment();
     filteredProducts.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = p.name; 
+        opt.value = p.name;
         frag.appendChild(opt);
     });
     DOM.datalists.product.appendChild(frag);
@@ -2332,7 +2334,7 @@ function updateProductDatalist() {
 function updateBundleDatalist() {
     let bundleList = document.getElementById('bundle-product-search-list');
     const searchInput = document.getElementById('bundle-search');
-    
+
     if (!searchInput) return;
 
     if (!bundleList) {
@@ -2343,13 +2345,13 @@ function updateBundleDatalist() {
     }
 
     bundleList.innerHTML = '';
-    
+
     const locDropdown = document.getElementById('inv-form-location');
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
-    const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
+    const canAccessAllLocations = (role === 'admin' || role === 'accountant');
 
     let targetLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
-    
+
     if (canAccessAllLocations && locDropdown) {
         targetLoc = locDropdown.value || 'main';
     }
@@ -2361,7 +2363,7 @@ function updateBundleDatalist() {
     const frag = document.createDocumentFragment();
     filteredProducts.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = p.name; 
+        opt.value = p.name;
         frag.appendChild(opt);
     });
     bundleList.appendChild(frag);
@@ -2372,7 +2374,7 @@ export function renderInventoryTable() {
     const searchTerm = DOM.inventory.search ? DOM.inventory.search.value.toLowerCase() : '';
     const sortMode = DOM.inventory.sort ? DOM.inventory.sort.value : 'name-asc';
     const currencySymbol = getCurrencySymbol();
-    
+
     const locFilterDropdown = document.getElementById('inv-table-location-filter');
     const filterLocation = locFilterDropdown ? locFilterDropdown.value : 'all';
 
@@ -2393,19 +2395,19 @@ export function renderInventoryTable() {
     filteredProducts = filteredProducts.map(product => {
         if (product.type === 'bundle' && product.bundleComponents && product.bundleComponents.length > 0) {
             let maxBundlesPossible = Infinity;
-            
+
             product.bundleComponents.forEach(comp => {
                 const realProduct = localProductsCache.find(p => p.id === comp.id);
                 const realStockAvailable = realProduct ? secureFloat(realProduct.stockLevel) : 0;
-                
+
                 const possibleWithThisItem = Math.floor(realStockAvailable / comp.qty);
                 if (possibleWithThisItem < maxBundlesPossible) {
                     maxBundlesPossible = possibleWithThisItem;
                 }
             });
-            
+
             if (maxBundlesPossible === Infinity) maxBundlesPossible = 0;
-            
+
             // Return a cloned object so the original cache is unaltered
             return { ...product, stockLevel: maxBundlesPossible };
         }
@@ -2423,9 +2425,11 @@ export function renderInventoryTable() {
     });
 
     DOM.inventory.table.innerHTML = '';
-    
+
     if (filteredProducts.length === 0) {
-        DOM.inventory.table.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-gray-500">No products found.</td></tr>`;
+        DOM.inventory.table.innerHTML = tableStateRow('empty', {
+            subtitle: searchTerm ? `No products match "${searchTerm}". Try a different search term.` : 'Add your first product to start tracking stock.',
+        }, 7);
         return;
     }
 
@@ -2439,21 +2443,21 @@ export function renderInventoryTable() {
 
     const start = (window.currentInventoryPage - 1) * PRODUCTS_PER_PAGE;
     const end = start + PRODUCTS_PER_PAGE;
-    
+
     // 🚀 Slice the exact 50 records for this page
     const pagedData = filteredProducts.slice(start, end);
 
     // 🚀 THE FIX: Add the 'index' parameter here so the serial number math works
     pagedData.forEach((product, index) => {
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-indigo-50 transition duration-100 cursor-pointer table-row-animate';
-        
+        tr.className = 'hover:bg-SLATE-50 transition duration-100 cursor-pointer table-row-animate';
+
         const isLowStock = parseFloat(product.stockLevel) <= (parseInt(product.lowStockThreshold) || 0);
         const expStatus = getExpirationStatus(product.expirationDate);
         let expDisplay = product.expirationDate ? escapeHTML(product.expirationDate) : '-';
-        
-        if (expStatus === 'expired') { 
-            tr.classList.add('bg-red-50'); 
+
+        if (expStatus === 'expired') {
+            tr.classList.add('bg-red-50');
             expDisplay = `<span class="text-red-600 font-bold" title="Expired">${expDisplay} ⚠️</span>`;
         } else if (expStatus === 'soon') {
             tr.classList.add('bg-amber-50');
@@ -2478,7 +2482,7 @@ export function renderInventoryTable() {
             dealers.add(escapeHTML(product.dealerName));
         }
 
-        const dealerHtml = dealers.size > 0 
+        const dealerHtml = dealers.size > 0
             ? Array.from(dealers).map(d => `<div class="truncate max-w-[140px]" title="${d}">${d}</div>`).join('<div class="h-px w-full bg-slate-200 my-1.5"></div>')
             : '<span class="text-gray-400 italic">No Supplier</span>';
 
@@ -2488,7 +2492,7 @@ export function renderInventoryTable() {
                 <div class="flex items-center gap-3">
                     <div class="relative group cursor-pointer w-10 h-10 bg-slate-50 rounded-lg border border-slate-200 overflow-hidden flex-shrink-0" onclick="window.triggerPosImageUpload('${product.sku || product.id}')">
                         <img id="inv-img-${product.sku || product.id}" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23cbd5e1' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'></path></svg>" class="w-full h-full object-cover p-1.5" alt="Upload">
-                        <div class="absolute inset-0 bg-indigo-600/80 hidden group-hover:flex items-center justify-center transition-all">
+                        <div class="absolute inset-0 bg-SLATE-600/80 hidden group-hover:flex items-center justify-center transition-all">
                             <span class="text-[9px] font-bold text-white uppercase tracking-wider">Pic</span>
                         </div>
                     </div>
@@ -2507,7 +2511,7 @@ export function renderInventoryTable() {
             <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap align-top pt-3">
                  <button data-id="${product.id}" data-action="barcode" class="text-slate-500 hover:text-slate-800 font-bold text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md transition-colors" title="Print Barcode">🖨️</button>
                  <button data-id="${product.id}" data-action="adjust" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs bg-emerald-50 px-2.5 py-1.5 rounded-md transition-colors">Adjust</button>
-                 <button data-id="${product.id}" data-action="edit" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs bg-indigo-50 px-2.5 py-1.5 rounded-md transition-colors">Edit</button>
+                 <button data-id="${product.id}" data-action="edit" class="text-SLATE-600 hover:text-SLATE-800 font-bold text-xs bg-SLATE-50 px-2.5 py-1.5 rounded-md transition-colors">Edit</button>
                  <button data-id="${product.id}" data-name="${escapeHTML(product.name)}" data-action="delete" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-2.5 py-1.5 rounded-md transition-colors">Del</button>
             </td>
         `;
@@ -2521,11 +2525,11 @@ export function renderInventoryTable() {
         <td colspan="8" class="p-4 border-t border-slate-200">
             <div class="flex items-center justify-between">
                 <div class="text-xs text-slate-500 font-medium font-mono">
-                    Showing <span class="font-bold text-indigo-600">${totalItems > 0 ? start + 1 : 0}</span> to <span class="font-bold text-indigo-600">${Math.min(end, totalItems)}</span> of <span class="font-bold text-indigo-600">${totalItems}</span> products
+                    Showing <span class="font-bold text-SLATE-600">${totalItems > 0 ? start + 1 : 0}</span> to <span class="font-bold text-SLATE-600">${Math.min(end, totalItems)}</span> of <span class="font-bold text-SLATE-600">${totalItems}</span> products
                 </div>
                 <div class="flex gap-2">
                     <button onclick="window.changeInventoryPage(-1)" class="px-4 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all" ${window.currentInventoryPage === 1 ? 'disabled' : ''}>Prev</button>
-                    <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 shadow-inner">Page ${window.currentInventoryPage} of ${totalPages || 1}</span>
+                    <span class="text-xs font-bold text-SLATE-700 bg-SLATE-50 px-3 py-1.5 rounded-lg border border-SLATE-200 shadow-inner">Page ${window.currentInventoryPage} of ${totalPages || 1}</span>
                     <button onclick="window.changeInventoryPage(1)" class="px-4 py-1.5 text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all" ${window.currentInventoryPage >= totalPages ? 'disabled' : ''}>Next</button>
                 </div>
             </div>
@@ -2540,23 +2544,23 @@ export function renderInventoryTable() {
                 if (entry.isIntersecting) {
                     const img = entry.target;
                     const imageId = img.dataset.imageId || img.id.replace('inv-img-', '');
-                    
+
                     if (imageId && !img.dataset.loaded) {
-                        img.dataset.loaded = 'true'; 
-                        
+                        img.dataset.loaded = 'true';
+
                         if (typeof loadPosImage === 'function') {
                             loadPosImage(imageId).then(base64 => {
                                 if (base64) {
                                     img.src = base64;
                                     img.classList.remove('p-1.5');
                                 }
-                            }).catch(() => {});
+                            }).catch(() => { });
                         }
                     }
-                    observer.unobserve(img); 
+                    observer.unobserve(img);
                 }
             });
-        }, { rootMargin: '100px 0px' }); 
+        }, { rootMargin: '100px 0px' });
 
         document.querySelectorAll('img[id^="inv-img-"]').forEach(img => {
             imageObserver.observe(img);
@@ -2570,18 +2574,18 @@ export function renderInventoryTable() {
 export async function resetForm() {
     const formEl = DOM.inventory?.form || document.getElementById('product-form');
     if (formEl) formEl.reset();
-    
+
     setEditingProductId(null);
-    
+
     const titleEl = DOM.inventory?.formTitle || document.getElementById('form-title') || document.getElementById('inventory-form-title');
     if (titleEl) titleEl.textContent = 'Add New Product';
-    
+
     const saveBtn = DOM.inventory?.saveBtn || document.getElementById('save-product-btn');
     if (saveBtn) saveBtn.textContent = 'Save Product / Update Stock';
-    
+
     const cancelBtn = DOM.inventory?.cancelBtn || document.getElementById('cancel-edit-btn');
     if (cancelBtn) cancelBtn.classList.add('hidden');
-    
+
     const clearIds = [
         'prod-sl', 'prod-hsn', 'prod-batch', 'prod-upc', 'prod-mrp', 'prod-cess',
         'prod-base-rate', 'prod-sch-disc', 'prod-rs-disc', 'prod-taxable-amt',
@@ -2593,17 +2597,17 @@ export async function resetForm() {
         const el = document.getElementById(id);
         if (el) { el.value = ''; el.disabled = false; el.classList.remove('bg-gray-100', 'bg-gray-50'); }
     });
-    
+
     const discVal = document.getElementById('inv-discount-val');
     if (discVal) discVal.value = '';
-    
+
     // Defaults
     const upcEl = document.getElementById('prod-upc');
     if (upcEl) upcEl.value = "1";
     const schType = document.getElementById('prod-sch-disc-type');
-    if(schType) schType.value = '₹';
+    if (schType) schType.value = '₹';
     const rsType = document.getElementById('prod-rs-disc-type');
-    if(rsType) rsType.value = '₹';
+    if (rsType) rsType.value = '₹';
     const casesEl = document.getElementById('prod-cases');
     if (casesEl) casesEl.value = "0";
     const piecesEl = document.getElementById('prod-pieces');
@@ -2627,7 +2631,7 @@ export async function resetForm() {
     if (rsToggle) rsToggle.checked = false;
     const invDiscToggle = document.getElementById('inv-discount-type-toggle');
     if (invDiscToggle) invDiscToggle.checked = false;
-    
+
     const chequeDrawer = document.getElementById('prod-cheque-drawer');
     if (chequeDrawer) {
         chequeDrawer.classList.add('hidden');
@@ -2636,7 +2640,7 @@ export async function resetForm() {
         document.getElementById('prod-cheque-no').value = '';
         document.getElementById('prod-cheque-date').value = '';
     }
-    
+
     const i = DOM.inventory?.inputs || {};
     if (i.stock) {
         i.stock.disabled = false;
@@ -2659,24 +2663,24 @@ export async function resetForm() {
 
     if (i.sku) {
         i.sku.value = 'Generating...';
-        i.sku.disabled = true; 
+        i.sku.disabled = true;
         const nextSku = await generateNextSku();
         i.sku.value = nextSku;
-        i.sku.disabled = false; 
-        if (i.barcode && !i.barcode.value) i.barcode.value = nextSku; 
+        i.sku.disabled = false;
+        if (i.barcode && !i.barcode.value) i.barcode.value = nextSku;
     }
-    
+
     bundleComponents = [];
     if (typeof renderBundleTable === 'function') renderBundleTable();
     const bb = document.getElementById('bundle-builder');
     if (bb) bb.classList.add('hidden');
-    
+
     // 🚀 THE FIX: Reset the new Dropdown instead of Radios
     const typeSelect = document.getElementById('productType');
     if (typeSelect) typeSelect.value = 'standard';
-    
+
     if (typeof toggleProductTypeUI === 'function') toggleProductTypeUI('standard');
-    
+
     // 🚀 THE FIX: Re-enable the Add Batch button when the form is cleared/saved
     const addBatchBtn = document.querySelector('button[onclick="window.prepareNewBatch()"]');
     if (addBatchBtn) {
@@ -2684,7 +2688,7 @@ export async function resetForm() {
         addBatchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         addBatchBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add New Batch`;
     }
-    
+
     if (formEl && window.scrollY > 300) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -2699,13 +2703,13 @@ export function getExpirationStatus(dateStr) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const expDate = new Date(dateStr);
-    
+
     if (expDate < today) return 'expired';
-    
+
     const warningDate = new Date(today);
     warningDate.setDate(today.getDate() + 30);
     if (expDate <= warningDate) return 'soon';
-    
+
     return 'ok';
 }
 
@@ -2721,9 +2725,9 @@ let dealerLookupDebounce = null;
 export async function handleDealerInfoChange(triggerField, rawValue) {
     if (rawValue === undefined) {
         const el = document.getElementById(
-            triggerField === 'phone' ? 'prod-dealer-phone' : 
-            triggerField === 'gstin' ? 'prod-gstin' : 
-            triggerField === 'name' ? 'prod-dealer' : 'prod-dealer-id'
+            triggerField === 'phone' ? 'prod-dealer-phone' :
+                triggerField === 'gstin' ? 'prod-gstin' :
+                    triggerField === 'name' ? 'prod-dealer' : 'prod-dealer-id'
         );
         if (el) rawValue = el.value;
     }
@@ -2747,12 +2751,12 @@ export async function handleDealerInfoChange(triggerField, rawValue) {
 
         // 1. Search local cached directory
         if (isExactName) {
-            match = localDealersCache.find(d => 
+            match = localDealersCache.find(d =>
                 (d.name || d.storeName || '').trim().toLowerCase() === val.toLowerCase()
             );
         } else if (isExactPhone) {
             const targetPhone = rawDigits.slice(-10);
-            match = localDealersCache.find(d => 
+            match = localDealersCache.find(d =>
                 (d.phone || '').replace(/\D/g, '').endsWith(targetPhone)
             );
 
@@ -2761,7 +2765,7 @@ export async function handleDealerInfoChange(triggerField, rawValue) {
             }
         } else if (isExactGstin) {
             const cleanGst = val.toUpperCase();
-            match = localDealersCache.find(d => 
+            match = localDealersCache.find(d =>
                 (d.gstin || '').trim().toUpperCase() === cleanGst
             );
 
@@ -2772,10 +2776,10 @@ export async function handleDealerInfoChange(triggerField, rawValue) {
 
         // 2. ONLY populate if there is an exact match
         if (match) {
-            activeDealerState = { 
-                id: match.id || match.merchantId || null, 
-                phone: match.phone || '', 
-                name: match.name || match.storeName || '' 
+            activeDealerState = {
+                id: match.id || match.merchantId || null,
+                phone: match.phone || '',
+                name: match.name || match.storeName || ''
             };
             fillDealerFieldsSafe(match);
             if (typeof showToast === 'function') {
@@ -2795,17 +2799,17 @@ function fillDealerFieldsSafe(data) {
     const id = (data.merchantId || data.id || '').trim();
     const pan = (data.pan || '').trim();
     let state = (data.state || '').trim();
-    
+
     // 🚀 THE FIX: Auto-infer the state from the dropdown dealer's GSTIN if it's missing in the database
     if (!state && gst.length >= 2) {
         const GST_STATE_CODES = {
-            '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', 
-            '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', 
-            '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', 
-            '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', 
-            '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat', 
-            '25': 'Daman & Diu', '26': 'Dadra & Nagar Haveli', '27': 'Maharashtra', '29': 'Karnataka', 
-            '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', 
+            '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
+            '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
+            '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur',
+            '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal',
+            '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat',
+            '25': 'Daman & Diu', '26': 'Dadra & Nagar Haveli', '27': 'Maharashtra', '29': 'Karnataka',
+            '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry',
             '35': 'Andaman & Nicobar', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh'
         };
         const stateName = GST_STATE_CODES[gst.substring(0, 2)];
@@ -2837,10 +2841,10 @@ function fillDealerFieldsSafe(data) {
 
 function unlockDealerFieldsSafe() {
     const fieldIds = [
-        'prod-dealer', 'prod-dealer-phone', 'prod-dealer-id', 
+        'prod-dealer', 'prod-dealer-phone', 'prod-dealer-id',
         'prod-gstin', 'prod-dealer-pan', 'prod-dealer-state', 'prod-invoice'
     ];
-    
+
     fieldIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -2858,11 +2862,11 @@ if (clearDealerBtn) {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
-        
+
         if (typeof activeDealerState !== 'undefined') {
             activeDealerState = { id: null, phone: '', name: '' };
         }
-        
+
         unlockDealerFieldsSafe();
         const nameInput = document.getElementById('prod-dealer');
         if (nameInput) nameInput.focus();
@@ -2874,20 +2878,20 @@ if (clearDealerBtn) {
 async function searchGlobalDirectory(type, val) {
     try {
         const dirRef = collection(db, `artifacts/${appId}/directory_merchants`);
-        
+
         if (type === 'id') {
             const docSnap = await getDoc(doc(dirRef, val));
             return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
-        } 
-        
+        }
+
         if (type === 'phone') {
             let queries = [];
             queries.push(getDocs(query(dirRef, where('phone', '==', val), limit(1))));
-            
+
             if (val.length === 10) {
                 queries.push(getDocs(query(dirRef, where('phone', '==', `+91${val}`), limit(1))));
             }
-            
+
             const results = await Promise.all(queries);
             for (const snap of results) {
                 if (!snap.empty) {
@@ -2903,15 +2907,15 @@ async function searchGlobalDirectory(type, val) {
     }
 }
 
-function injectExtraDealerFields() {
-    const gstInput = document.getElementById('prod-gstin') || document.querySelector('input[name="gstin"]'); 
+async function injectExtraDealerFields() {
+    const gstInput = document.getElementById('prod-gstin') || document.querySelector('input[name="gstin"]');
     if (gstInput && !document.getElementById('prod-dealer-pan')) {
-        const wrapper = gstInput.closest('div'); 
+        const wrapper = gstInput.closest('div');
         if (wrapper) {
             wrapper.insertAdjacentHTML('afterend', `
                 <div>
                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Supplier PAN</label>
-                    <input type="text" id="prod-dealer-pan" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5 border uppercase font-mono focus:ring-indigo-500 focus:border-indigo-500" placeholder="OPTIONAL">
+                    <input type="text" id="prod-dealer-pan" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5 border uppercase font-mono focus:ring-SLATE-500 focus:border-SLATE-500" placeholder="OPTIONAL">
                 </div>
             `);
         }
@@ -2925,21 +2929,29 @@ function injectExtraDealerFields() {
             wrapper.insertAdjacentHTML('afterend', `
                 <div class="col-span-1 md:col-span-2 lg:col-span-1">
                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Supplier State <span class="text-red-500">*</span></label>
-                    <input type="text" id="prod-dealer-state" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5 border font-bold text-gray-800 focus:ring-indigo-500 focus:border-indigo-500 bg-white" placeholder="e.g. Maharashtra">
+                    <input type="text" id="prod-dealer-state" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2.5 border font-bold text-gray-800 focus:ring-SLATE-500 focus:border-SLATE-500 bg-white" placeholder="e.g. Maharashtra">
                 </div>
             `);
         }
+    }
+
+    // Initialize GSTIN Auto-Fill for inventory dealer form
+    try {
+        const { attachGstinAutoFill, GSTIN_FIELD_MAPS } = await import('../utils/gstinAutoFill.js');
+        attachGstinAutoFill(GSTIN_FIELD_MAPS.inventoryDealer);
+    } catch (e) {
+        console.warn('GSTIN AutoFill for inventory dealer failed:', e);
     }
 }
 
 function injectDiscountCalculator() {
     const mrpInput = document.getElementById('prod-mrp');
     const priceInput = document.getElementById('price');
-    
+
     if (!mrpInput || !priceInput || document.getElementById('inv-discount-container')) return;
 
-    const wrapper = priceInput.closest('div'); 
-    
+    const wrapper = priceInput.closest('div');
+
     // 🚀 FIXED: Top row layout strictly mirrors standard inputs
     const html = `
         <div id="inv-discount-container" class=" ">
@@ -2947,16 +2959,16 @@ function injectDiscountCalculator() {
                 <label class="text-xs font-bold text-gray-600 uppercase tracking-wider truncate mr-2">Discount</label>
                 <label class="flex items-center cursor-pointer bg-slate-200/60 rounded px-0.5 py-0.5 border border-slate-200 select-none shadow-inner shrink-0">
                     <input type="checkbox" id="inv-discount-type-toggle" class="sr-only peer">
-                    <span class="px-2.5 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-indigo-700 whitespace-nowrap">₹</span>
-                    <span class="px-2.5 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-indigo-700 text-slate-400 bg-transparent whitespace-nowrap">%</span>
+                    <span class="px-2.5 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-SLATE-700 whitespace-nowrap">₹</span>
+                    <span class="px-2.5 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-SLATE-700 text-slate-400 bg-transparent whitespace-nowrap">%</span>
                 </label>
             </div>
-            <div class="flex rounded-md shadow-sm border border-gray-300 overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all bg-white">
-                <input type="number" id="inv-discount-val" class="flex-1 w-full px-3 py-2 outline-none sm:text-sm font-bold text-indigo-700 border-none m-0 focus:ring-0" placeholder="0">
+            <div class="flex rounded-md shadow-sm border border-gray-300 overflow-hidden focus-within:ring-1 focus-within:ring-SLATE-500 focus-within:border-SLATE-500 transition-all bg-white">
+                <input type="number" id="inv-discount-val" class="flex-1 w-full px-3 py-2 outline-none sm:text-sm font-bold text-SLATE-700 border-none m-0 focus:ring-0" placeholder="0">
             </div>
         </div>
     `;
-    
+
     wrapper.insertAdjacentHTML('afterend', html);
 
     const discVal = document.getElementById('inv-discount-val');
@@ -2965,9 +2977,9 @@ function injectDiscountCalculator() {
     const calculateSellingPrice = () => {
         const mrp = parseFloat(mrpInput.value) || 0;
         const disc = parseFloat(discVal.value) || 0;
-        const isPercent = discTypeToggle.checked; 
+        const isPercent = discTypeToggle.checked;
 
-        if (mrp <= 0) return; 
+        if (mrp <= 0) return;
 
         let finalPrice = mrp;
         if (isPercent) {
@@ -2975,10 +2987,10 @@ function injectDiscountCalculator() {
         } else {
             finalPrice = mrp - disc;
         }
-        
+
         finalPrice = Math.max(0, finalPrice);
         priceInput.value = finalPrice.toFixed(2);
-        
+
         priceInput.classList.add('bg-green-50', 'text-green-700', 'border-green-400', 'transition-colors');
         setTimeout(() => priceInput.classList.remove('bg-green-50', 'text-green-700', 'border-green-400'), 500);
     };
@@ -2990,30 +3002,30 @@ function injectDiscountCalculator() {
 
 function injectTaxInclusiveToggle() {
     const baseRateInput = document.getElementById('prod-base-rate');
-    
+
     if (baseRateInput && !document.getElementById('tax-inclusive-toggle-container')) {
         const wrapper = baseRateInput.parentElement;
         const label = wrapper.querySelector('label');
-        
+
         if (label) {
             // 🚀 SURGICAL FIX: Remove specific margins from the label so the parent container can control the height
-            label.classList.remove('mb-2', 'h-[18px]'); 
-            
+            label.classList.remove('mb-2', 'h-[18px]');
+
             // Create a perfect flex container
             const flexHeader = document.createElement('div');
             flexHeader.id = 'tax-inclusive-toggle-container';
             flexHeader.className = 'flex justify-between items-center w-full mb-2 h-[18px]';
-            
+
             // Gently wrap the existing label (leaving tooltips 100% intact!)
             wrapper.insertBefore(flexHeader, label);
             flexHeader.appendChild(label);
-            
+
             // Inject the toggle next to it
             const toggleHTML = `
                 <label class="flex items-center cursor-pointer bg-slate-200/60 rounded px-0.5 py-0.5 border border-slate-200 select-none shadow-inner shrink-0 ml-2" title="Is the tax already included in the base rate?">
                     <input type="checkbox" id="tax-inclusive-toggle" class="sr-only peer">
-                    <span class="px-1.5 py-[1px] text-[9px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-indigo-700 whitespace-nowrap">+ TAX</span>
-                    <span class="px-1.5 py-[1px] text-[9px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-indigo-700 text-slate-400 bg-transparent whitespace-nowrap">INCL</span>
+                    <span class="px-1.5 py-[1px] text-[9px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-SLATE-700 whitespace-nowrap">+ TAX</span>
+                    <span class="px-1.5 py-[1px] text-[9px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-SLATE-700 text-slate-400 bg-transparent whitespace-nowrap">INCL</span>
                 </label>
             `;
             flexHeader.insertAdjacentHTML('beforeend', toggleHTML);
@@ -3029,7 +3041,7 @@ function injectPurchaseDiscountToggles() {
         // 🚀 THE FIX: Traverse UP the DOM tree until we find the label!
         let wrapper = input.parentElement;
         let label = wrapper ? wrapper.querySelector('label') : null;
-        
+
         while (!label && wrapper && wrapper !== document.body) {
             wrapper = wrapper.parentElement;
             label = wrapper ? wrapper.querySelector('label') : null;
@@ -3045,11 +3057,11 @@ function injectPurchaseDiscountToggles() {
 
             // Remove margins to allow the wrapper to take control
             label.classList.remove('mb-2', 'h-[18px]');
-            
+
             // Create the flex wrapper
             const flexHeader = document.createElement('div');
             flexHeader.className = 'flex justify-between items-center w-full mb-2 h-[18px]';
-            
+
             // Wrap the label
             label.parentNode.insertBefore(flexHeader, label);
             flexHeader.appendChild(label);
@@ -3058,8 +3070,8 @@ function injectPurchaseDiscountToggles() {
             const toggleHTML = `
                 <label class="flex items-center cursor-pointer bg-slate-200/60 rounded px-0.5 py-0.5 border border-slate-200 select-none shadow-inner shrink-0 ml-2">
                     <input type="checkbox" id="${id}-type-toggle" class="sr-only peer">
-                    <span class="px-2 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-indigo-700 whitespace-nowrap">₹</span>
-                    <span class="px-2 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-indigo-700 text-slate-400 bg-transparent whitespace-nowrap">%</span>
+                    <span class="px-2 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:text-slate-400 peer-checked:bg-transparent bg-white shadow-sm text-SLATE-700 whitespace-nowrap">₹</span>
+                    <span class="px-2 py-[1px] text-[10px] font-bold rounded-sm transition-all peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-SLATE-700 text-slate-400 bg-transparent whitespace-nowrap">%</span>
                 </label>
             `;
             flexHeader.insertAdjacentHTML('beforeend', toggleHTML);
@@ -3082,17 +3094,17 @@ function injectPurchaseDiscountToggles() {
 function injectPaymentFields() {
     // 🚀 THE FIX: Changed the anchor from FSSAI to the Supplier Invoice field
     const anchorInput = document.getElementById('prod-invoice');
-    
+
     if (anchorInput && !document.getElementById('prod-payment-method')) {
-        const wrapper = anchorInput.closest('div').parentElement; 
-        
+        const wrapper = anchorInput.closest('div').parentElement;
+
         wrapper.insertAdjacentHTML('afterend', `
-            <div class="col-span-full mt-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 ">
-                <h4 class="text-[10px] font-black text-indigo-800 uppercase tracking-widest mb-3">Payment Details (For Stock Purchases)</h4>
+            <div class="col-span-full mt-4 p-4 bg-SLATE-50/50 rounded-xl border border-SLATE-100 ">
+                <h4 class="text-[10px] font-black text-SLATE-800 uppercase tracking-widest mb-3">Payment Details (For Stock Purchases)</h4>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Payment Mode</label>
-                        <select id="prod-payment-method" class="w-full rounded-lg border-gray-300 shadow-sm p-2.5 text-sm font-bold text-indigo-700 bg-white focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer">
+                        <select id="prod-payment-method" class="w-full rounded-lg border-gray-300 shadow-sm p-2.5 text-sm font-bold text-SLATE-700 bg-white focus:ring-SLATE-500 focus:border-SLATE-500 cursor-pointer">
                             <option value="CASH">Cash</option>
                             <option value="UPI">UPI</option>
                             <option value="CHEQUE">Cheque</option>
@@ -3101,18 +3113,18 @@ function injectPaymentFields() {
                     </div>
                 </div>
                 <!-- Hidden Cheque Drawer -->
-                <div id="prod-cheque-drawer" class="hidden grid-cols-1 md:grid-cols-3 gap-4 mt-4 bg-white p-4 rounded-lg border border-indigo-200 shadow-inner">
+                <div id="prod-cheque-drawer" class="hidden grid-cols-1 md:grid-cols-3 gap-4 mt-4 bg-white p-4 rounded-lg border border-SLATE-200 shadow-inner">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Bank Name</label>
-                        <input type="text" id="prod-cheque-bank" placeholder="e.g. HDFC, SBI" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="text" id="prod-cheque-bank" placeholder="e.g. HDFC, SBI" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm focus:ring-SLATE-500 focus:border-SLATE-500">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Cheque No.</label>
-                        <input type="text" id="prod-cheque-no" placeholder="6 Digits" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm font-mono focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="text" id="prod-cheque-no" placeholder="6 Digits" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm font-mono focus:ring-SLATE-500 focus:border-SLATE-500">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Clearance Date</label>
-                        <input type="date" id="prod-cheque-date" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 text-gray-700">
+                        <input type="date" id="prod-cheque-date" class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm focus:ring-SLATE-500 focus:border-SLATE-500 text-gray-700">
                     </div>
                 </div>
             </div>
@@ -3137,11 +3149,11 @@ function setInputLoading(el, isLoading) {
     if (!el || !el.parentNode) return;
     const parent = el.parentNode;
     let spinner = parent.querySelector('.input-spinner');
-    
+
     if (isLoading) {
         if (!spinner) {
             spinner = document.createElement('div');
-            spinner.className = 'input-spinner absolute right-2 top-2.5 animate-spin h-4 w-4 border-2 border-indigo-500 rounded-full border-t-transparent';
+            spinner.className = 'input-spinner absolute right-2 top-2.5 animate-spin h-4 w-4 border-2 border-SLATE-500 rounded-full border-t-transparent';
             if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
             parent.appendChild(spinner);
         }
@@ -3152,7 +3164,7 @@ function setInputLoading(el, isLoading) {
 
 function setInputStatus(el, status) {
     if (!el) return;
-    el.classList.remove('border-green-500', 'border-red-500', 'border-indigo-500');
+    el.classList.remove('border-green-500', 'border-red-500', 'border-SLATE-500');
     if (status === 'success') el.classList.add('border-green-500');
     if (status === 'error') el.classList.add('border-red-500');
     if (status === 'neutral') el.classList.add('border-gray-300');
@@ -3164,14 +3176,14 @@ function editProduct(id) {
     setEditingProductId(id);
     const gstinInput = document.getElementById('edit-product-gstin');
     const i = DOM.inventory?.inputs || {};
-    
+
     const safeVal = (val, isNumber = false) => {
         if (val === null || val === undefined) return isNumber ? "0" : "";
         if (isNumber && isNaN(val)) return "0";
         return String(val);
     };
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    
+
     // ========================================================================
     // 🚀 THE FIX: FEFO/FIFO BATCH RECONCILIATION
     // If POS sales depleted stockLevel but not batches, or manual stock was added,
@@ -3179,17 +3191,17 @@ function editProduct(id) {
     // ========================================================================
     const liveStock = parseFloat(p.stockLevel) || 0;
     let workingBatches = p.batches ? JSON.parse(JSON.stringify(p.batches)) : [];
-    
+
     // 🚀 THE FIX: Use strict LOCAL timezone midnight instead of UTC toISOString().
     // This prevents batches from ghosting in and out of expiry depending on the time of night.
     const todayTime = new Date().setHours(0, 0, 0, 0);
-    
+
     let sumActiveBatches = 0;
     workingBatches.forEach(b => {
         const isExpired = b.expirationDate && new Date(b.expirationDate).getTime() < todayTime;
         if (!isExpired) sumActiveBatches += (parseFloat(b.qty) || 0);
     });
-    
+
     if (workingBatches.length > 0 && Math.abs(liveStock - sumActiveBatches) > 0.01) {
         if (liveStock < sumActiveBatches) {
             // Stock was sold. Deplete batches logically, but ONLY from active stock.
@@ -3197,7 +3209,7 @@ function editProduct(id) {
             workingBatches = sortBatchesFefoFifo(workingBatches);
             for (let j = 0; j < workingBatches.length; j++) {
                 if (diff <= 0) break;
-                
+
                 const isExpired = workingBatches[j].expirationDate && new Date(workingBatches[j].expirationDate).getTime() < todayTime;
                 if (isExpired) continue; // Skip quarantines, they weren't sold!
 
@@ -3234,7 +3246,7 @@ function editProduct(id) {
     if (activeSellableBatches.length > 0) {
         // 🚀 THE FIX: Target the actively selling batch (FEFO/FIFO front of queue)
         const sortedActive = sortBatchesFefoFifo(activeSellableBatches);
-        activeBatch = sortedActive[0]; 
+        activeBatch = sortedActive[0];
     }
     const source = activeBatch || p;
 
@@ -3249,7 +3261,7 @@ function editProduct(id) {
     let cases = parseInt(source.cases) || 0;
     let pieces = parseInt(source.pieces) || (activeBatch ? targetQty : trueActiveStock);
     let freeQty = parseInt(source.freeQty) || 0;
-    
+
     // Force mathematical sync if the saved cases/pieces don't match the target quantity
     if ((cases * upc + pieces + freeQty) !== targetQty) {
         if (upc > 1) {
@@ -3263,11 +3275,11 @@ function editProduct(id) {
     }
     let calcQty = targetQty > 0 ? targetQty : 1;
 
-// 1. Basic Info UI Rendering
+    // 1. Basic Info UI Rendering
     if (i.name) i.name.value = safeVal(p.name);
     if (i.sku) { i.sku.value = safeVal(p.sku); i.sku.disabled = false; }
     if (i.barcode) i.barcode.value = safeVal(p.barcode);
-    
+
     // 🚀 THE FIX: Pull ALL financials strictly from the Active Batch
     let basePrice = activeBatch?.price !== undefined && activeBatch?.price !== null ? activeBatch.price : p.price;
     let baseCost = activeBatch?.cost !== undefined && activeBatch?.cost !== null ? activeBatch.cost : p.cost;
@@ -3279,15 +3291,15 @@ function editProduct(id) {
     // 🚀 THE FIX: Only display the active, non-expired stock in the main UI
     if (i.stock) {
         i.stock.value = safeVal(trueActiveStock, true);
-        i.stock.dataset.baseStock = Math.max(0, trueActiveStock - targetQty).toString(); 
-        
+        i.stock.dataset.baseStock = Math.max(0, trueActiveStock - targetQty).toString();
+
         if (activeBatch && p.batches) {
             // Explicitly locate via timestamp/batchNo mapping to safely bypass deep cloning breaks
-            const bIndex = p.batches.findIndex(b => 
-                b.timestamp === activeBatch.timestamp && 
+            const bIndex = p.batches.findIndex(b =>
+                b.timestamp === activeBatch.timestamp &&
                 b.batchNo === activeBatch.batchNo
             );
-            
+
             if (bIndex > -1) {
                 i.stock.dataset.editingBatchIndex = bIndex;
             } else {
@@ -3296,7 +3308,7 @@ function editProduct(id) {
         } else {
             delete i.stock.dataset.editingBatchIndex;
         }
-        i.stock.disabled = false; 
+        i.stock.disabled = false;
         i.stock.classList.remove('bg-gray-200', 'cursor-not-allowed', 'opacity-50');
     }
     if (i.lowStock) i.lowStock.value = safeVal(p.lowStockThreshold, true);
@@ -3311,7 +3323,7 @@ function editProduct(id) {
                 return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
             }
         }
-        return ""; 
+        return "";
     };
 
     // --- POPULATE NEW FIELDS ---
@@ -3320,17 +3332,17 @@ function editProduct(id) {
     setEl('prod-batch', safeVal(source.batchNo === 'LEGACY-STOCK' ? '' : (source.batchNo || p.batch)));
     setEl('prod-upc', safeVal(p.upc, true) || "1");
     setEl('prod-mrp', safeVal(source.mrp || p.mrp, true));
-    
+
     const mMrp = parseFloat(source.mrp || p.mrp) || 0;
     const mPrice = parseFloat(source.price || p.price) || 0;
     const discVal = document.getElementById('inv-discount-val');
     const discToggle = document.getElementById('inv-discount-type-toggle');
-    
+
     if (discVal && mMrp > mPrice) {
         discVal.value = (mMrp - mPrice).toFixed(2);
-        if (discToggle) discToggle.checked = false; 
+        if (discToggle) discToggle.checked = false;
     }
-    
+
     let baseRateVal = parseFloat(source.baseRate);
     if (isNaN(baseRateVal)) baseRateVal = 0;
 
@@ -3340,7 +3352,7 @@ function editProduct(id) {
     const cost = parseFloat(source.cost || p.cost) || 0;
     const gst = parseFloat(source.gstSlab || p.gstSlab) || 0;
     const cess = parseFloat(source.cess || p.cess) || 0;
-    
+
     if (baseRateVal === 0 && (cost > 0 || netAmt > 0)) {
         const taxMultiplier = 1 + (gst / 100) + (cess / 100);
         if (netAmt > 0) {
@@ -3351,7 +3363,7 @@ function editProduct(id) {
             baseRateVal = (unitCostWithoutTax * calcQty + schDisc + rsDisc) / calcQty;
         }
     }
-    
+
     setEl('prod-base-rate', baseRateVal > 0 ? baseRateVal.toFixed(2) : "0");
     setEl('prod-sch-disc', schDisc > 0 ? schDisc.toFixed(2) : "0");
     setEl('prod-rs-disc', rsDisc > 0 ? rsDisc.toFixed(2) : "0");
@@ -3364,16 +3376,16 @@ function editProduct(id) {
     setEl('prod-free-qty', freeQty);
 
     if (i.gst) i.gst.value = safeVal(source.gstSlab || p.gstSlab, true);
-    if (i.cess) i.cess.value = safeVal(source.cess || p.cess, true); 
+    if (i.cess) i.cess.value = safeVal(source.cess || p.cess, true);
 
     if (typeof window.calculateInvoiceBreakdown === 'function') {
         window.calculateInvoiceBreakdown('manual-fetch');
     }
-    
+
     setEl('expirationDate', toDateInput(source.expirationDate || p.expirationDate));
     if (i.packaged) i.packaged.value = toDateInput(source.packagedDate || p.packagedDate || (p.type === 'manufactured' ? (p.createdAt ? p.createdAt.split('T')[0] : '') : ''));
     if (i.bestBefore) i.bestBefore.value = isNaN(parseInt(p.bestBeforeMonths)) ? "" : parseInt(p.bestBeforeMonths);
-    setEl('prod-date', toDateInput(source.date || p.purchaseDate || (p.createdAt ? p.createdAt.split('T')[0] : ''))); 
+    setEl('prod-date', toDateInput(source.date || p.purchaseDate || (p.createdAt ? p.createdAt.split('T')[0] : '')));
 
     const dealerInput = document.getElementById('prod-dealer');
     const dealerIdInput = document.getElementById('prod-dealer-id');
@@ -3392,7 +3404,7 @@ function editProduct(id) {
     } else {
         let dName = source.dealerName || p.dealerName || '';
         let dId = source.dealerId || source.supplierId || p.dealerId || '';
-        
+
         if (dName.startsWith('MERCH-')) {
             dId = dName;
             dName = '';
@@ -3406,11 +3418,11 @@ function editProduct(id) {
 
         if (dealerInput) dealerInput.value = safeVal(dName);
         if (dealerIdInput) dealerIdInput.value = safeVal(dId);
-        
+
         // 🚀 THE FIX: Fetch Phone, GSTIN, PAN, and State from the active batch or cache
         if (phoneInput) {
             phoneInput.value = safeVal(source.dealerPhone || p.dealerPhone || (cachedDealer ? cachedDealer.phone : '')).replace(/^\+?91/, '');
-            
+
             // Safe listener binding to prevent memory leaks
             if (!phoneInput.dataset.listenerBound) {
                 phoneInput.addEventListener('input', (e) => {
@@ -3431,7 +3443,7 @@ function editProduct(id) {
         const gstinInputEl = dealerGstInput || document.getElementById('prod-gstin');
         if (gstinInputEl) {
             gstinInputEl.value = safeVal(source.dealerGstin || p.gstin || (cachedDealer ? cachedDealer.gstin : ''));
-            
+
             if (!gstinInputEl.dataset.listenerBound) {
                 gstinInputEl.addEventListener('input', (e) => {
                     let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -3446,19 +3458,19 @@ function editProduct(id) {
                     // 🚀 THE FIX: Auto-Extract State from the first 2 digits of GSTIN
                     if (val.length >= 2) {
                         const GST_STATE_CODES = {
-                            '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', 
-                            '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh', 
-                            '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', 
-                            '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', 
-                            '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat', 
-                            '25': 'Daman & Diu', '26': 'Dadra & Nagar Haveli', '27': 'Maharashtra', '29': 'Karnataka', 
-                            '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', 
+                            '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
+                            '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
+                            '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur',
+                            '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal',
+                            '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat',
+                            '25': 'Daman & Diu', '26': 'Dadra & Nagar Haveli', '27': 'Maharashtra', '29': 'Karnataka',
+                            '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry',
                             '35': 'Andaman & Nicobar', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh'
                         };
                         const stateCode = val.substring(0, 2);
                         const stateName = GST_STATE_CODES[stateCode];
                         const stateInput = document.getElementById('prod-dealer-state');
-                        
+
                         if (stateInput && !stateInput.value && stateName) {
                             stateInput.value = `${stateCode}-${stateName}`;
                             stateInput.classList.add('bg-emerald-50', 'transition-colors');
@@ -3484,7 +3496,7 @@ function editProduct(id) {
                 gstinInputEl.dataset.listenerBound = 'true';
             }
         }
-        
+
         if (panInput) panInput.value = safeVal(source.dealerPan || p.dealerPan || (cachedDealer ? cachedDealer.pan : ''));
         if (stateInput) stateInput.value = safeVal(source.dealerState || p.dealerState || (cachedDealer ? cachedDealer.state : ''));
         setEl('prod-invoice', safeVal(source.supplierInvoice || p.supplierInvoice));
@@ -3495,10 +3507,10 @@ function editProduct(id) {
     [dealerInput, dealerIdInput, dealerGstInput, phoneInput, panInput, stateInput].forEach(f => {
         if (f) {
             if (p.dealerId && f.value.trim() !== '') {
-                f.disabled = true; 
+                f.disabled = true;
                 f.classList.add('bg-gray-100', 'cursor-not-allowed', 'text-gray-500');
             } else {
-                f.disabled = false; 
+                f.disabled = false;
                 f.classList.remove('bg-gray-100', 'cursor-not-allowed', 'text-gray-500');
             }
         }
@@ -3508,15 +3520,15 @@ function editProduct(id) {
     if (locDropdown) locDropdown.value = p.locationId || 'main';
 
     if (i.unit) i.unit.value = p.unit || 'units';
-    
+
     const poCheck = document.getElementById('prod-in-po-catalog');
     if (poCheck) poCheck.checked = (p.inPoCatalog !== false);
-    
+
     const typeSelect = document.getElementById('productType');
     const builder = document.getElementById('bundle-builder');
-    
+
     let pType = p.type || 'standard';
-    if (pType === 'manufactured' || pType === 'homemade') pType = 'standard'; 
+    if (pType === 'manufactured' || pType === 'homemade') pType = 'standard';
 
     if (typeSelect) {
         typeSelect.value = pType;
@@ -3552,10 +3564,10 @@ function editProduct(id) {
     const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
 
     if (regSection && regBody) {
-        regSection.classList.remove('hidden'); 
-        
-        let batches = sortBatchesFefoFifo(workingBatches); 
-        
+        regSection.classList.remove('hidden');
+
+        let batches = sortBatchesFefoFifo(workingBatches);
+
         if (batches.length === 0 && liveStock > 0) {
             batches = [{
                 batchNo: 'LEGACY-STOCK',
@@ -3586,17 +3598,17 @@ function editProduct(id) {
             let rows = '';
             let tQty = 0, tVal = 0;
             let activeIndexToLoad = 0; // 🚀 ADDED: Tracks the active FEFO index
-            
+
             window._tempBatchList = batches;
-            
+
             batches.forEach((b, index) => {
                 const val = b.qty * b.cost;
                 tQty += b.qty;
                 tVal += val;
-                
+
                 const displayQty = Number.isInteger(b.qty) ? b.qty : parseFloat(b.qty).toFixed(2);
                 const batchRef = escapeHTML(b.batchNo || 'SYS-ADJ');
-                
+
                 let dName = b.dealerName || '';
                 if (dName.startsWith('MERCH-')) {
                     b.supplierId = dName;
@@ -3606,22 +3618,22 @@ function editProduct(id) {
                     const cD = localDealersCache.find(d => d.id === b.supplierId || d.id === b.dealerId);
                     if (cD) dName = cD.name || cD.storeName;
                 }
-                
+
                 const supplierRef = escapeHTML(b.supplierInvoice ? `Inv: ${b.supplierInvoice}` : (dName || b.supplierId || ''));
-                
+
                 // 🚀 THE FIX: Visually flag quarantined expired batches AND the active batch
-                const isExpired = b.expirationDate && new Date(b.expirationDate).getTime() < new Date().setHours(0,0,0,0);
+                const isExpired = b.expirationDate && new Date(b.expirationDate).getTime() < new Date().setHours(0, 0, 0, 0);
                 const isActiveFEFO = activeBatch && b.timestamp === activeBatch.timestamp && b.batchNo === activeBatch.batchNo;
-                
+
                 if (isActiveFEFO) activeIndexToLoad = index; // 🚀 Capture the active index
 
-                let rowClass = 'hover:bg-indigo-50/50';
+                let rowClass = 'hover:bg-SLATE-50/50';
                 if (isExpired) rowClass = 'bg-red-50/50 hover:bg-red-100/50 opacity-80';
                 else if (isActiveFEFO) rowClass = 'bg-emerald-50/70 border-l-4 border-emerald-500 hover:bg-emerald-100/70';
-                
+
                 const expTextClass = isExpired ? 'text-red-600 font-black' : (b.expirationDate ? (isActiveFEFO ? 'text-emerald-700 font-bold' : 'text-orange-600') : 'text-slate-400');
                 const expBadge = isExpired ? '<br><span class="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest mt-1 inline-block border border-red-200">Quarantined</span>' : (isActiveFEFO ? '<br><span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest mt-1 inline-block border border-emerald-300 shadow-sm">Active Batch</span>' : '');
-                
+
                 rows += `<tr class="${rowClass} transition-colors cursor-pointer group" ondblclick="window.loadBatchToForm(${index})" title="Double-click to load into form">
                     <td class="p-3">${b.date}</td>
                     <td class="p-3 font-mono text-[10px] bg-white rounded px-2 py-0.5 w-fit mt-1.5 border border-slate-200 shadow-sm transition-colors">
@@ -3629,12 +3641,12 @@ function editProduct(id) {
                         <span class="text-[9px] text-slate-400 truncate max-w-[120px] block">${supplierRef}</span>
                     </td>
                     <td class="p-3 text-center text-xs font-bold ${expTextClass}">${escapeHTML(b.expirationDate || '--')}${expBadge}</td>
-                    <td class="p-3 text-right font-black ${isExpired ? 'text-red-500' : 'text-indigo-600'}">${displayQty}</td>
+                    <td class="p-3 text-right font-black ${isExpired ? 'text-red-500' : 'text-SLATE-600'}">${displayQty}</td>
                     <td class="p-3 text-right">${currency}${parseFloat(b.cost).toFixed(2)}</td>
                     <td class="p-3 text-right font-bold text-slate-800">${currency}${val.toFixed(2)}</td>
                 </tr>`;
             });
-            
+
             regBody.innerHTML = rows;
             document.getElementById('reg-total-qty').textContent = Number.isInteger(tQty) ? tQty : tQty.toFixed(2);
             document.getElementById('reg-total-val').textContent = tVal.toFixed(2);
@@ -3649,13 +3661,13 @@ function editProduct(id) {
             document.getElementById('reg-avg-cost').textContent = currency + '0.00';
         }
     }
-    
+
     let isLatest = true;
     if (activeBatch && p.batches && p.batches.length > 0) {
         const latestTimestamp = Math.max(...p.batches.map(x => x.timestamp || 0));
         isLatest = (activeBatch.timestamp === latestTimestamp);
     }
-    
+
     if (typeof window.toggleBatchEditability === 'function') {
         window.toggleBatchEditability(isLatest);
     }
@@ -3678,7 +3690,7 @@ async function deleteProduct(id, name) {
     showModal('Confirm Delete', `Are you sure you want to delete **${escapeHTML(name)}**?`, 'confirm', async () => {
         try {
             await deleteDoc(doc(getProductsRef(), id));
-            showModal('Success', 'Item deleted.', 'success'); 
+            showModal('Success', 'Item deleted.', 'success');
             logInventoryChange('DELETE', name, 'Deleted by admin');
         } catch (e) { console.error(e); }
     });
@@ -3691,7 +3703,7 @@ async function generateNextSku() {
     try {
         // 🚀 THE FIX: Read from the local SQLite cache instead of Firebase
         let allProducts = typeof localProductsCache !== 'undefined' ? localProductsCache : [];
-        
+
         if (window.dbAPI && window.dbAPI.getProducts) {
             const dbProducts = await window.dbAPI.getProducts();
             if (dbProducts && dbProducts.length > 0) allProducts = dbProducts;
@@ -3700,7 +3712,7 @@ async function generateNextSku() {
         if (!allProducts || allProducts.length === 0) return '100001';
 
         let maxSkuNum = 100000; // Baseline
-        
+
         allProducts.forEach(p => {
             const numericPart = (p.sku || '').replace(/\D/g, '');
             if (numericPart) {
@@ -3708,11 +3720,11 @@ async function generateNextSku() {
                 if (num > maxSkuNum) maxSkuNum = num;
             }
         });
-        
+
         return String(maxSkuNum + 1);
     } catch (e) {
         console.warn("Generating offline-safe SKU fallback.");
-        return Date.now().toString().slice(-8); 
+        return Date.now().toString().slice(-8);
     }
 }
 
@@ -3726,23 +3738,23 @@ export function handleGenerateBarcode() {
 export async function printProductBarcode(productId) {
     const p = localProductsCache.find(x => x.id === productId);
     if (!p) return;
-    
+
     const code = p.barcode || p.sku || '000000';
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
     const savedPrinterPref = localStorage.getItem('mifela_barcode_printer') || 'label_50x25';
-    
+
     let storeName = 'RETAIL STORE';
     try {
         const currentStoreId = typeof getStoreId === 'function' ? getStoreId() : window.primaryStoreId;
         const currentAppId = typeof window !== 'undefined' && window.__app_id ? window.__app_id : appId;
-        
+
         if (currentStoreId) {
             const profileSnap = await getDoc(doc(db, `artifacts/${currentAppId}/stores/${currentStoreId}/settings/profile`));
             if (profileSnap.exists() && profileSnap.data().storeName) {
                 storeName = profileSnap.data().storeName;
             }
         }
-    } catch(e) {
+    } catch (e) {
         console.warn("Failed to fetch store name for barcode", e);
     }
 
@@ -3837,7 +3849,7 @@ export async function printProductBarcode(productId) {
                     </button>
                     
                     <h3 class="text-xl font-black text-slate-800 mb-4 flex items-center gap-2">
-                        <div class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg">
+                        <div class="bg-SLATE-100 text-SLATE-600 p-1.5 rounded-lg">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                         </div>
                         Print Batch Labels
@@ -3846,7 +3858,7 @@ export async function printProductBarcode(productId) {
                     ${activeBatches.length > 0 ? `
                     <div class="w-full bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-inner mb-3 text-left">
                         <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Select Source Batch</label>
-                        <select id="barcode-batch-selector" class="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all">
+                        <select id="barcode-batch-selector" class="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-SLATE-500 shadow-sm transition-all">
                             ${activeBatches.map((b, i) => `
                                 <option value="${i}">${escapeHTML(b.batchNo || 'LEGACY')} | Qty: ${b.qty} | Exp: ${b.expirationDate ? formatCompactDate(b.expirationDate) : 'N/A'}</option>
                             `).join('')}
@@ -3857,17 +3869,17 @@ export async function printProductBarcode(productId) {
                     <div class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner mb-4 flex gap-3 text-left">
                         <div class="flex-1">
                             <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Override MFG Date</label>
-                            <input type="text" id="barcode-edit-mfg" class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors shadow-sm" placeholder="DD/MM/YY">
+                            <input type="text" id="barcode-edit-mfg" class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-SLATE-500 transition-colors shadow-sm" placeholder="DD/MM/YY">
                         </div>
                         <div class="flex-1">
                             <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Override EXP Date</label>
-                            <input type="text" id="barcode-edit-exp" class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors shadow-sm" placeholder="DD/MM/YY">
+                            <input type="text" id="barcode-edit-exp" class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-SLATE-500 transition-colors shadow-sm" placeholder="DD/MM/YY">
                         </div>
                     </div>
 
                     <div class="flex items-center justify-between w-full mb-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-inner">
                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Printer Profile</span>
-                        <select id="barcode-printer-type" class="text-xs font-bold text-indigo-700 bg-white border border-indigo-100 rounded-lg px-3 py-1.5 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all">
+                        <select id="barcode-printer-type" class="text-xs font-bold text-SLATE-700 bg-white border border-SLATE-100 rounded-lg px-3 py-1.5 outline-none cursor-pointer focus:ring-2 focus:ring-SLATE-500 shadow-sm transition-all">
                             <option value="label_34x22_3up">3-Across Thermal (34x22mm)</option>
                             <option value="label_50x25">Thermal Label (50x25mm)</option>
                             <option value="label_38x25">Small Label (38x25mm)</option>
@@ -3877,7 +3889,7 @@ export async function printProductBarcode(productId) {
 
                     <div class="flex items-center justify-between w-full mb-4 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-inner">
                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Print Quantity</span>
-                        <input type="number" id="barcode-print-qty" min="1" class="text-xs font-bold text-indigo-700 bg-white border border-indigo-100 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm w-20 text-center">
+                        <input type="number" id="barcode-print-qty" min="1" class="text-xs font-bold text-SLATE-700 bg-white border border-SLATE-100 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-SLATE-500 shadow-sm w-20 text-center">
                     </div>
                     
                     <div class="bg-slate-100 p-6 rounded-2xl mb-6 w-full flex justify-center shadow-inner border border-slate-200">
@@ -3889,7 +3901,7 @@ export async function printProductBarcode(productId) {
                         <button id="download-barcode-btn" class="flex-1 py-3.5 bg-slate-800 text-white text-sm font-bold rounded-xl hover:bg-slate-900 transition-colors flex justify-center items-center gap-2 shadow-md">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> PNG
                         </button>
-                        <button id="confirm-print-barcode-btn" class="flex-[1.5] py-3.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex justify-center items-center gap-2 transition-all active:scale-95">
+                        <button id="confirm-print-barcode-btn" class="flex-[1.5] py-3.5 bg-SLATE-600 text-white text-sm font-bold rounded-xl hover:bg-SLATE-700 shadow-lg shadow-SLATE-200 flex justify-center items-center gap-2 transition-all active:scale-95">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> Print
                         </button>
                     </div>
@@ -3902,29 +3914,29 @@ export async function printProductBarcode(productId) {
     const closeModal = () => {
         if (!modal) return;
         modal.classList.add('hidden');
-        modal.classList.remove('flex', 'fixed', 'inset-0'); 
+        modal.classList.remove('flex', 'fixed', 'inset-0');
         modal.style.display = 'none'; // Hard CSS override
-        
+
         document.body.classList.remove('overflow-hidden');
         document.documentElement.classList.remove('overflow-hidden');
-        
+
         setTimeout(() => {
             if (modal && modal.parentNode) {
                 modal.parentNode.removeChild(modal);
             }
         }, 300);
     };
-    
+
     const closeTopBtn = document.getElementById('close-barcode-modal');
     if (closeTopBtn) closeTopBtn.onclick = closeModal;
-    
+
     const cancelBottomBtn = document.getElementById('cancel-barcode-btn');
     if (cancelBottomBtn) cancelBottomBtn.onclick = closeModal;
 
     const mfgInput = document.getElementById('barcode-edit-mfg');
     const expInput = document.getElementById('barcode-edit-exp');
     const qtyInput = document.getElementById('barcode-print-qty');
-    
+
     if (mfgInput) mfgInput.value = mfgDate;
     if (expInput) expInput.value = expDate;
     if (qtyInput) qtyInput.value = defaultQty;
@@ -3956,21 +3968,21 @@ export async function printProductBarcode(productId) {
         const liveMfg = mfgInput ? mfgInput.value.trim() : mfgDate;
         const liveExp = expInput ? expInput.value.trim() : expDate;
 
-        let w = 406, h = 203; 
+        let w = 406, h = 203;
         let labelWidth = '2in';
         let labelHeight = '1in';
 
-        if (type === 'label_50x25') { 
-            w = 406; h = 203; 
+        if (type === 'label_50x25') {
+            w = 406; h = 203;
             labelWidth = '2in'; labelHeight = '1in';
-        } else if (type === 'label_38x25') { 
-            w = 304; h = 203; 
+        } else if (type === 'label_38x25') {
+            w = 304; h = 203;
             labelWidth = '1.5in'; labelHeight = '1in';
-        } else if (type === 'label_34x22_3up') { 
-            w = 272; h = 176; 
+        } else if (type === 'label_34x22_3up') {
+            w = 272; h = 176;
             labelWidth = '34mm'; labelHeight = '22mm';
-        } else if (type === 'receipt_80') { 
-            w = 576; h = 400;  
+        } else if (type === 'receipt_80') {
+            w = 576; h = 400;
             labelWidth = '80mm'; labelHeight = 'auto';
         }
 
@@ -3983,7 +3995,7 @@ export async function printProductBarcode(productId) {
         ctx.fillRect(0, 0, w, h);
         ctx.fillStyle = "#000000";
 
-        const drawText = (txt, x, y, font, align="center") => {
+        const drawText = (txt, x, y, font, align = "center") => {
             ctx.font = font; ctx.textAlign = align; ctx.fillText(txt, x, y);
         };
 
@@ -3997,30 +4009,30 @@ export async function printProductBarcode(productId) {
 
         const tempCanvas = document.createElement('canvas');
         let bcHeightSetting = 50;
-        if (type === 'label_34x22_3up') bcHeightSetting = 40; 
+        if (type === 'label_34x22_3up') bcHeightSetting = 40;
 
         try {
             if (window.JsBarcode) {
                 JsBarcode(tempCanvas, code, {
                     format: "CODE128",
-                    displayValue: false, 
+                    displayValue: false,
                     margin: 0,
                     height: bcHeightSetting,
                     width: 2
                 });
             }
-        } catch(e) { console.error("Barcode generation failed", e); }
+        } catch (e) { console.error("Barcode generation failed", e); }
 
         if (type === 'label_34x22_3up') {
             const cx = w / 2;
             drawText(storeName.toUpperCase(), cx, 18, tinyFont);
-            ctx.beginPath(); ctx.moveTo(5, 24); ctx.lineTo(w-5, 24); ctx.stroke();
-            
+            ctx.beginPath(); ctx.moveTo(5, 24); ctx.lineTo(w - 5, 24); ctx.stroke();
+
             if (pName.length > 18) pName = pName.substring(0, 16) + '..';
             drawText(pName, cx, 42, smallFont);
 
             const bcWidth = Math.min(tempCanvas.width, w - 10);
-            const bcHeight = 40; 
+            const bcHeight = 40;
             const bcX = (w - bcWidth) / 2;
             ctx.drawImage(tempCanvas, bcX, 52, bcWidth, bcHeight);
 
@@ -4032,8 +4044,8 @@ export async function printProductBarcode(productId) {
         } else if (type === 'label_50x25' || type === 'label_38x25') {
             const cx = w / 2;
             drawText(storeName.toUpperCase(), cx, 24, baseFont);
-            ctx.beginPath(); ctx.moveTo(10, 32); ctx.lineTo(w-10, 32); ctx.stroke();
-            
+            ctx.beginPath(); ctx.moveTo(10, 32); ctx.lineTo(w - 10, 32); ctx.stroke();
+
             const maxLen = type === 'label_38x25' ? 16 : 22;
             if (pName.length > maxLen) pName = pName.substring(0, maxLen - 2) + '..';
             drawText(pName, cx, 56, baseFont);
@@ -4049,13 +4061,13 @@ export async function printProductBarcode(productId) {
             drawText(priceStr, w - 10, 190, priceFont, "right");
 
         } else {
-            const cx = w/2;
+            const cx = w / 2;
             if (pName.length > 35) pName = pName.substring(0, 32) + '...';
 
             drawText(storeName.toUpperCase(), cx, 40, "900 28px monospace");
-            ctx.beginPath(); ctx.moveTo(20, 55); ctx.lineTo(w-20, 55); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(20, 55); ctx.lineTo(w - 20, 55); ctx.stroke();
             drawText(pName, cx, 95, "bold 32px monospace");
-            
+
             const bcWidth = Math.min(tempCanvas.width, w - 60);
             const bcHeight = 120;
             const bcX = (w - bcWidth) / 2;
@@ -4116,15 +4128,15 @@ export async function printProductBarcode(productId) {
 
         // 1. Fetch from the correct localStorage keys
         let targetPrinter = '';
-        let isSilent = true; 
+        let isSilent = true;
         try {
             const config = JSON.parse(localStorage.getItem('mifela_printer_config') || '{}');
             if (config.printerName) targetPrinter = config.printerName;
             if (config.silent !== undefined) isSilent = config.silent;
-            
+
             const smartConfig = JSON.parse(localStorage.getItem('mifela_smart_printers') || '{}');
             if (!targetPrinter && smartConfig.barcode) targetPrinter = smartConfig.barcode;
-        } catch(e) {}
+        } catch (e) { }
 
         // 🚀 SAFEGUARD: Fallback to the OS default printer if local storage is completely empty
         if (!targetPrinter && isDesktop && window.electronAPI.getPrinters) {
@@ -4132,7 +4144,7 @@ export async function printProductBarcode(productId) {
                 const printers = await window.electronAPI.getPrinters();
                 const defaultP = printers.find(pr => pr.isDefault) || printers[0];
                 if (defaultP) targetPrinter = defaultP.name;
-            } catch(e) {}
+            } catch (e) { }
         }
 
         if (!targetPrinter) {
@@ -4140,10 +4152,10 @@ export async function printProductBarcode(productId) {
             return;
         }
 
-        const isRawLabelPrinter = mediaId === 'label_34x22_3up' || 
-                                  targetPrinter.toLowerCase().includes('tsc') || 
-                                  targetPrinter.toLowerCase().includes('zebra') || 
-                                  targetPrinter.toLowerCase().includes('zdesigner');
+        const isRawLabelPrinter = mediaId === 'label_34x22_3up' ||
+            targetPrinter.toLowerCase().includes('tsc') ||
+            targetPrinter.toLowerCase().includes('zebra') ||
+            targetPrinter.toLowerCase().includes('zdesigner');
 
         const liveMfg = mfgInput ? mfgInput.value.trim() : mfgDate;
         const liveExp = expInput ? expInput.value.trim() : expDate;
@@ -4154,14 +4166,31 @@ export async function printProductBarcode(productId) {
         btn.innerHTML = `<svg class="animate-spin w-4 h-4 mr-2" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...`;
 
         try {
-            if (isDesktop && isRawLabelPrinter) {
+            if (isDesktop) {
+                // Determine manufacturer from printer name for ProtocolRegistry lookup
+                const printerName = targetPrinter.toLowerCase();
+                let manufacturer;
+                if (printerName.includes('tsc') || printerName.includes('tspl')) {
+                    manufacturer = 'tsc';
+                } else if (printerName.includes('zebra') || printerName.includes('zpl')) {
+                    manufacturer = 'zebra';
+                } else if (printerName.includes('tvs')) {
+                    manufacturer = 'tvs';
+                } else if (printerName.includes('honeywell')) {
+                    manufacturer = 'honeywell';
+                } else if (printerName.includes('godex')) {
+                    manufacturer = 'godex';
+                } else {
+                    manufacturer = 'tsc'; // fallback
+                }
+
                 const connectionConfig = { type: 'os', address: targetPrinter };
 
                 const printerProfile = {
                     name: targetPrinter,
-                    manufacturer: 'tsc',
+                    manufacturer: manufacturer,
                     dpi: 203,
-                    connection: connectionConfig 
+                    connection: connectionConfig
                 };
 
                 const labelData = {
@@ -4173,49 +4202,60 @@ export async function printProductBarcode(productId) {
                     price: parseFloat(p.price).toFixed(2)
                 };
 
-                if (typeof PrinterManager === 'undefined') {
-                    throw new Error("PrinterManager module is missing. Check your import paths.");
-                }
+                const rawJob = PrinterManager.generateRawPayload(printerProfile, mediaId, labelData, printQuantity);
 
-                await PrinterManager.printLabel(printerProfile, mediaId, labelData, printQuantity);
-                if (typeof showToast === 'function') showToast("Success", `Sent ${printQuantity} labels to printer buffer.`, "success");
-                closeModal(); 
+                const jobData = {
+                    jobId: `barcode-${Date.now()}`,
+                    printerId: targetPrinter,
+                    printerName: targetPrinter,
+                    manufacturer: printerProfile.manufacturer,
+                    protocol: printerProfile.manufacturer === 'tsc' ? 'tspl' : (printerProfile.manufacturer === 'zebra' ? 'zpl' : 'tspl'),
+                    payload: rawJob.payload,
+                    quantity: printQuantity,
+                    idempotencyKey: `barcode-${code}-${Math.floor(Date.now() / 2000)}` // 2s window
+                };
+
+                const { PrintDispatcher } = await import('../printing/PrintDispatcher.js');
+                await PrintDispatcher.enqueueJob(jobData);
+
+                if (typeof showToast === 'function') showToast("Queued", `Sent ${printQuantity} labels to print queue.`, "success");
+                closeModal();
                 return;
             }
 
             const canvas = document.getElementById('barcode-canvas-element');
             const dataUrl = canvas.toDataURL("image/png");
-            
-            let printW = canvas.dataset.printWidth || '104mm'; 
-            let printH = canvas.dataset.printHeight || '22mm'; 
+
+            let printW = canvas.dataset.printWidth || '104mm';
+            let printH = canvas.dataset.printHeight || '22mm';
             let pdfWidthMicrons = 104000;
             let pdfHeightMicrons = 22000;
 
             let copiesHtml = '';
-            
+
             if (mediaId === 'label_34x22_3up') {
                 const numRows = Math.ceil(printQuantity / 3);
-                
-                printW = '104mm'; 
-                printH = `${numRows * 22}mm`; 
+
+                printW = '104mm';
+                printH = `${numRows * 22}mm`;
                 pdfWidthMicrons = 104000;
-                pdfHeightMicrons = numRows * 22000; 
+                pdfHeightMicrons = numRows * 22000;
 
                 copiesHtml += `<div class="page" style="display: flex; flex-direction: column; justify-content: flex-start; align-items: center; width: ${printW}; height: ${printH}; margin: 0 auto; padding: 0; box-sizing: border-box; overflow: hidden; background: white;">`;
-                
+
                 let printedCount = 0;
-                
+
                 for (let r = 0; r < numRows; r++) {
                     copiesHtml += `<div class="row" style="display: flex; flex-direction: row; justify-content: center; align-items: flex-start; gap: 1mm; width: 104mm; height: 22mm; margin: 0 auto; padding: 0; box-sizing: border-box; overflow: hidden; flex-shrink: 0;">`;
-                    
+
                     for (let c = 0; c < 3; c++) {
                         copiesHtml += `<div style="width: 34mm; height: 22mm; display: flex; justify-content: center; align-items: flex-start; flex-shrink: 0; box-sizing: border-box; overflow: hidden;">`;
-                        
+
                         if (printedCount < printQuantity) {
                             copiesHtml += `<img src="${dataUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; object-position: top center; display: block;" />`;
                             printedCount++;
                         }
-                        
+
                         copiesHtml += `</div>`;
                     }
                     copiesHtml += `</div>`;
@@ -4279,33 +4319,33 @@ export async function printProductBarcode(productId) {
                     content: printHtml,
                     silent: true,
                     printerName: targetPrinter,
-                    copies: mediaId === 'label_34x22_3up' ? 1 : printQuantity, 
-                    pageSize: { width: pdfWidthMicrons, height: pdfHeightMicrons }, 
-                    landscape: false 
+                    copies: mediaId === 'label_34x22_3up' ? 1 : printQuantity,
+                    pageSize: { width: pdfWidthMicrons, height: pdfHeightMicrons },
+                    landscape: false
                 });
-                
+
                 if (typeof showToast === 'function') showToast("Printing", `Sending ${printQuantity} generic labels to spooler...`, "info");
-                closeModal(); 
+                closeModal();
             } else {
                 const printFrame = document.createElement('iframe');
                 printFrame.style.position = 'fixed';
                 printFrame.style.right = '-9999px';
                 printFrame.style.bottom = '-9999px';
                 document.body.appendChild(printFrame);
-                
+
                 const frameDoc = printFrame.contentWindow.document;
                 frameDoc.open();
                 frameDoc.write(printHtml);
                 frameDoc.close();
-                
-                printFrame.onload = function() {
+
+                printFrame.onload = function () {
                     setTimeout(() => {
                         printFrame.contentWindow.focus();
                         printFrame.contentWindow.print();
                         setTimeout(() => document.body.removeChild(printFrame), 500);
                     }, 200);
                 };
-                closeModal(); 
+                closeModal();
             }
 
         } catch (error) {
@@ -4318,7 +4358,7 @@ export async function printProductBarcode(productId) {
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    modal.style.pointerEvents = 'auto'; 
+    modal.style.pointerEvents = 'auto';
     document.body.classList.add('overflow-hidden');
 }
 
@@ -4330,15 +4370,15 @@ export function handleBestBefore() {
 
     const baseDateStr = (i.packaged && i.packaged.value) ? i.packaged.value : new Date().toISOString().split('T')[0];
     const d = new Date(baseDateStr);
-    
+
     // 🚀 THE FIX: Store original day and clamp to prevent month-rollover anomalies
     const originalDay = d.getDate();
     d.setMonth(d.getMonth() + months);
-    
+
     if (d.getDate() !== originalDay) {
         d.setDate(0); // Pushes it back to the last valid day of the target month
     }
-    
+
     i.expiry.value = d.toISOString().split('T')[0];
 }
 
@@ -4347,22 +4387,22 @@ export function handleBestBefore() {
 export function openStockAdjustmentModal(id) {
     productToAdjust = localProductsCache.find(p => p.id === id);
     if (!productToAdjust) return;
-    
+
     const m = DOM.modals.stock;
-    if(m.self) {
+    if (m.self) {
         m.title.textContent = `Adjust: ${productToAdjust.name}`;
         m.current.textContent = productToAdjust.stockLevel;
         m.form.reset();
         m.self.classList.remove('hidden');
         m.self.classList.add('flex');
-    m.self.style.pointerEvents = 'auto';
+        m.self.style.pointerEvents = 'auto';
         document.body.classList.add('overflow-hidden');
     }
 }
 
 export function closeStockAdjustmentModal() {
     const m = DOM.modals.stock;
-    if(m && m.self) {
+    if (m && m.self) {
         m.self.classList.add('hidden');
         m.self.classList.remove('flex');
     }
@@ -4390,35 +4430,35 @@ export async function handleStockAdjustmentSubmit(e) {
     try {
         const productsRef = getProductsRef();
         const productRef = doc(productsRef, targetProductId);
-        
+
         let inventoryChange = rawQty;
         let financialTotal = 0;
         let transactionType = 'ADJUSTMENT';
-        
+
         const price = secureFloat(productToAdjust.price);
         const cost = secureFloat(productToAdjust.cost);
 
         switch (reason) {
             case 'Correction': inventoryChange = rawQty; break;
-            case 'Damage': 
-                inventoryChange = -qtyAbs; 
+            case 'Damage':
+                inventoryChange = -qtyAbs;
                 financialTotal = -safeMath.multiply(cost, qtyAbs); // ENFORCED safeMath
-                transactionType = 'LOSS'; 
+                transactionType = 'LOSS';
                 break;
-            case 'Return': 
-                inventoryChange = qtyAbs; 
-                financialTotal = -safeMath.multiply(price, qtyAbs); 
-                transactionType = 'REFUND'; 
+            case 'Return':
+                inventoryChange = qtyAbs;
+                financialTotal = -safeMath.multiply(price, qtyAbs);
+                transactionType = 'REFUND';
                 break;
-            case 'Shipment': 
-                inventoryChange = qtyAbs; 
-                financialTotal = -safeMath.multiply(cost, qtyAbs); 
-                transactionType = 'PURCHASE'; 
+            case 'Shipment':
+                inventoryChange = qtyAbs;
+                financialTotal = -safeMath.multiply(cost, qtyAbs);
+                transactionType = 'PURCHASE';
                 break;
-            case 'Theft': 
-                inventoryChange = -qtyAbs; 
-                financialTotal = -safeMath.multiply(cost, qtyAbs); 
-                transactionType = 'LOSS'; 
+            case 'Theft':
+                inventoryChange = -qtyAbs;
+                financialTotal = -safeMath.multiply(cost, qtyAbs);
+                transactionType = 'LOSS';
                 break;
         }
 
@@ -4430,8 +4470,8 @@ export async function handleStockAdjustmentSubmit(e) {
         }
 
         const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
-        const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
-        
+        const canAccessAllLocations = (role === 'admin' || role === 'accountant');
+
         const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
         let adjustmentLocation = getNormalizedLoc(canAccessAllLocations ? (productToAdjust.locationId || 'main') : assignedLoc);
 
@@ -4439,7 +4479,7 @@ export async function handleStockAdjustmentSubmit(e) {
         await runTransaction(db, async (transaction) => {
             const prodDoc = await transaction.get(productRef);
             if (!prodDoc.exists()) throw new Error("Product does not exist!");
-            
+
             const prodData = prodDoc.data();
             let currentBatches = prodData.batches ? [...prodData.batches] : [];
             const oldStock = secureFloat(prodData.stockLevel);
@@ -4506,19 +4546,19 @@ export async function handleStockAdjustmentSubmit(e) {
 
             const transactionsRef = getTransactionsRef();
             const newTxRef = doc(transactionsRef);
-            
+
             transaction.set(newTxRef, {
                 invoiceId: `ADJ-${Date.now()}`,
                 storeId: getStoreId(),
                 locationId: adjustmentLocation,
                 timestamp: new Date(),
                 type: transactionType,
-                customer: prodData.dealerId ? { 
-                    id: prodData.dealerId, 
+                customer: prodData.dealerId ? {
+                    id: prodData.dealerId,
                     name: prodData.dealerName,
                     gstin: prodData.gstin || '',
                     state: prodData.gstin ? String(prodData.gstin).substring(0, 2) : ''
-                } : null, 
+                } : null,
                 summary: {
                     total: financialTotal,
                     profit: financialTotal,
@@ -4542,8 +4582,8 @@ export async function handleStockAdjustmentSubmit(e) {
 
         showModal('Success', 'Stock adjusted successfully.', 'success');
         logInventoryChange('ADJUST', productToAdjust.name, `Change: ${rawQty} (${reason})`);
-        closeStockAdjustmentModal(); 
-        
+        closeStockAdjustmentModal();
+
     } catch (error) {
         console.error("Adjustment error:", error);
         showModal('Error', error.message, 'error');
@@ -4600,36 +4640,36 @@ async function loadDealerDropdowns() {
         if (window.dbAPI && window.dbAPI.getCustomers) {
             let docs = await window.dbAPI.getCustomers();
             docs = docs.filter(d => d.type === 'dealer' || d.type === 'supplier');
-            
+
             const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
             const canAccessAllLocations = (role === 'admin' || role === 'accountant');
             const normAssignedLoc = getNormalizedLoc(typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main');
 
             if (!canAccessAllLocations) docs = docs.filter(d => getNormalizedLoc(d.locationId) === normAssignedLoc);
             localDealersCache = docs;
-            
+
             let dealerSearchList = document.getElementById('dealer-search-list');
             if (!dealerSearchList) {
                 dealerSearchList = document.createElement('datalist');
                 dealerSearchList.id = 'dealer-search-list';
                 document.body.appendChild(dealerSearchList);
             }
-            
-            const nameInput = document.getElementById('prod-dealer') || document.querySelector('input[name="dealer"]');
-                if (nameInput) {
-                    nameInput.setAttribute('list', 'dealer-search-list');
-                    
-                    // 🚀 THE FIX: Attach a listener to fetch full details when a name is picked from the dropdown
-                    if (!nameInput.dataset.listenerBound) {
-                        nameInput.addEventListener('input', (e) => {
-                            clearTimeout(dealerLookupDebounce);
-                            dealerLookupDebounce = setTimeout(() => handleDealerInfoChange('name', e.target.value), 300);
-                        });
-                        nameInput.dataset.listenerBound = 'true';
-                    }
-                }
 
-                dealerSearchList.innerHTML = '';
+            const nameInput = document.getElementById('prod-dealer') || document.querySelector('input[name="dealer"]');
+            if (nameInput) {
+                nameInput.setAttribute('list', 'dealer-search-list');
+
+                // 🚀 THE FIX: Attach a listener to fetch full details when a name is picked from the dropdown
+                if (!nameInput.dataset.listenerBound) {
+                    nameInput.addEventListener('input', (e) => {
+                        clearTimeout(dealerLookupDebounce);
+                        dealerLookupDebounce = setTimeout(() => handleDealerInfoChange('name', e.target.value), 300);
+                    });
+                    nameInput.dataset.listenerBound = 'true';
+                }
+            }
+
+            dealerSearchList.innerHTML = '';
             localDealersCache.forEach(d => { if (d.name) dealerSearchList.appendChild(new Option(d.name)); });
         }
     } catch (e) { console.error("Error loading dealers:", e); }
@@ -4648,21 +4688,21 @@ export function setupActivityListener() {
         // If the inline dashboard container exists, refresh it
         const inlineContainer = document.getElementById('activity-log-container');
         if (inlineContainer) loadRecentActivity('activity-log-container');
-        
+
         // If the popup modal is currently open on screen, refresh it live
         const modalContainer = document.getElementById('activity-log-container-modal');
         if (modalContainer && document.getElementById('activity-log-modal')) {
             loadRecentActivity('activity-log-container-modal');
         }
     });
-    
+
     loadRecentActivity('activity-log-container');
 }
 
-window.openActivityModal = async function() {
+window.openActivityModal = async function () {
     const modalId = 'activity-log-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
-    
+
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[400] bg-slate-900/60 flex items-center justify-center p-4">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col h-[80vh] overflow-hidden border border-slate-100">
@@ -4684,20 +4724,20 @@ window.openActivityModal = async function() {
             </div>
         </div>
     `;
-    
+
     document.body.classList.add('overflow-hidden');
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     await loadRecentActivity('activity-log-container-modal');
 };
 
 async function loadRecentActivity(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     try {
         let logs = [];
-        
+
         if (window.dbAPI && window.dbAPI.getTransactions) {
             const txs = await window.dbAPI.getTransactions();
             logs = txs.map(tx => ({
@@ -4707,31 +4747,31 @@ async function loadRecentActivity(containerId) {
                 timestamp: tx.timestamp || tx.localTimestamp || new Date().toISOString()
             }));
         }
-        
+
         if (window.dbAPI && window.dbAPI.getTelemetry) {
             const tele = await window.dbAPI.getTelemetry(50) || [];
             logs = [...logs, ...tele];
         }
-        
-        logs.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        logs = logs.slice(0, 50); 
-        
+
+        logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        logs = logs.slice(0, 50);
+
         if (logs.length === 0) {
             container.innerHTML = '<div class="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-300"><span class="text-5xl mb-4 opacity-50">📭</span><p class="text-slate-600 font-bold text-lg">No recent activity.</p><p class="text-xs text-slate-400 mt-1 uppercase tracking-widest">Adjust stock to see logs here.</p></div>';
             return;
         }
-        
+
         let html = '<div class="space-y-4">';
         logs.forEach(log => {
             const d = new Date(log.timestamp);
-            const timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
-            let color = 'indigo';
+            const timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            let color = 'SLATE';
             if (log.action === 'LOSS' || log.action === 'DELETE') color = 'red';
             if (log.action === 'PURCHASE' || log.action === 'CREATE') color = 'emerald';
             if (log.action === 'SALE') color = 'blue';
             if (log.action === 'ADJUSTMENT' || log.action === 'UPDATE') color = 'amber';
-            
+
             html += `
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-start mb-2.5">
@@ -4744,7 +4784,7 @@ async function loadRecentActivity(containerId) {
             `;
         });
         html += '</div>';
-        
+
         container.innerHTML = html;
     } catch (e) {
         console.error("Activity load error", e);
@@ -4770,18 +4810,18 @@ function handleAddToBundle() {
 
     const locDropdown = document.getElementById('inv-form-location');
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
-    
-    const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
+
+    const canAccessAllLocations = (role === 'admin' || role === 'accountant');
 
     let targetLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
     if (canAccessAllLocations && locDropdown) targetLoc = locDropdown.value || 'main';
     targetLoc = getNormalizedLoc(targetLoc);
 
-    const product = localProductsCache.find(p => 
-        getNormalizedLoc(p.locationId) === targetLoc && 
+    const product = localProductsCache.find(p =>
+        getNormalizedLoc(p.locationId) === targetLoc &&
         (p.name === term || p.sku === term || p.barcode === term)
     );
-    
+
     if (product) {
         if (product.type === 'bundle') {
             showToast("Invalid", "Cannot add a bundle inside another bundle.", "error");
@@ -4803,7 +4843,7 @@ function handleAddToBundle() {
                 expirationDate: product.expirationDate || null
             });
         }
-        
+
         searchInput.value = '';
         renderBundleTable();
         // 🚀 Trigger the auto-math engine!
@@ -4816,9 +4856,9 @@ function handleAddToBundle() {
 function renderBundleTable() {
     const tbody = document.getElementById('bundle-components-list');
     const totalEl = document.getElementById('bundle-total-cost');
-    
+
     if (!tbody) return;
-    
+
     if (bundleComponents.length === 0) {
         tbody.innerHTML = `<tr id="bundle-empty-row"><td colspan="4" class="text-center py-4 text-gray-400 italic">No components added.</td></tr>`;
         if (totalEl) totalEl.textContent = '0.00';
@@ -4832,11 +4872,11 @@ function renderBundleTable() {
     bundleComponents.forEach((comp, index) => {
         const lineCost = isMathReady ? safeMath.multiply(comp.qty, comp.cost) : (comp.qty * comp.cost);
         totalCost = isMathReady ? safeMath.add(totalCost, lineCost) : (totalCost + lineCost);
-        
+
         html += `
             <tr class="border-b border-gray-50">
                 <td class="px-3 py-2 text-gray-700">${escapeHTML(comp.name)}</td>
-                <td class="px-3 py-2 text-center font-bold text-indigo-600">${comp.qty}</td>
+                <td class="px-3 py-2 text-center font-bold text-SLATE-600">${comp.qty}</td>
                 <td class="px-3 py-2 text-right text-gray-600">${lineCost.toFixed(2)}</td>
                 <td class="px-3 py-2 text-center">
                     <button type="button" class="text-red-400 hover:text-red-600 remove-bundle-btn" data-index="${index}">&times;</button>
@@ -4855,7 +4895,7 @@ function updateBundleCalculations() {
     const priceInput = document.getElementById('price');
     const mrpInput = document.getElementById('prod-mrp');
     const expInput = document.getElementById('expirationDate');
-    
+
     let stockInput = null;
     if (DOM.inventory && DOM.inventory.inputs && DOM.inventory.inputs.stock) {
         stockInput = DOM.inventory.inputs.stock;
@@ -4869,12 +4909,12 @@ function updateBundleCalculations() {
     let totalPrice = 0;
     let totalMrp = 0;
     let earliestExp = null;
-    let maxBundlesPossible = Infinity; 
+    let maxBundlesPossible = Infinity;
 
     bundleComponents.forEach(comp => {
         const realProduct = localProductsCache.find(p => p.id === comp.id);
         const realStockAvailable = realProduct ? parseFloat(realProduct.stockLevel || 0) : 0;
-        
+
         const possibleWithThisItem = Math.floor(realStockAvailable / comp.qty);
         if (possibleWithThisItem < maxBundlesPossible) {
             maxBundlesPossible = possibleWithThisItem;
@@ -4882,7 +4922,7 @@ function updateBundleCalculations() {
 
         totalCost += (parseFloat(comp.cost) || 0) * comp.qty;
         totalPrice += (parseFloat(comp.price) || 0) * comp.qty;
-        
+
         // Failsafe: If component doesn't have MRP, use its Selling Price for the total MRP math
         const compMrp = parseFloat(comp.mrp) > 0 ? parseFloat(comp.mrp) : parseFloat(comp.price);
         totalMrp += (compMrp || 0) * comp.qty;
@@ -4900,48 +4940,48 @@ function updateBundleCalculations() {
     if (costInput) costInput.value = totalCost.toFixed(2);
     if (priceInput) priceInput.value = totalPrice.toFixed(2);
     if (mrpInput) mrpInput.value = totalMrp.toFixed(2);
-    
+
     if (stockInput) {
         stockInput.value = maxBundlesPossible;
-        stockInput.readOnly = true; 
-        stockInput.classList.add('bg-indigo-50', 'text-indigo-700', 'font-bold', 'cursor-not-allowed');
+        stockInput.readOnly = true;
+        stockInput.classList.add('bg-SLATE-50', 'text-SLATE-700', 'font-bold', 'cursor-not-allowed');
     }
 
     if (expInput && earliestExp) {
         expInput.value = earliestExp.toISOString().split('T')[0];
     }
 
-    // Flash indigo to show the user it was auto-calculated
+    // Flash SLATE to show the user it was auto-calculated
     [costInput, priceInput, mrpInput, stockInput, expInput].forEach(el => {
         if (el) {
-            el.classList.add('bg-indigo-50', 'border-indigo-400', 'transition-colors', 'duration-300');
-            setTimeout(() => el.classList.remove('bg-indigo-50', 'border-indigo-400'), 800);
+            el.classList.add('bg-SLATE-50', 'border-SLATE-400', 'transition-colors', 'duration-300');
+            setTimeout(() => el.classList.remove('bg-SLATE-50', 'border-SLATE-400'), 800);
         }
     });
 }
 // 🚀 SURGICAL UI TOGGLER: Safely hides individual elements without breaking the layout or math
 export function toggleProductTypeUI(type) {
     const isBundle = type === 'bundle';
-    const isHomemade = type === 'homemade' || type === 'manufactured' || type === 'non_gst';    
-    
+    const isHomemade = type === 'homemade' || type === 'manufactured' || type === 'non_gst';
+
     // 1. SAFELY HIDE DEALER INPUT FIELDS (Preserves Barcode)
     const hideForHomemade = ['prod-gstin', 'prod-dealer-pan', 'prod-invoice', 'prod-dealer-id', 'gstin'];
-    const hideForBundle = ['prod-dealer', 'prod-dealer-phone', 'prod-dealer-id', 'prod-gstin', 'prod-dealer-pan',  'prod-invoice', 'gstin'];
-    const allDealerFields = ['prod-dealer', 'prod-dealer-phone', 'prod-dealer-id', 'prod-gstin', 'prod-dealer-pan',  'prod-invoice', 'gstin'];
+    const hideForBundle = ['prod-dealer', 'prod-dealer-phone', 'prod-dealer-id', 'prod-gstin', 'prod-dealer-pan', 'prod-invoice', 'gstin'];
+    const allDealerFields = ['prod-dealer', 'prod-dealer-phone', 'prod-dealer-id', 'prod-gstin', 'prod-dealer-pan', 'prod-invoice', 'gstin'];
 
     allDealerFields.forEach(id => {
         let el = document.getElementById(id);
         if (!el) el = document.querySelector(`input[name="${id}"]`);
 
         if (el) {
-            const wrapper = el.closest('div'); 
+            const wrapper = el.closest('div');
             if (wrapper && wrapper.tagName === 'DIV') {
                 if (isBundle && hideForBundle.includes(id)) {
                     wrapper.style.display = 'none';
                 } else if (isHomemade && hideForHomemade.includes(id)) {
                     wrapper.style.display = 'none';
                 } else {
-                    wrapper.style.display = ''; 
+                    wrapper.style.display = '';
                 }
             }
         }
@@ -4952,7 +4992,7 @@ export function toggleProductTypeUI(type) {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
         let textNode;
         let headerEl = null;
-        
+
         while (textNode = walker.nextNode()) {
             if (textNode.nodeValue.toUpperCase().includes(searchText.toUpperCase())) {
                 headerEl = textNode.parentElement;
@@ -4972,21 +5012,21 @@ export function toggleProductTypeUI(type) {
         } else {
             const inputEl = document.getElementById(inputId);
             if (inputEl) {
-                const fallbackContainer = inputEl.closest('.border, .rounded-xl, .bg-indigo-50\\/50');
+                const fallbackContainer = inputEl.closest('.border, .rounded-xl, .bg-SLATE-50\\/50');
                 if (fallbackContainer) fallbackContainer.style.display = shouldHide ? 'none' : '';
             }
         }
     }
 
     // 🚀 THE FIX: Always keep the TAX BREAKDOWN container visible!
-    hideSectionByTextAndInput('TAX BREAKDOWN', 'prod-base-rate', false); 
+    hideSectionByTextAndInput('TAX BREAKDOWN', 'prod-base-rate', false);
     hideSectionByTextAndInput('BUNDLE COMPONENTS', 'bundle-search', !isBundle);
     hideSectionByTextAndInput('PAYMENT DETAILS', 'prod-payment-method', isBundle || isHomemade);
     hideSectionByTextAndInput('SUPPLIER & SOURCING DETAILS', 'prod-dealer', isBundle || isHomemade);
 
     // 🚀 SURGICAL HIDE FIX: Target the outermost .col-span-1 wrapper to hide the input, label, AND tooltip simultaneously
     const taxFieldsToHide = ['prod-sch-disc', 'prod-rs-disc', 'prod-taxable-amt', 'gst-slab', 'prod-cess', 'prod-cgst', 'prod-sgst'];
-    
+
     taxFieldsToHide.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -5022,7 +5062,7 @@ export function toggleProductTypeUI(type) {
 
 function injectBatchRegistry() {
     const targetDiv = document.getElementById('batch-registry-injection-point');
-    
+
     if (targetDiv && !document.getElementById('batch-registry-section')) {
         targetDiv.innerHTML = `
             <div id="batch-registry-section" class="mt-4 mb-6 bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner w-full col-span-full">
@@ -5031,8 +5071,8 @@ function injectBatchRegistry() {
                          Internal Batch Registry (FIFO)
                     </h4>
                     <div class="flex items-center gap-3">
-                        <span class="text-[9px] font-black bg-indigo-100 text-indigo-700 px-2 py-1 rounded uppercase tracking-widest shadow-sm">Weighted Avg Active</span>
-                        <button type="button" onclick="window.prepareNewBatch()" class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-1 active:scale-95">
+                        <span class="text-[9px] font-black bg-SLATE-100 text-SLATE-700 px-2 py-1 rounded uppercase tracking-widest shadow-sm">Weighted Avg Active</span>
+                        <button type="button" onclick="window.prepareNewBatch()" class="bg-SLATE-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-SLATE-700 transition-all flex items-center gap-1 active:scale-95">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Add New Batch
                         </button>
                     </div>
@@ -5054,7 +5094,7 @@ function injectBatchRegistry() {
                         <tfoot class="bg-slate-50 font-black text-slate-900 border-t-2 border-slate-200">
                             <tr>
                                 <td colspan="3" class="p-3 text-right text-slate-500 uppercase tracking-widest text-[10px]">Averages & Totals:</td>
-                                <td class="p-3 text-right text-indigo-600 text-sm" id="reg-total-qty">0</td>
+                                <td class="p-3 text-right text-SLATE-600 text-sm" id="reg-total-qty">0</td>
                                 <td class="p-3 text-right text-emerald-600 text-sm" id="reg-avg-cost">₹0.00</td>
                                 <td class="p-3 text-right text-sm">₹<span id="reg-total-val">0.00</span></td>
                             </tr>
@@ -5076,10 +5116,10 @@ window.calculateInvoiceBreakdown = (triggerId) => {
 
     const cases = parseInt(document.getElementById('prod-cases')?.value) || 0;
     const pieces = parseInt(document.getElementById('prod-pieces')?.value) || 0;
-    const freeQty = parseInt(document.getElementById('prod-free-qty')?.value) || 0; 
+    const freeQty = parseInt(document.getElementById('prod-free-qty')?.value) || 0;
 
     let upc = parseInt(document.getElementById('prod-upc')?.value);
-    if (isNaN(upc) || upc <= 0) upc = 1; 
+    if (isNaN(upc) || upc <= 0) upc = 1;
 
     // 🚀 THE CRITICAL FIX: Universally target the Stock Input field regardless of HTML changes
     const stockInput = document.getElementById('stockLevel') || document.getElementById('stock') || document.querySelector('input[name="stock"]');
@@ -5088,18 +5128,18 @@ window.calculateInvoiceBreakdown = (triggerId) => {
     const paidQty = (cases * upc) + pieces;
     const currentBatchPhysicalQty = paidQty + freeQty;
     const totalPhysicalQty = currentBatchPhysicalQty + baseStock;
-    const calcQty = paidQty > 0 ? paidQty : 1; 
+    const calcQty = paidQty > 0 ? paidQty : 1;
 
     if (['prod-cases', 'prod-pieces', 'prod-upc', 'prod-free-qty'].includes(triggerId)) {
         if (stockInput) {
-            stockInput.value = totalPhysicalQty; 
+            stockInput.value = totalPhysicalQty;
             // Force a DOM event update to ensure getFormData catches it later
             stockInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
 
     const gstSlab = parseFloat(document.getElementById('gst-slab')?.value) || 0;
-    const cessRate = parseFloat(document.getElementById('prod-cess')?.value) || 0; 
+    const cessRate = parseFloat(document.getElementById('prod-cess')?.value) || 0;
     const taxMultiplier = 1 + (gstSlab / 100) + (cessRate / 100);
     const isInclusive = document.getElementById('tax-inclusive-toggle')?.checked || false;
 
@@ -5123,24 +5163,24 @@ window.calculateInvoiceBreakdown = (triggerId) => {
         }
 
         let targetLineTotal = isInclusive ? netAmt : taxableAmt;
-        
+
         let pctSum = 0;
         let absSum = 0;
         if (isSchPercent) pctSum += (schDiscVal / 100); else absSum += schDiscVal;
         if (isRsPercent) pctSum += (rsDiscVal / 100); else absSum += rsDiscVal;
-        
+
         let X = 0;
         if (1 - pctSum !== 0) {
             X = (targetLineTotal + absSum) / (1 - pctSum);
         }
         baseRate = X / calcQty;
 
-    } 
+    }
     // 🚀 FORWARD MATH ALGEBRA
     else {
         baseRate = parseFloat(document.getElementById('prod-base-rate')?.value) || 0;
         const X = baseRate * calcQty;
-        
+
         const schDiscAmt = isSchPercent ? X * (schDiscVal / 100) : schDiscVal;
         const rsDiscAmt = isRsPercent ? X * (rsDiscVal / 100) : rsDiscVal;
 
@@ -5159,11 +5199,11 @@ window.calculateInvoiceBreakdown = (triggerId) => {
     const cgst = baseTax / 2;
     const sgst = baseTax / 2;
 
-    const setVal = (id, val) => { 
-        const el = document.getElementById(id); 
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
         // Only format and push to DOM if we aren't actively typing in it
         if (el && document.activeElement !== el) {
-            el.value = val.toFixed(2); 
+            el.value = val.toFixed(2);
         }
     };
 
@@ -5174,8 +5214,8 @@ window.calculateInvoiceBreakdown = (triggerId) => {
     setVal('prod-net-amt', netAmt);
 
     const costInput = document.getElementById('cost');
-    if (costInput) { 
-        costInput.value = (netAmt / (currentBatchPhysicalQty > 0 ? currentBatchPhysicalQty : 1)).toFixed(2); 
+    if (costInput) {
+        costInput.value = (netAmt / (currentBatchPhysicalQty > 0 ? currentBatchPhysicalQty : 1)).toFixed(2);
         costInput.classList.add('bg-green-50', 'text-green-700', 'border-green-400', 'transition-colors');
         setTimeout(() => costInput.classList.remove('bg-green-50', 'text-green-700', 'border-green-400'), 500);
     }
@@ -5184,8 +5224,8 @@ window.calculateInvoiceBreakdown = (triggerId) => {
 ['input', 'change'].forEach(evt => {
     document.body.addEventListener(evt, (e) => {
         const triggers = [
-            'prod-base-rate', 'prod-sch-disc', 'prod-rs-disc', 'gst-slab', 
-            'prod-cess', 'prod-cases', 'prod-pieces', 'prod-upc', 
+            'prod-base-rate', 'prod-sch-disc', 'prod-rs-disc', 'gst-slab',
+            'prod-cess', 'prod-cases', 'prod-pieces', 'prod-upc',
             'tax-inclusive-toggle', 'prod-free-qty', 'prod-net-amt', 'prod-taxable-amt'
         ];
         if (triggers.includes(e.target.id)) {
@@ -5194,7 +5234,7 @@ window.calculateInvoiceBreakdown = (triggerId) => {
     });
 });
 
-window.handleManualBulkClick = function() {
+window.handleManualBulkClick = function () {
     const choiceModal = document.getElementById('import-choice-modal');
     if (choiceModal) choiceModal.remove();
 
@@ -5202,14 +5242,14 @@ window.handleManualBulkClick = function() {
     openManualBulkUpload(async (payloadArray) => {
         console.log("Uploading manual items:", payloadArray);
         await processScannedBulkUpload(payloadArray);
-        
+
         if (typeof showToast === 'function') showToast('Success', `Imported ${payloadArray.length} items manually.`, 'success');
         renderInventoryTable();
         updateInventoryCountDisplay();
-    }, localDealersCache, localProductsCache); 
+    }, localDealersCache, localProductsCache);
 };
 
-window.openImportDialog = function() {
+window.openImportDialog = function () {
     const existing = document.getElementById('import-choice-modal');
     if (existing) existing.remove();
 
@@ -5227,8 +5267,8 @@ window.openImportDialog = function() {
             </div>
             
             <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div onclick="document.getElementById('spreadsheet-file-input').click()" class="cursor-pointer bg-white border-2 border-slate-100 hover:border-indigo-600 rounded-3xl p-8 hover:shadow-xl hover:shadow-indigo-100 flex flex-col items-center text-center">
-                    <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                <div onclick="document.getElementById('spreadsheet-file-input').click()" class="cursor-pointer bg-white border-2 border-slate-100 hover:border-SLATE-600 rounded-3xl p-8 hover:shadow-xl hover:shadow-SLATE-100 flex flex-col items-center text-center">
+                    <div class="w-16 h-16 bg-SLATE-50 text-SLATE-600 rounded-2xl flex items-center justify-center mb-4">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
                     <h4 class="font-black text-slate-800 mb-2">Excel / CSV Upload</h4>
@@ -5247,7 +5287,7 @@ window.openImportDialog = function() {
             </div>
             
             <div class="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-end">
-                <button onclick="window.downloadSpreadsheetTemplate()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">Download Template</button>
+                <button onclick="window.downloadSpreadsheetTemplate()" class="text-xs font-bold text-SLATE-600 hover:text-SLATE-800 bg-SLATE-50 px-3 py-1.5 rounded-lg border border-SLATE-100">Download Template</button>
             </div>
         </div>
     </div>
@@ -5257,13 +5297,13 @@ window.openImportDialog = function() {
     document.body.classList.add('overflow-hidden');
 };
 
-window.handlePhotoUpload = async function() {};
+window.handlePhotoUpload = async function () { };
 
 // --- AI Scanner Access (Plan-Free, Daily Cap Active) ---
 async function verifyScannerAccess() {
-    const today = new Date().toISOString().split('T')[0]; 
+    const today = new Date().toISOString().split('T')[0];
     const localUsageKey = `mifela_ai_scans_${today}`;
-    
+
     // 1. Check Daily Limit (10 Scans) via Local Storage
     let scansToday = parseInt(localStorage.getItem(localUsageKey)) || 0;
 
@@ -5283,7 +5323,7 @@ async function verifyScannerAccess() {
     // 2. Increment locally and allow
     localStorage.setItem(localUsageKey, scansToday + 1);
     console.log(`🚀 AI Scan authorized. Scan #${scansToday + 1}/10 for ${today}.`);
-    return true; 
+    return true;
 }
 
 
@@ -5291,8 +5331,8 @@ async function verifyScannerAccess() {
 function injectFreeQtyField() {
     const piecesInput = document.getElementById('prod-pieces');
     if (piecesInput && !document.getElementById('prod-free-qty')) {
-        const wrapper = piecesInput.closest('div'); 
-        
+        const wrapper = piecesInput.closest('div');
+
         // 🚀 THE FIX: Matched the exact CSS classes of "Cases" and "Pieces" (mt-1, p-2, rounded-md, text-xs)
         wrapper.insertAdjacentHTML('afterend', `
             <div>
@@ -5320,7 +5360,7 @@ function injectFreeQtyField() {
 //     if (currentPlan !== 'gold') {
 //         try {
 //             const productsRef = typeof getProductsRef === 'function' ? getProductsRef() : null;
-            
+
 //             if (productsRef && productsRef.parent) {
 //                 const storeSnap = await getDoc(productsRef.parent);
 //                 if (storeSnap.exists()) {
@@ -5351,12 +5391,12 @@ function injectFreeQtyField() {
 //     try {
 //         // Try to sync with Firebase across devices
 //         const productsRef = typeof getProductsRef === 'function' ? getProductsRef() : null;
-        
+
 //         if (productsRef && productsRef.path) {
 //             // Build the exact string path to avoid .parent object confusion
 //             const usagePath = productsRef.path.replace('/products', '/usage') + `/scans_${today}`;
 //             const usageRef = doc(db, usagePath);
-            
+
 //             const usageSnap = await getDoc(usageRef);
 //             if (usageSnap.exists()) {
 //                 scansToday = Math.max(scansToday, usageSnap.data().count || 0);
@@ -5382,7 +5422,7 @@ function injectFreeQtyField() {
 
 //     // Increment local storage successfully
 //     localStorage.setItem(localUsageKey, scansToday + 1);
-    
+
 //     return true; 
 // }
 // --- NEW: Firebase Bulk Upload Logic for Scanned Bills & Excel ---
@@ -5400,30 +5440,30 @@ async function processScannedBulkUpload(itemsData) {
 
     const productsRef = getProductsRef();
     const transactionsRef = getTransactionsRef();
-    const customersRef = getCustomersRef(); 
-    
+    const customersRef = getCustomersRef();
+
     const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
     const safeTargetLoc = getNormalizedLoc(assignedLoc);
 
     const existingProductsSnap = await getDocs(productsRef);
-    
+
     // 🚀 FIX: Convert to O(1) Dictionary Lookup to prevent O(N²) freezing
     const existingInventoryMap = new Map();
     existingProductsSnap.docs.forEach(d => {
         const p = d.data();
-        
+
         // 1. Index by Barcode
         if (p.barcode) existingInventoryMap.set(`barcode_${p.barcode.trim()}`, { id: d.id, ...p });
-        
+
         // 2. Index by SKU
         if (p.sku) existingInventoryMap.set(`sku_${p.sku.trim()}`, { id: d.id, ...p });
-        
+
         // 3. Fallback Index (Name + Expiry + Batch)
         const fallbackKey = `fallback_${(p.name || '').trim().toLowerCase()}_${(p.expirationDate || '').trim()}_${(p.batch || '').trim().toUpperCase()}`;
         existingInventoryMap.set(fallbackKey, { id: d.id, ...p });
     });
 
-    const newDealersMap = {}; 
+    const newDealersMap = {};
     const invoiceGroups = {};
 
     for (let i = 0; i < itemsData.length; i++) {
@@ -5435,7 +5475,7 @@ async function processScannedBulkUpload(itemsData) {
                 if (typeof window.showModal === 'function') window.showModal('Validation Failed', msg, 'error');
                 throw new Error(msg);
             }
-            
+
             // 🚀 THE FIX: Backend GSTIN validation interceptor
             const rawGstin = item.dealerGstin || item.gstin || '';
             if (rawGstin.length < 15) {
@@ -5456,7 +5496,7 @@ async function processScannedBulkUpload(itemsData) {
             item.cess = 0;
             item.dealerPhone = '';
             item.dealerGstin = '';
-            item.supplierInvoice = ''; 
+            item.supplierInvoice = '';
         } else {
             const generateSafeId = (str) => {
                 let hash = 0x811c9dc5;
@@ -5471,17 +5511,17 @@ async function processScannedBulkUpload(itemsData) {
                 let rawPhone = item.dealerPhone ? String(item.dealerPhone).replace(/\D/g, '') : '';
                 if (rawPhone.length >= 10) {
                     let normalizedPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-                    currentDealerId = `MERCH-${generateSafeId(normalizedPhone)}`; 
-                    
+                    currentDealerId = `MERCH-${generateSafeId(normalizedPhone)}`;
+
                     if (!newDealersMap[currentDealerId] && customersRef) {
                         const newDealerRef = doc(customersRef, currentDealerId);
                         currentBatch.set(newDealerRef, {
-                            id: currentDealerId, 
-                            name: currentDealerName, 
+                            id: currentDealerId,
+                            name: currentDealerName,
                             type: 'dealer',
-                            phone: `+${normalizedPhone}`, 
+                            phone: `+${normalizedPhone}`,
                             gstin: item.dealerGstin || item.gstin || '',
-                            pan: item.dealerPan || '',      
+                            pan: item.dealerPan || '',
                             updatedAt: serverTimestamp()
                         }, { merge: true });
 
@@ -5490,17 +5530,17 @@ async function processScannedBulkUpload(itemsData) {
                             const globalDirRef = doc(db, `artifacts/${currentAppId}/directory_merchants/${currentDealerId}`);
                             currentBatch.set(globalDirRef, {
                                 merchantId: currentDealerId,
-                                name: currentDealerName, 
+                                name: currentDealerName,
                                 storeName: currentDealerName,
                                 type: 'dealer',
                                 phone: `+${normalizedPhone}`,
                                 gstin: item.dealerGstin || item.gstin || '',
-                                pan: item.dealerPan || '',      
+                                pan: item.dealerPan || '',
                                 updatedAt: serverTimestamp()
                             }, { merge: true });
                             batchOpCount++;
                         }
-                        
+
                         newDealersMap[currentDealerId] = { id: currentDealerId, name: currentDealerName };
                         batchOpCount++;
                     }
@@ -5515,15 +5555,15 @@ async function processScannedBulkUpload(itemsData) {
 
         // 🚀 FIX: O(1) Dictionary Check
         const matchKey = `${(item.name || '').trim().toLowerCase()}_${(item.expirationDate || '').trim()}_${(item.batch || '').trim().toUpperCase()}`;
-        
+
         let match = null;
-        
+
         if (item.barcode) match = existingInventoryMap.get(`barcode_${item.barcode.trim()}`);
-        
+
         if (!match && item.sku && !item.sku.startsWith('SKU')) {
             match = existingInventoryMap.get(`sku_${item.sku.trim()}`);
         }
-        
+
         if (!match) {
             const fallbackKey = `fallback_${(item.name || '').trim().toLowerCase()}_${(item.expirationDate || '').trim()}_${(item.batch || '').trim().toUpperCase()}`;
             match = existingInventoryMap.get(fallbackKey);
@@ -5535,7 +5575,7 @@ async function processScannedBulkUpload(itemsData) {
         if (match) {
             // 🚀 THE FIX: Maintain FIFO batches & Weighted Avg Cost when merging!
             const currentBatches = match.batches ? [...match.batches] : [];
-            
+
             if (item.stockLevel > 0) {
                 currentBatches.push({
                     batchNo: item.batch || `BLK-${Date.now().toString().slice(-6)}`,
@@ -5572,16 +5612,16 @@ async function processScannedBulkUpload(itemsData) {
             }
 
             currentBatch.set(targetDocRef, {
-                stockLevel: increment(item.stockLevel), 
+                stockLevel: increment(item.stockLevel),
                 freeQty: increment(item.freeQty || 0),
                 batches: currentBatches,
                 cost: newWac,
                 updatedAt: serverTimestamp()
             }, { merge: true });
-            
+
         } else {
             const finalBarcode = item.barcode && item.barcode !== item.sku ? item.barcode : freshSku;
-            
+
             // 🚀 THE FIX: Standardize Batch Generation for New Bulk Imports
             const initialBatch = [{
                 batchNo: item.batch || `BLK-${Date.now().toString().slice(-6)}`,
@@ -5609,11 +5649,11 @@ async function processScannedBulkUpload(itemsData) {
             }];
 
             currentBatch.set(targetDocRef, {
-                ...item, 
+                ...item,
                 sku: freshSku,
                 barcode: finalBarcode,
                 batches: initialBatch, // Inject the array here
-                createdAt: new Date().toISOString(), 
+                createdAt: new Date().toISOString(),
                 updatedAt: serverTimestamp()
             });
         }
@@ -5626,9 +5666,9 @@ async function processScannedBulkUpload(itemsData) {
             batchOpCount = 0;
         }
 
-        if (item.stockLevel > 0) { 
+        if (item.stockLevel > 0) {
             const invoiceStr = item.supplierInvoice || 'NO_INV';
-            const groupKey = `${invoiceStr}_${currentDealerId}`; 
+            const groupKey = `${invoiceStr}_${currentDealerId}`;
 
             if (!invoiceGroups[groupKey]) {
                 invoiceGroups[groupKey] = {
@@ -5639,7 +5679,7 @@ async function processScannedBulkUpload(itemsData) {
                     paymentMethod: item.paymentMethod || 'CASH',
                     chequeDetails: item.chequeDetails || null,
                     roundOffApplied: item.roundOffApplied || 0,
-                    invoiceTotalOverride: item.invoiceTotalOverride, 
+                    invoiceTotalOverride: item.invoiceTotalOverride,
                     calculatedSum: 0,
                     txType: (item.type === 'homemade' || item.type === 'manufactured') ? 'PRODUCTION' : 'PURCHASE',
                     items: []
@@ -5648,20 +5688,20 @@ async function processScannedBulkUpload(itemsData) {
 
             invoiceGroups[groupKey].calculatedSum += item.netAmt;
             const dealerStateCode = item.gstin ? String(item.gstin).substring(0, 2) : '';
-            const isInterState = dealerStateCode !== '' && dealerStateCode !== '27'; 
+            const isInterState = dealerStateCode !== '' && dealerStateCode !== '27';
 
             invoiceGroups[groupKey].items.push({
-                id: targetDocRef.id, 
-                name: item.name, 
-                sku: freshSku, 
-                quantity: item.stockLevel, 
-                cost: item.cost, 
+                id: targetDocRef.id,
+                name: item.name,
+                sku: freshSku,
+                quantity: item.stockLevel,
+                cost: item.cost,
                 price: item.price,
-                taxRate: item.gstSlab || 0, 
+                taxRate: item.gstSlab || 0,
                 cessRate: item.cess || item.cessPct || 0,
                 isOms: isInterState,
-                amount: item.netAmt, 
-                total: item.netAmt, 
+                amount: item.netAmt,
+                total: item.netAmt,
                 subtotal: item.taxableAmt
             });
         }
@@ -5673,7 +5713,7 @@ async function processScannedBulkUpload(itemsData) {
         if (group.items.length > 0) {
             const txRef = doc(transactionsRef);
             const finalTxTotal = group.invoiceTotalOverride !== undefined ? group.invoiceTotalOverride : group.calculatedSum;
-            
+
             let generatedInvoiceId;
             let reasonStr;
             const invoiceStr = group.supplierInvoice || 'NO_INV';
@@ -5682,39 +5722,39 @@ async function processScannedBulkUpload(itemsData) {
                 generatedInvoiceId = `MFG-${Date.now().toString().slice(-6)}`;
                 reasonStr = 'Initial Production Stock';
             } else {
-                generatedInvoiceId = group.supplierInvoice ? `SUPP-${group.supplierInvoice}` : `PUR-SCAN-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                generatedInvoiceId = group.supplierInvoice ? `SUPP-${group.supplierInvoice}` : `PUR-SCAN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
                 reasonStr = group.supplierInvoice ? 'Excel/AI Import' : 'Bulk Inventory Import';
             }
-            
+
             currentBatch.set(txRef, {
-                invoiceId: generatedInvoiceId, 
+                invoiceId: generatedInvoiceId,
                 supplierInvoice: group.supplierInvoice || '',
-                storeId: getStoreId(), 
-                locationId: safeTargetLoc, 
-                timestamp: serverTimestamp(), 
-                type: group.txType, 
+                storeId: getStoreId(),
+                locationId: safeTargetLoc,
+                timestamp: serverTimestamp(),
+                type: group.txType,
                 status: 'completed',
-                customer: { 
-                    id: group.dealerId, 
-                    name: group.dealerName, 
-                    gstin: group.gstin 
+                customer: {
+                    id: group.dealerId,
+                    name: group.dealerName,
+                    gstin: group.gstin
                 },
-                summary: { 
-                    total: finalTxTotal, 
-                    discount: group.roundOffApplied || 0, 
-                    profit: 0, 
-                    paymentMethod: group.paymentMethod, 
+                summary: {
+                    total: finalTxTotal,
+                    discount: group.roundOffApplied || 0,
+                    profit: 0,
+                    paymentMethod: group.paymentMethod,
                     chequeDetails: group.chequeDetails,
-                    reason: reasonStr, 
-                    itemCount: group.items.reduce((sum, i) => sum + i.quantity, 0) 
+                    reason: reasonStr,
+                    itemCount: group.items.reduce((sum, i) => sum + i.quantity, 0)
                 },
-                items: group.items, 
+                items: group.items,
                 cashierId: getUserId(),
                 cashierName: (() => {
                     try {
                         const fbKey = Object.keys(localStorage).find(k => k.startsWith('firebase:authUser:'));
                         if (fbKey) return JSON.parse(localStorage.getItem(fbKey)).displayName || 'Store Admin';
-                    } catch (e) {} return 'Store Admin';
+                    } catch (e) { } return 'Store Admin';
                 })(),
                 currency: { code: getCurrencyCode(), symbol: getCurrencySymbol() }
             });
@@ -5737,7 +5777,7 @@ async function processScannedBulkUpload(itemsData) {
     if (typeof loadDealerDropdowns === 'function') loadDealerDropdowns();
 }
 
-window.downloadCsvTemplate = function() {
+window.downloadCsvTemplate = function () {
     const csvContent = "data:text/csv;charset=utf-8,Item Name,Category,Cost Price,Selling Price,Stock Quantity,GST %,HSN Code\nSample Coffee,Grocery,100,150,50,5,2101";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -5758,7 +5798,7 @@ export async function handleInventoryLookup(code) {
         // 1. Basic Details
         const nameInput = document.getElementById('prod-name'); // Using standard IDs
         if (nameInput) nameInput.value = match.name || '';
-        
+
         document.getElementById('prod-mrp').value = match.mrp || match.price || 0;
         document.getElementById('price').value = match.price || 0;
         document.getElementById('cost').value = match.cost || 0;
@@ -5768,7 +5808,7 @@ export async function handleInventoryLookup(code) {
         document.getElementById('prod-batch').value = match.batch || '';
         document.getElementById('prod-upc').value = match.upc || 1;
         document.getElementById('prod-sl').value = match.sl || '';
-        
+
         // Ensure barcode field reflects the code if it was found via SKU
         if (document.getElementById('barcode')) {
             document.getElementById('barcode').value = match.barcode || match.sku || '';
@@ -5791,11 +5831,11 @@ export async function handleInventoryLookup(code) {
         // Update UI Text
         const title = document.getElementById('inventory-form-title');
         if (title) title.textContent = `Edit / Restock: ${match.name}`;
-        
+
         const saveBtn = document.getElementById('save-product-btn');
         if (saveBtn) {
             saveBtn.textContent = 'Update Product & Stock';
-            saveBtn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+            saveBtn.classList.replace('bg-SLATE-600', 'bg-emerald-600');
         }
 
         // Reveal the Cancel button
@@ -5810,10 +5850,10 @@ export async function handleInventoryLookup(code) {
 
 window.currentImageUploadSku = null;
 
-window.triggerPosImageUpload = function(sku) {
+window.triggerPosImageUpload = function (sku) {
     window.currentImageUploadSku = sku;
     let input = document.getElementById('hidden-pos-image-input');
-    
+
     if (!input) {
         input = document.createElement('input');
         input.type = 'file';
@@ -5825,7 +5865,7 @@ window.triggerPosImageUpload = function(sku) {
         input.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file || !window.currentImageUploadSku) return;
-            
+
             if (typeof window.showModal === 'function') {
                 window.showModal('Processing...', 'Optimizing image for POS...', 'info');
             }
@@ -5833,26 +5873,26 @@ window.triggerPosImageUpload = function(sku) {
             try {
                 // 1. Auto-compress the image
                 const compressedBase64 = await window.compressImageForPos(file);
-                
+
                 // 2. Save to local database
                 await savePosImage(window.currentImageUploadSku, compressedBase64);
-                
+
                 // 3. Refresh the table
                 if (typeof renderInventoryTable === 'function') renderInventoryTable();
-                
+
             } catch (error) {
                 console.error("Image save failed:", error);
                 if (typeof showModal === 'function') showModal("Error", "Failed to save image.", "error");
             } finally {
                 input.value = ''; // Reset input
-                
+
                 // 🚀 THE FIX: Always forcefully kill the modals in the 'finally' block!
                 const genModal = document.getElementById('generic-modal');
                 if (genModal) {
                     genModal.classList.add('hidden');
                     genModal.classList.remove('flex');
                 }
-                
+
                 const customModal = document.getElementById('custom-modal');
                 if (customModal) customModal.remove();
 
@@ -5862,12 +5902,12 @@ window.triggerPosImageUpload = function(sku) {
             }
         });
     }
-    
+
     input.click(); // Trigger the file picker!
 };
 
 // The Auto-Compressor
-window.compressImageForPos = function(file) {
+window.compressImageForPos = function (file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -5879,19 +5919,19 @@ window.compressImageForPos = function(file) {
                 const size = 300; // Perfect square for POS tiles
                 canvas.width = size;
                 canvas.height = size;
-                
+
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = "#F8FAFC"; // Light slate background for transparent PNGs
                 ctx.fillRect(0, 0, size, size);
-                
+
                 // Crop and center
                 const scale = Math.max(size / img.width, size / img.height);
                 const x = (size / 2) - (img.width / 2) * scale;
                 const y = (size / 2) - (img.height / 2) * scale;
                 ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                
+
                 // Export as lightweight JPEG
-resolve(canvas.toDataURL('image/png'));
+                resolve(canvas.toDataURL('image/png'));
             };
             img.onerror = error => reject(error);
         };
@@ -5924,22 +5964,22 @@ export async function mergeDuplicateInventoryItems() {
                 const safeName = (p.name || '').trim().toLowerCase();
                 const safeDealer = (p.dealerName || '').trim().toLowerCase();
                 const key = `${safeName}|${safeDealer}`;
-                
+
                 if (!groups[key]) groups[key] = [];
                 groups[key].push(p);
             });
 
             let currentBatch = writeBatch(db);
-            let batchOpCount = 0; 
+            let batchOpCount = 0;
             let mergedGroupsCount = 0;
             let deletedDuplicatesCount = 0;
 
             for (const key in groups) {
                 const items = groups[key];
-                
+
                 if (items.length > 1) {
                     mergedGroupsCount++;
-                    
+
                     items.sort((a, b) => {
                         const getTime = (val) => {
                             if (!val) return 0;
@@ -5953,7 +5993,7 @@ export async function mergeDuplicateInventoryItems() {
                     const master = items[0];
                     const duplicates = items.slice(1);
                     let masterBatches = master.batches ? [...master.batches] : [];
-                    
+
                     const masterStock = parseFloat(master.stockLevel) || 0;
                     if (masterBatches.length === 0 && masterStock > 0) {
                         masterBatches.push({
@@ -5970,7 +6010,7 @@ export async function mergeDuplicateInventoryItems() {
 
                     for (const dup of duplicates) {
                         const dupStock = parseFloat(dup.stockLevel) || 0;
-                        
+
                         if (dupStock > 0) {
                             totalAddedStock += dupStock;
                             if (dup.batches && dup.batches.length > 0) {
@@ -6056,7 +6096,7 @@ export async function mergeDuplicateInventoryItems() {
 // interfering with native clicks, date-pickers, forms, or typing.
 setInterval(() => {
     let activeModals = 0;
-    
+
     // 1. Clean up broken modal wrappers
     const overlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
     overlays.forEach(el => {
@@ -6078,21 +6118,21 @@ setInterval(() => {
         document.body.classList.remove('overflow-hidden');
         document.documentElement.classList.remove('overflow-hidden');
     }
-    
+
     // 3. Neutralize invisible full-screen click traps
     const allAbsoluteFixed = document.querySelectorAll('div.fixed, div.absolute');
     allAbsoluteFixed.forEach(el => {
         if (el.classList.contains('hidden') || el.style.pointerEvents === 'none') return;
-        
+
         const rect = el.getBoundingClientRect();
         const coversScreen = rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8;
-        
+
         if (coversScreen) {
             const style = window.getComputedStyle(el);
-            const isInvisibleTrap = style.opacity === '0' || 
-                                    style.backgroundColor === 'rgba(0, 0, 0, 0)' || 
-                                    style.backgroundColor === 'transparent';
-            
+            const isInvisibleTrap = style.opacity === '0' ||
+                style.backgroundColor === 'rgba(0, 0, 0, 0)' ||
+                style.backgroundColor === 'transparent';
+
             if (isInvisibleTrap) {
                 el.style.pointerEvents = 'none';
                 console.log('🧹 Ghostbuster passively neutralized an invisible click trap:', el.id || el.className);
@@ -6107,19 +6147,19 @@ setInterval(() => {
 
 export function injectB2BPricingButton() {
     const actionContainer = document.getElementById('inventory-action-buttons');
-    
+
     if (!actionContainer || document.getElementById('btn-b2b-pricing')) return;
 
     const b2bBtn = document.createElement('button');
     b2bBtn.id = 'btn-b2b-pricing';
-    
+
     // 🚀 THE FIX: Perfectly matched the soft pastel CSS blueprint of the adjacent buttons!
     b2bBtn.className = "px-4 py-2 text-sm font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-xl hover:bg-purple-100 hover:border-purple-300 shadow-sm transition-all flex items-center gap-2 whitespace-nowrap";
-    
+
     // Swapped the SVG stroke-width back to 2 to match the other icons perfectly
     b2bBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg> Manage B2B Rates`;
     b2bBtn.onclick = openB2BPricingModal;
-    
+
     actionContainer.appendChild(b2bBtn);
 }
 window.b2bProductState = { customerId: null, page: 1, search: '', sort: 'name_asc' };
@@ -6127,21 +6167,21 @@ window.b2bProductState = { customerId: null, page: 1, search: '', sort: 'name_as
 async function openB2BPricingModal() {
     const modalId = 'b2b-pricing-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
-    
-    window.b2bProductsCache = (window.dbAPI && window.dbAPI.getProducts) 
-        ? await window.dbAPI.getProducts() 
+
+    window.b2bProductsCache = (window.dbAPI && window.dbAPI.getProducts)
+        ? await window.dbAPI.getProducts()
         : [...(localProductsCache || [])];
-        
+
     document.documentElement.classList.add('overflow-hidden');
     document.body.classList.add('overflow-hidden');
-    
+
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col h-[90vh] overflow-hidden border border-slate-100">
                 <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0 shadow-sm z-10">
                     <div>
                         <h3 class="text-xl font-black text-slate-800 flex items-center gap-2">
-                            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg">🏷️</span> B2B Custom Rates Manager
+                            <span class="bg-SLATE-100 text-SLATE-600 p-1.5 rounded-lg">🏷️</span> B2B Custom Rates Manager
                         </h3>
                         <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Assign special pricing per customer</p>
                     </div>
@@ -6150,7 +6190,7 @@ async function openB2BPricingModal() {
                     </button>
                 </div>
                 <div class="p-4 border-b border-slate-100 bg-white shrink-0 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-                    <input type="text" id="b2b-customer-search" placeholder="🔍 Search customers by name or phone..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:border-indigo-500 outline-none transition-colors bg-slate-50 focus:bg-white">
+                    <input type="text" id="b2b-customer-search" placeholder="🔍 Search customers by name or phone..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:border-SLATE-500 outline-none transition-colors bg-slate-50 focus:bg-white">
                 </div>
                <div class="flex-1 overflow-y-auto overscroll-contain p-6 bg-slate-100 custom-scrollbar transform-gpu [-webkit-overflow-scrolling:touch]" id="b2b-modal-content">
                     <div class="text-center py-10 text-slate-400 font-bold animate-pulse">Loading Directory...</div>
@@ -6158,12 +6198,12 @@ async function openB2BPricingModal() {
             </div>
         </div>
     `;
-    
+
     document.body.classList.remove('overflow-hidden');
     document.body.insertAdjacentHTML('beforeend', html);
 
     const content = document.getElementById('b2b-modal-content');
-    
+
     try {
         let customers = [];
         if (window.dbAPI && window.dbAPI.getCustomers) {
@@ -6171,7 +6211,7 @@ async function openB2BPricingModal() {
         } else if (typeof localCustomersCache !== 'undefined') {
             customers = localCustomersCache;
         }
-        
+
         window.b2bCustomersCache = customers.filter(c => {
             const cid = String(c.id || c.docId || c.merchantId || '');
             if (c.role !== undefined || c.permissions !== undefined) return false;
@@ -6179,8 +6219,8 @@ async function openB2BPricingModal() {
             if (cid.includes('shifts_') || Array.isArray(c.records)) return false;
             if (cid.includes('_att_') || cid.includes('helper_') || cid.includes('staff_') || cid.includes('user_')) return false;
             return true;
-        }).sort((a,b) => (a.name||a.storeName||'').localeCompare(b.name||b.storeName||''));
-        
+        }).sort((a, b) => (a.name || a.storeName || '').localeCompare(b.name || b.storeName || ''));
+
         if (window.b2bCustomersCache.length === 0) {
             content.innerHTML = `<div class="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300"><span class="text-5xl mb-4 opacity-50">👥</span><p class="text-slate-500 font-bold text-lg">No customers found.</p><p class="text-xs text-slate-400 mt-1 uppercase tracking-widest">Please add a customer in the Trade tab first.</p></div>`;
             return;
@@ -6189,41 +6229,41 @@ async function openB2BPricingModal() {
         if (typeof window.renderB2BCustomerList === 'function') {
             window.renderB2BCustomerList();
         }
-        
+
         document.getElementById('b2b-customer-search').addEventListener('input', (e) => {
             if (typeof window.renderB2BCustomerList === 'function') {
                 window.renderB2BCustomerList(e.target.value.trim());
             }
         });
-        
+
     } catch (err) {
         console.error(err);
         content.innerHTML = `<div class="text-center py-10 text-red-500 font-bold">Failed to load customers.</div>`;
     }
 }
 
-window.renderB2BCustomerList = function(searchTerm = '') {
+window.renderB2BCustomerList = function (searchTerm = '') {
     const content = document.getElementById('b2b-modal-content');
     if (!content) return;
-    
+
     let filtered = window.b2bCustomersCache;
     if (searchTerm) {
         const term = searchTerm.toLowerCase();
         filtered = filtered.filter(c => (c.name || '').toLowerCase().includes(term) || (c.phone || '').includes(term));
     }
-    
+
     if (filtered.length === 0) {
         content.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold">No matching customers.</div>`;
         return;
     }
-    
+
     const html = filtered.map(c => {
         const activeRatesCount = Object.keys(c.customPricing || {}).length;
-        const countBadgeClass = activeRatesCount > 0 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-600';
-        
+        const countBadgeClass = activeRatesCount > 0 ? 'bg-SLATE-600 text-white shadow-md' : 'bg-slate-200 text-slate-600';
+
         return `
         <div class="mb-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all b2b-accordion" data-customer-id="${c.id}">
-            <div class="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-indigo-50/50 transition-colors" onclick="window.toggleB2BCustomer('${c.id}')">
+            <div class="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-SLATE-50/50 transition-colors" onclick="window.toggleB2BCustomer('${c.id}')">
                 <div>
                     <h4 class="font-black text-slate-800 text-lg">${escapeHTML(c.name || c.storeName || 'Unknown')}</h4>
                     <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">${escapeHTML(c.phone || c.type || 'Customer')}</p>
@@ -6239,43 +6279,43 @@ window.renderB2BCustomerList = function(searchTerm = '') {
                 </div>
         </div>
     `}).join('');
-    
+
     content.innerHTML = html;
 };
 
-window.toggleB2BCustomer = function(customerId) {
+window.toggleB2BCustomer = function (customerId) {
     const body = document.getElementById(`b2b-body-${customerId}`);
     const accordion = body.closest('.b2b-accordion');
     const arrow = accordion.querySelector('.b2b-arrow');
-    
+
     // Close all other accordions
     document.querySelectorAll('.b2b-accordion .b2b-arrow').forEach(a => { if (a !== arrow) a.classList.remove('rotate-180'); });
     document.querySelectorAll('.b2b-accordion > div:nth-child(2)').forEach(b => { if (b !== body) b.classList.add('hidden'); });
-    document.querySelectorAll('.b2b-accordion').forEach(acc => { if (acc !== accordion) acc.classList.remove('border-indigo-400', 'ring-2', 'ring-indigo-100'); });
-    
+    document.querySelectorAll('.b2b-accordion').forEach(acc => { if (acc !== accordion) acc.classList.remove('border-SLATE-400', 'ring-2', 'ring-SLATE-100'); });
+
     if (body.classList.contains('hidden')) {
         body.classList.remove('hidden');
         arrow.classList.add('rotate-180');
-        accordion.classList.add('border-indigo-400', 'ring-2', 'ring-indigo-100');
-        
+        accordion.classList.add('border-SLATE-400', 'ring-2', 'ring-SLATE-100');
+
         window.b2bProductState = { customerId, page: 1, search: '', sort: 'name_asc' };
         window.renderB2BProducts(customerId);
     } else {
         body.classList.add('hidden');
         arrow.classList.remove('rotate-180');
-        accordion.classList.remove('border-indigo-400', 'ring-2', 'ring-indigo-100');
+        accordion.classList.remove('border-SLATE-400', 'ring-2', 'ring-SLATE-100');
     }
 };
 
-window.renderB2BProducts = function(customerId) {
+window.renderB2BProducts = function (customerId) {
     const body = document.getElementById(`b2b-body-${customerId}`);
     if (!body) return;
-    
+
     if (!document.getElementById(`b2b-controls-${customerId}`)) {
         body.innerHTML = `
             <div id="b2b-controls-${customerId}" class="flex gap-3 mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                <input type="text" placeholder="Search inventory..." class="flex-1 border-2 border-slate-100 rounded-lg p-2 text-sm font-bold text-slate-700 focus:border-indigo-500 outline-none transition-colors bg-slate-50 focus:bg-white" oninput="window.b2bProductState.search = this.value; window.b2bProductState.page = 1; window.renderB2BProductsTable('${customerId}')">
-                <select class="border-2 border-slate-100 rounded-lg p-2 text-sm font-bold text-slate-600 focus:border-indigo-500 outline-none bg-slate-50 cursor-pointer" onchange="window.b2bProductState.sort = this.value; window.b2bProductState.page = 1; window.renderB2BProductsTable('${customerId}')">
+                <input type="text" placeholder="Search inventory..." class="flex-1 border-2 border-slate-100 rounded-lg p-2 text-sm font-bold text-slate-700 focus:border-SLATE-500 outline-none transition-colors bg-slate-50 focus:bg-white" oninput="window.b2bProductState.search = this.value; window.b2bProductState.page = 1; window.renderB2BProductsTable('${customerId}')">
+                <select class="border-2 border-slate-100 rounded-lg p-2 text-sm font-bold text-slate-600 focus:border-SLATE-500 outline-none bg-slate-50 cursor-pointer" onchange="window.b2bProductState.sort = this.value; window.b2bProductState.page = 1; window.renderB2BProductsTable('${customerId}')">
                     <option value="name_asc">Sort: A-Z</option>
                     <option value="custom_first">Sort: Custom Rates First</option>
                 </select>
@@ -6289,22 +6329,22 @@ window.renderB2BProducts = function(customerId) {
     }
 };
 
-window.renderB2BProductsTable = function(customerId) {
+window.renderB2BProductsTable = function (customerId) {
     const tableContainer = document.getElementById(`b2b-table-${customerId}`);
     const pagContainer = document.getElementById(`b2b-pagination-${customerId}`);
     if (!tableContainer) return;
-    
+
     const state = window.b2bProductState;
     const customer = window.b2bCustomersCache.find(c => c.id === customerId);
     const customPricing = customer.customPricing || {};
     let products = [...(window.b2bProductsCache || [])];
-    
+
     // 1. Filter
     if (state.search) {
         const term = state.search.toLowerCase();
         products = products.filter(p => (p.name || '').toLowerCase().includes(term) || (p.sku || '').toLowerCase().includes(term));
     }
-    
+
     // 2. Sort
     if (state.sort === 'name_asc') {
         products.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -6312,27 +6352,27 @@ window.renderB2BProductsTable = function(customerId) {
         products.sort((a, b) => {
             const hasA = customPricing[a.id] ? 1 : 0;
             const hasB = customPricing[b.id] ? 1 : 0;
-            if (hasA !== hasB) return hasB - hasA; 
+            if (hasA !== hasB) return hasB - hasA;
             return (a.name || '').localeCompare(b.name || '');
         });
     }
-    
+
     // 3. Pagination (10 per page)
     const itemsPerPage = 10;
     const totalItems = products.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (state.page > totalPages) state.page = totalPages;
-    
+
     const start = (state.page - 1) * itemsPerPage;
     const pagedProducts = products.slice(start, start + itemsPerPage);
-    
+
     const currency = '₹';
     const rows = pagedProducts.map(p => {
         const currentCustomPrice = customPricing[p.id]?.price;
         const hasCustom = currentCustomPrice !== undefined;
         const valStr = hasCustom ? currentCustomPrice.toFixed(2) : '';
         const basePrice = parseFloat(p.price || 0).toFixed(2);
-        
+
         return `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                 <td class="p-4 w-1/4 text-sm font-bold text-slate-800 align-middle break-words">
@@ -6347,7 +6387,7 @@ window.renderB2BProductsTable = function(customerId) {
                 <td class="p-4 w-1/4 align-middle">
                     <div class="flex items-center justify-center gap-2">
                         <span class="text-slate-400 font-bold">${currency}</span>
-                        <input type="number" id="b2b-input-${customerId}-${p.id}" value="${valStr}" placeholder="${basePrice}" class="w-24 border-2 ${hasCustom ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-800'} rounded-lg p-2 text-sm font-black text-center focus:border-indigo-600 outline-none transition-colors">
+                        <input type="number" id="b2b-input-${customerId}-${p.id}" value="${valStr}" placeholder="${basePrice}" class="w-24 border-2 ${hasCustom ? 'border-SLATE-400 bg-SLATE-50 text-SLATE-700' : 'border-slate-200 bg-white text-slate-800'} rounded-lg p-2 text-sm font-black text-center focus:border-SLATE-600 outline-none transition-colors">
                     </div>
                 </td>
                 
@@ -6366,7 +6406,7 @@ window.renderB2BProductsTable = function(customerId) {
             </tr>
         `;
     }).join('');
-    
+
     tableContainer.innerHTML = `
         <table class="w-full table-fixed">
             <thead class="bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">
@@ -6380,18 +6420,18 @@ window.renderB2BProductsTable = function(customerId) {
             <tbody>${rows || `<tr><td colspan="4" class="p-8 text-center text-slate-400 font-bold">No products found.</td></tr>`}</tbody>
         </table>
     `;
-    
+
     pagContainer.innerHTML = `
         <span class="text-slate-500 font-bold text-xs uppercase tracking-widest">Showing ${start + 1} to ${Math.min(start + itemsPerPage, totalItems)} of ${totalItems}</span>
         <div class="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
             <button onclick="window.b2bProductState.page--; window.renderB2BProductsTable('${customerId}')" class="px-4 py-1.5 bg-white rounded-md hover:bg-slate-50 disabled:opacity-30 font-bold text-slate-600 transition-colors" ${state.page === 1 ? 'disabled' : ''}>Prev</button>
-            <span class="px-4 py-1.5 font-black text-indigo-700 bg-indigo-50 rounded-md border border-indigo-100">Page ${state.page}</span>
+            <span class="px-4 py-1.5 font-black text-SLATE-700 bg-SLATE-50 rounded-md border border-SLATE-100">Page ${state.page}</span>
             <button onclick="window.b2bProductState.page++; window.renderB2BProductsTable('${customerId}')" class="px-4 py-1.5 bg-white rounded-md hover:bg-slate-50 disabled:opacity-30 font-bold text-slate-600 transition-colors" ${state.page === totalPages ? 'disabled' : ''}>Next</button>
         </div>
     `;
 };
 
-window.resetB2BPrice = async function(customerId, productId, productName) {
+window.resetB2BPrice = async function (customerId, productId, productName) {
     const customer = window.b2bCustomersCache.find(c => c.id === customerId);
     if (!customer || !customer.customPricing || !customer.customPricing[productId]) return;
 
@@ -6405,58 +6445,58 @@ window.resetB2BPrice = async function(customerId, productId, productName) {
         const batch = writeBatch();
         batch.set(doc('customers', customerId), { customPricing: customer.customPricing }, { merge: true });
         await batch.commit();
-        
+
         const countSpan = document.getElementById(`b2b-count-${customerId}`);
         if (countSpan) {
             const newCount = Object.keys(customer.customPricing).length;
             countSpan.textContent = `${newCount} Custom Rates`;
-            countSpan.className = `text-[10px] font-black px-3 py-1.5 rounded-lg ${newCount > 0 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-600'}`;
+            countSpan.className = `text-[10px] font-black px-3 py-1.5 rounded-lg ${newCount > 0 ? 'bg-SLATE-600 text-white shadow-md' : 'bg-slate-200 text-slate-600'}`;
         }
-        
+
         if (typeof showToast === 'function') {
             showToast('Reset Success', `Custom rate for ${productName} removed. Standard shop rate applies.`, 'info');
         }
-        window.renderB2BProductsTable(customerId); 
+        window.renderB2BProductsTable(customerId);
     } catch (e) {
         console.error("Failed to reset B2B rate", e);
         alert("Failed to reset rate.");
     }
 };
 
-window.saveB2BPrice = async function(customerId, productId, productName) {
+window.saveB2BPrice = async function (customerId, productId, productName) {
     const input = document.getElementById(`b2b-input-${customerId}-${productId}`);
     const val = parseFloat(input.value);
-    
+
     const customer = window.b2bCustomersCache.find(c => c.id === customerId);
     if (!customer) return;
-    
+
     customer.customPricing = customer.customPricing || {};
-    
+
     let isDelete = false;
     if (isNaN(val) || val < 0 || input.value.trim() === '') {
-        delete customer.customPricing[productId]; 
+        delete customer.customPricing[productId];
         isDelete = true;
     } else {
-        customer.customPricing[productId] = { name: productName, price: val }; 
+        customer.customPricing[productId] = { name: productName, price: val };
     }
-    
+
     try {
         // 🚀 THE FIX: Use local offline batch writer instead of Firebase updateDoc
         const batch = writeBatch();
         batch.set(doc('customers', customerId), { customPricing: customer.customPricing }, { merge: true });
         await batch.commit();
-        
+
         const countSpan = document.getElementById(`b2b-count-${customerId}`);
         if (countSpan) {
             const newCount = Object.keys(customer.customPricing).length;
             countSpan.textContent = `${newCount} Custom Rates`;
-            countSpan.className = `text-[10px] font-black px-3 py-1.5 rounded-lg ${newCount > 0 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-600'}`;
+            countSpan.className = `text-[10px] font-black px-3 py-1.5 rounded-lg ${newCount > 0 ? 'bg-SLATE-600 text-white shadow-md' : 'bg-slate-200 text-slate-600'}`;
         }
-        
+
         if (typeof showToast === 'function') {
             showToast('Saved', isDelete ? 'Custom rate removed. Default applies.' : `Rate for ${productName} locked at ₹${val.toFixed(2)}`, 'success');
         }
-        window.renderB2BProductsTable(customerId); 
+        window.renderB2BProductsTable(customerId);
     } catch (e) {
         console.error("Failed to save B2B rate", e);
         alert("Failed to save rate.");
@@ -6468,7 +6508,7 @@ function capitalizeName(name) {
         return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
 }
-window.openInventoryGuideModal = function() {
+window.openInventoryGuideModal = function () {
     const modalId = 'inventory-guide-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -6479,13 +6519,13 @@ window.openInventoryGuideModal = function() {
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[300] bg-slate-900/70 flex items-center justify-center p-4  ">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden max-h-[90vh] animate-scaleIn">
-                <div class="px-6 py-4 border-b border-slate-100 bg-indigo-50 flex justify-between items-center shrink-0">
-                    <h2 class="text-xl font-black text-indigo-900 flex items-center gap-2">
+                <div class="px-6 py-4 border-b border-slate-100 bg-SLATE-50 flex justify-between items-center shrink-0">
+                    <h2 class="text-xl font-black text-SLATE-900 flex items-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Inventory & Workflow Guide
                     </h2>
                     <!-- 🚀 THE FIX: Unlock the background scrolling when closed -->
-                    <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden'); document.documentElement.classList.remove('overflow-hidden');" class="text-indigo-400 hover:text-indigo-700 bg-white rounded-full p-1.5 transition shadow-sm">
+                    <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden'); document.documentElement.classList.remove('overflow-hidden');" class="text-SLATE-400 hover:text-SLATE-700 bg-white rounded-full p-1.5 transition shadow-sm">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -6495,7 +6535,7 @@ window.openInventoryGuideModal = function() {
                     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                         <h3 class="font-black text-slate-800 text-base mb-2 border-b pb-2">🔄 Primary Workflows</h3>
                         <ul class="space-y-3 font-medium">
-                            <li><strong class="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">1. Add New Product:</strong> Fill out the form completely. A new SKU will be generated automatically. When saved, the stock is logged as your first batch.</li>
+                            <li><strong class="text-SLATE-700 bg-SLATE-50 px-2 py-0.5 rounded">1. Add New Product:</strong> Fill out the form completely. A new SKU will be generated automatically. When saved, the stock is logged as your first batch.</li>
                             <li><strong class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">2. Restock (Add Batch):</strong> Click "Edit" on a product in the table below. Enter the newly received quantities (Cases/Pieces) and the Supplier Invoice details. <strong>Do not overwrite the existing total stock</strong>—the system will safely add your new pieces to the total and log a new batch.</li>
                             <li><strong class="text-amber-700 bg-amber-50 px-2 py-0.5 rounded">3. Edit Metadata:</strong> Click "Edit", change the Selling Price, MRP, Name, or Thresholds, leave stock fields empty (0), and click Update.</li>
                         </ul>
@@ -6521,11 +6561,11 @@ window.openInventoryGuideModal = function() {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <h4 class="font-bold text-slate-800 mb-1">Exclusive (+TAX)</h4>
-                                <p class="text-xs">The Base Rate is the item price <strong class="text-indigo-600">without tax</strong>. The system will calculate GST on top of it to figure out the Net Amount.</p>
+                                <p class="text-xs">The Base Rate is the item price <strong class="text-SLATE-600">without tax</strong>. The system will calculate GST on top of it to figure out the Net Amount.</p>
                             </div>
-                            <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-                                <h4 class="font-bold text-indigo-800 mb-1">Inclusive (INCL)</h4>
-                                <p class="text-xs">The Base Rate you type is the <strong class="text-indigo-600">final total</strong>. The system will reverse-calculate to separate the tax and subtotal.</p>
+                            <div class="bg-SLATE-50 p-3 rounded-lg border border-SLATE-200">
+                                <h4 class="font-bold text-SLATE-800 mb-1">Inclusive (INCL)</h4>
+                                <p class="text-xs">The Base Rate you type is the <strong class="text-SLATE-600">final total</strong>. The system will reverse-calculate to separate the tax and subtotal.</p>
                             </div>
                         </div>
                     </div>

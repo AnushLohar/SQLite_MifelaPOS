@@ -9,7 +9,7 @@ export function openTnCModal() {
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl flex flex-col h-[85vh] overflow-hidden border border-slate-100">
                 <div class="px-8 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
                     <h3 class="text-xl font-black text-slate-800 flex items-center gap-3">
-                        <span class="bg-indigo-100 text-indigo-600 p-2 rounded-xl text-sm">📜</span> Terms and Conditions
+                        <span class="bg-SLATE-100 text-SLATE-600 p-2 rounded-xl text-sm">📜</span> Terms and Conditions
                     </h3>
                     <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden');" class="text-slate-400 hover:text-red-500 transition-colors p-2 bg-white rounded-full border border-slate-200 shadow-sm">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -36,7 +36,7 @@ export function openTnCModal() {
                 </div>
                 
                 <div class="px-8 py-5 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
-                    <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden');" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black tracking-wide rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95">Accept & Close</button>
+                    <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden');" class="px-8 py-3 bg-SLATE-600 hover:bg-SLATE-700 text-white font-black tracking-wide rounded-xl shadow-lg shadow-SLATE-200 transition-all active:scale-95">Accept & Close</button>
                 </div>
             </div>
         </div>

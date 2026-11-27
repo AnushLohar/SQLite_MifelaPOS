@@ -76,7 +76,7 @@ const DATA_SUBJECT_RIGHTS = {
     consentRecords: new Map(),
 
     // Grant consent with full audit trail
-    grantConsent: function(consentType, merchantId, options = {}) {
+    grantConsent: function (consentType, merchantId, options = {}) {
         const record = {
             id: `${merchantId}-${consentType}-${Date.now()}`,
             consentType: consentType,
@@ -97,7 +97,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Withdraw consent with audit trail
-    withdrawConsent: function(consentType, merchantId) {
+    withdrawConsent: function (consentType, merchantId) {
         const record = this.consentRecords.get(`${merchantId}-${consentType}-${Date.now() - 86400000}`);
         if (record) {
             record.status = 'withdrawn';
@@ -115,7 +115,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Handle consent withdrawal - delete or anonymize data
-    handleConsentWithdrawal: function(consentType, merchantId) {
+    handleConsentWithdrawal: function (consentType, merchantId) {
         switch (consentType) {
             case 'telemetry':
                 // Anonymize usage data, keep no PII
@@ -135,7 +135,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Check if consent is given for a specific type
-    hasConsent: function(consentType, merchantId) {
+    hasConsent: function (consentType, merchantId) {
         const record = localStorage.getItem(`mifela_consent_${consentType}`);
         if (!record) return false;
 
@@ -144,7 +144,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Check consent expiration based on policy version
-    isConsentExpired: function(consentRecord) {
+    isConsentExpired: function (consentRecord) {
         // Consent expires if privacy policy version changes significantly
         // or after mandated retention period
         const currentVersion = '1.0.0';
@@ -152,7 +152,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Get all consent records for a merchant
-    getAllConsents: function(merchantId) {
+    getAllConsents: function (merchantId) {
         const records = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -167,7 +167,7 @@ const DATA_SUBJECT_RIGHTS = {
     },
 
     // Export consent history for audit
-    exportConsentHistory: function(merchantId) {
+    exportConsentHistory: function (merchantId) {
         const history = {
             merchantId: merchantId,
             exportedAt: new Date().toISOString(),
@@ -180,7 +180,7 @@ const DATA_SUBJECT_RIGHTS = {
 // 🔍 Data Subject Rights Request Handler
 const DATA_SUBJECT_RIGHTS_HANDLER = {
     // Right to Access - export all personal data
-    handleAccessRequest: async function(merchantId) {
+    handleAccessRequest: async function (merchantId) {
         console.log(`🔍 Processing Data Access Request for: ${merchantId}`);
 
         try {
@@ -225,7 +225,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Right to Rectification - correct inaccurate data
-    handleRectificationRequest: async function(merchantId, corrections) {
+    handleRectificationRequest: async function (merchantId, corrections) {
         console.log(`🔧 Processing Rectification Request for: ${merchantId}`);
 
         try {
@@ -262,7 +262,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Right to Erasure - delete personal data
-    handleErasureRequest: async function(merchantId, dataCategories, reason) {
+    handleErasureRequest: async function (merchantId, dataCategories, reason) {
         console.log(`🗑️ Processing Erasure Request for: ${merchantId} (reason: ${reason})`);
 
         try {
@@ -306,7 +306,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Right to Restrict Processing
-    handleRestrictionRequest: async function(merchantId, dataCategories) {
+    handleRestrictionRequest: async function (merchantId, dataCategories) {
         console.log(`🚫 Processing Restriction Request for: ${merchantId}`);
 
         try {
@@ -335,7 +335,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Right to Data Portability
-    handlePortabilityRequest: async function(merchantId) {
+    handlePortabilityRequest: async function (merchantId) {
         console.log(`📦 Processing Data Portability Request for: ${merchantId}`);
 
         try {
@@ -369,7 +369,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Helper: Summarize transactions for export
-    summarizeTransactions: function(txData) {
+    summarizeTransactions: function (txData) {
         const summary = {
             totalTransactions: txData ? txData.length : 0,
             totalValue: txData ? txData.reduce((sum, tx) => sum + Math.abs(tx.summary.total || 0), 0) : 0,
@@ -386,7 +386,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
     },
 
     // Get processing information for transparency
-    getProcessingInformation: function() {
+    getProcessingInformation: function () {
         return {
             controller: 'Mifela Solutions',
             purpose: 'POS and Inventory Management System',
@@ -407,7 +407,7 @@ const DATA_SUBJECT_RIGHTS_HANDLER = {
 // 📊 Retention Policy Enforcement
 const RETENTION_POLICY = {
     // Check and enforce retention policies
-    checkRetentionCompliance: function() {
+    checkRetentionCompliance: function () {
         const now = new Date();
         const expiredData = [];
 
@@ -447,7 +447,7 @@ const RETENTION_POLICY = {
     },
 
     // Get retention period in milliseconds for a data category
-    getRetentionPeriod: function(category) {
+    getRetentionPeriod: function (category) {
         const mappings = {
             merchantIdentity: { years: 5, ms: 5 * 365 * 24 * 60 * 60 * 1000 },
             transactionRecords: { years: 7, ms: 7 * 365 * 24 * 60 * 60 * 1000 },
@@ -462,7 +462,7 @@ const RETENTION_POLICY = {
     },
 
     // Format milliseconds into human-readable duration
-    formatDuration: function(ms) {
+    formatDuration: function (ms) {
         const days = Math.floor(ms / (1000 * 60 * 60 * 24));
         if (days < 30) return `${days} day${days !== 1 ? 's' : ''}`;
         const months = Math.floor(days / 30);
@@ -472,7 +472,7 @@ const RETENTION_POLICY = {
     },
 
     // Mark data for retention-compliant deletion
-    markForDeletion: function(category, merchantId) {
+    markForDeletion: function (category, merchantId) {
         const timestampKey = `mifela_${category}_deleted_at`;
         localStorage.setItem(timestampKey, new Date().toISOString());
 
@@ -490,7 +490,7 @@ const RETENTION_POLICY = {
 // 🛡️ Breach Detection & Notification
 const BREACH_DETECTION = {
     // Detect potential data breach indicators
-    detectIndicators: function() {
+    detectIndicators: function () {
         const indicators = [];
 
         // Check for unusual access patterns
@@ -542,7 +542,7 @@ const BREACH_DETECTION = {
     },
 
     // Run breach detection and notify
-    runAudit: async function() {
+    runAudit: async function () {
         const indicators = this.detectIndicators();
         const now = new Date().toISOString();
 
@@ -582,7 +582,7 @@ const BREACH_DETECTION = {
 // 🔐 Consent Collection UI Integration
 const CONSENT_UI = {
     // Render consent collection modal
-    renderConsentModal: function(merchantOnboarding = true) {
+    renderConsentModal: function (merchantOnboarding = true) {
         const modalId = 'mifela-consent-modal';
         if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -601,7 +601,7 @@ const CONSENT_UI = {
                     <div class="p-6 space-y-6">
                         <p class="text-sm text-slate-500 leading-relaxed">
                             By continuing, you agree to our data processing practices as described in our
-                            <a href="#" class="text-indigo-600 hover:underline" id="privacy-policy-link"
+                            <a href="#" class="text-SLATE-600 hover:underline" id="privacy-policy-link"
                                onclick="event.preventDefault(); openPublicToSModal();">Privacy Policy</a>.
                         </p>
 
@@ -615,7 +615,7 @@ const CONSENT_UI = {
                                     </div>
                                     <label class="relative inline-flex items-center">
                                         <input type="checkbox" id="consent-functional" disabled="" checked=""
-                                               class="w-4 h-4 rounded border border-indigo-600 bg-indigo-600 cursor-not-allowed">
+                                               class="w-4 h-4 rounded border border-SLATE-600 bg-SLATE-600 cursor-not-allowed">
                                         <span class="ml-2 text-sm text-slate-500">Required</span>
                                     </label>
                                 </div>
@@ -631,7 +631,7 @@ const CONSENT_UI = {
                                     </div>
                                     <label class="relative inline-flex items-center">
                                         <input type="checkbox" id="consent-analytics"
-                                               class="w-4 h-4 rounded border border-indigo-600 bg-indigo-600 cursor-pointer">
+                                               class="w-4 h-4 rounded border border-SLATE-600 bg-SLATE-600 cursor-pointer">
                                         <span class="ml-2 text-sm text-slate-500">Enable</span>
                                     </label>
                                 </div>
@@ -647,7 +647,7 @@ const CONSENT_UI = {
                                     </div>
                                     <label class="relative inline-flex items-center">
                                         <input type="checkbox" id="consent-marketing"
-                                               class="w-4 h-4 rounded border border-indigo-600 bg-indigo-600 cursor-pointer">
+                                               class="w-4 h-4 rounded border border-SLATE-600 bg-SLATE-600 cursor-pointer">
                                         <span class="ml-2 text-sm text-slate-500">Subscribe</span>
                                     </label>
                                 </div>
@@ -656,7 +656,7 @@ const CONSENT_UI = {
                         </div>
 
                         <div class="pt-6 border-t border-slate-100 bg-slate-50">
-                            <button onclick="CONSENT_UI.grantSelectedConsents()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg">
+                            <button onclick="CONSENT_UI.grantSelectedConsents()" class="w-full bg-SLATE-600 hover:bg-SLATE-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg">
                                 I Agree & Continue
                             </button>
                         </div>
@@ -676,7 +676,7 @@ const CONSENT_UI = {
     },
 
     // Grant selected consents and record them
-    grantSelectedConsents: function() {
+    grantSelectedConsents: function () {
         const analyticsConsent = document.getElementById('consent-analytics')?.checked;
         const marketingConsent = document.getElementById('consent-marketing')?.checked;
 
@@ -727,7 +727,7 @@ const CONSENT_UI = {
 // 🚀 Initialize GDPR Compliance on App Load
 const GDPR_INIT = {
     // Initialize compliance framework when app loads
-    initialize: function() {
+    initialize: function () {
         console.log('🛡️ Initializing Mifela GDPR & DPPDP Compliance Framework');
 
         // 1. Check existing consents
@@ -761,7 +761,7 @@ const GDPR_INIT = {
     },
 
     // Check existing consents
-    checkExistingConsents: function() {
+    checkExistingConsents: function () {
         const consents = {
             hasExisting: false,
             grantedTypes: []
@@ -785,7 +785,7 @@ const GDPR_INIT = {
     },
 
     // Log compliance status
-    logComplianceStatus: function() {
+    logComplianceStatus: function () {
         const status = {
             frameworkVersion: '1.0.0',
             initializedAt: new Date().toISOString(),

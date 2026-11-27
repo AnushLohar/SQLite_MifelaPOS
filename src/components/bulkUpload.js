@@ -17,12 +17,12 @@ function openBulkGuideModal() {
     const html = `
         <div id="${modalId}" class="fixed inset-0 z-[300] bg-slate-900/70 flex items-center justify-center p-4 animate-fadeIn">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden max-h-[90vh] animate-scaleIn">
-                <div class="px-6 py-4 border-b border-slate-100 bg-indigo-50 flex justify-between items-center shrink-0">
-                    <h2 class="text-xl font-black text-indigo-900 flex items-center gap-2">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+                    <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Bulk Upload Guide
                     </h2>
-                    <button id="close-bulk-guide" class="text-indigo-400 hover:text-indigo-700 bg-white rounded-full p-1.5 transition shadow-sm">
+                    <button id="close-bulk-guide" class="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1.5 transition shadow-sm">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -49,11 +49,11 @@ function openBulkGuideModal() {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <h4 class="font-bold text-slate-800 mb-1">Exclusive (+GST)</h4>
-                                <p class="text-xs">The Base Rate is the item price <strong class="text-indigo-600">without tax</strong>. The system will calculate GST on top of it to figure out the Net Amount.</p>
+                                <p class="text-xs">The Base Rate is the item price <strong class="text-slate-600">without tax</strong>. The system will calculate GST on top of it to figure out the Net Amount.</p>
                             </div>
-                            <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-                                <h4 class="font-bold text-indigo-800 mb-1">Inclusive (Net)</h4>
-                                <p class="text-xs">The Base Rate you type is the <strong class="text-indigo-600">final total</strong>. The system will reverse-calculate to figure out what the tax and subtotal were.</p>
+                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <h4 class="font-bold text-slate-800 mb-1">Inclusive (Net)</h4>
+                                <p class="text-xs">The Base Rate you type is the <strong class="text-slate-600">final total</strong>. The system will reverse-calculate to figure out what the tax and subtotal were.</p>
                             </div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@ function openBulkGuideModal() {
 
                     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                         <h3 class="font-black text-slate-800 text-base mb-2 border-b pb-2">💵 Cost & Pricing</h3>
-                        <p class="mb-2"><strong>Unit Cost</strong> is permanently greyed out because it is <strong class="text-indigo-600">auto-calculated</strong>. It divides the <em>Total Net Amount</em> by the <em>Total Stock</em> to give you an exact, blended per-item cost.</p>
+                        <p class="mb-2"><strong>Unit Cost</strong> is permanently greyed out because it is <strong class="text-slate-600">auto-calculated</strong>. It divides the <em>Total Net Amount</em> by the <em>Total Stock</em> to give you an exact, blended per-item cost.</p>
                         <p><strong>MRP vs Selling Price:</strong> You can quickly copy prices across rows using the <strong class="text-slate-800">Push</strong> buttons in the table headers.</p>
                     </div>
 
@@ -82,7 +82,7 @@ function openBulkGuideModal() {
     document.getElementById('close-bulk-guide').onclick = () => document.getElementById(modalId).remove();
 }
 
-export function openManualBulkUpload(onSave, dealersCache = [], productsCache = []) {
+export async function openManualBulkUpload(onSave, dealersCache = [], productsCache = []) {
     // 📊 LOCAL TELEMETRY: Track UI interaction offline for your automated workflows
     if (window.dbAPI && window.dbAPI.logTelemetry) {
         window.dbAPI.logTelemetry('ui_interaction', { 
@@ -115,39 +115,39 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
     const generateEmptyRow = (index = 0) => {
         const autoSku = `SKU${Date.now().toString().slice(-5)}${Math.floor(Math.random()*1000)}${index}`;
         return `
-        <tr class="hover:bg-indigo-50/30 transition-all duration-200 group bulk-row animate-fadeIn">
-            <td class="p-1 min-w-[200px]"><input type="text" list="bulk-product-list" class="inp-name w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800" placeholder="Product Name *"></td>
-            <td class="p-1 min-w-[120px]"><input type="text" class="inp-sku w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${autoSku}"></td>
-            <td class="p-1 min-w-[120px]"><input type="text" class="inp-barcode w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" placeholder="Scan/Type"></td>
-            <td class="p-1 min-w-[100px]"><input type="number" class="inp-mrp w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600" placeholder="0.00"></td>
-            <td class="p-1 min-w-[120px]"><input type="number" class="inp-selling-price w-full border border-indigo-300 bg-indigo-50 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-indigo-900" placeholder="Required *"></td>
+        <tr class="hover:bg-slate-50/30 transition-all duration-200 group bulk-row animate-fadeIn">
+            <td class="p-1 min-w-[200px]"><input type="text" list="bulk-product-list" class="inp-name w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-800" placeholder="Product Name *"></td>
+            <td class="p-1 min-w-[120px]"><input type="text" class="inp-sku w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-mono text-slate-600" value="${autoSku}"></td>
+            <td class="p-1 min-w-[120px]"><input type="text" class="inp-barcode w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-mono text-slate-600" placeholder="Scan/Type"></td>
+            <td class="p-1 min-w-[100px]"><input type="number" class="inp-mrp w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-600" placeholder="0.00"></td>
+            <td class="p-1 min-w-[120px]"><input type="number" class="inp-selling-price w-full border border-slate-300 bg-slate-50 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-900" placeholder="Required *"></td>
             
             <td class="p-1 min-w-[100px]"><input type="number" class="inp-unit-cost w-full border border-slate-200 bg-slate-100 text-slate-500 rounded p-1.5 text-sm font-bold cursor-not-allowed select-none focus:ring-0" placeholder="Auto" readonly tabindex="-1"></td>
             
             <td class="p-1 bg-slate-100 border-l border-r border-slate-200/60"><input type="number" class="inp-total-stock w-full bg-transparent border-none text-center rounded p-1.5 text-sm font-bold text-slate-400 focus:outline-none" readonly tabindex="-1" value="0"></td>
             
-            <td class="p-1"><input type="number" class="inp-cs w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" placeholder="0"></td>
-            <td class="p-1"><input type="number" class="inp-upc w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="1"></td>
-            <td class="p-1"><input type="number" class="inp-pcs w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" placeholder="0"></td>
+            <td class="p-1"><input type="number" class="inp-cs w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" placeholder="0"></td>
+            <td class="p-1"><input type="number" class="inp-upc w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" value="1"></td>
+            <td class="p-1"><input type="number" class="inp-pcs w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger" placeholder="0"></td>
             
             <td class="p-1"><input type="number" class="inp-free-qty w-full border border-emerald-200 bg-emerald-50 hover:bg-white focus:border-emerald-500 rounded p-1.5 text-sm text-center font-bold text-emerald-700 calc-trigger" placeholder="0" value="0"></td>
             <td class="p-1">
-                <select class="inp-unit w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600 bg-white">
+                <select class="inp-unit w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-600 bg-white">
                     ${unitOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('')}
                 </select>
             </td>
             
             <td class="p-1">
-                <select class="inp-type w-full border border-slate-200 rounded p-1.5 text-[10px] font-bold uppercase bg-white focus:border-indigo-500">
+                <select class="inp-type w-full border border-slate-200 rounded p-1.5 text-[10px] font-bold uppercase bg-white focus:border-slate-500">
                     <option value="standard">GST Product</option>
                     <option value="non_gst">Non-GST</option>
                     <option value="raw_material">Raw Mat.</option>
                 </select>
             </td>
             
-            <td class="p-1"><input type="number" class="inp-base-rate w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" placeholder="0.00"></td>
+            <td class="p-1"><input type="number" class="inp-base-rate w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-800 calc-trigger" placeholder="0.00"></td>
             <td class="p-1 min-w-[120px]">
-                <div class="flex items-stretch border border-slate-200 rounded focus-within:border-indigo-500 overflow-hidden bg-white">
+                <div class="flex items-stretch border border-slate-200 rounded focus-within:border-slate-500 overflow-hidden bg-white">
                     <input type="number" class="inp-sch-disc w-full min-w-0 border-none p-1.5 text-sm font-bold text-slate-800 calc-trigger focus:ring-0" placeholder="0">
                     <select class="inp-sch-type bg-slate-100 text-slate-600 text-[10px] font-black border-l border-slate-200 px-1 cursor-pointer calc-trigger outline-none">
                         <option value="rs">₹</option><option value="pct">%</option>
@@ -155,7 +155,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 </div>
             </td>
             <td class="p-1 min-w-[120px]">
-                <div class="flex items-stretch border border-slate-200 rounded focus-within:border-indigo-500 overflow-hidden bg-white">
+                <div class="flex items-stretch border border-slate-200 rounded focus-within:border-slate-500 overflow-hidden bg-white">
                     <input type="number" class="inp-rs-disc w-full min-w-0 border-none p-1.5 text-sm font-bold text-slate-800 calc-trigger focus:ring-0" placeholder="0">
                     <select class="inp-rs-type bg-slate-100 text-slate-600 text-[10px] font-black border-l border-slate-200 px-1 cursor-pointer calc-trigger outline-none">
                         <option value="rs">₹</option><option value="pct">%</option>
@@ -163,28 +163,28 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 </div>
             </td>
             
-            <td class="p-1 min-w-[100px]"><input type="number" class="inp-taxable w-full border border-slate-200 bg-slate-50 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-600 calc-trigger" placeholder="0.00"></td>
+            <td class="p-1 min-w-[100px]"><input type="number" class="inp-taxable w-full border border-slate-200 bg-slate-50 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-600 calc-trigger" placeholder="0.00"></td>
             
             <td class="p-1 min-w-[90px]">
-                <select class="inp-gst w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger bg-white">
+                <select class="inp-gst w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-center font-bold text-slate-800 calc-trigger bg-white">
                     <option value="0">0%</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option><option value="28">28%</option>
                 </select>
             </td>
             
-            <td class="p-1 min-w-[80px]"><input type="number" class="inp-cess w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-center font-bold text-red-600 calc-trigger" placeholder="0%"></td>
+            <td class="p-1 min-w-[80px]"><input type="number" class="inp-cess w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-center font-bold text-red-600 calc-trigger" placeholder="0%"></td>
             
             <td class="p-1">
                 <div class="flex gap-1">
-                    <input type="number" class="inp-cgst w-full border border-slate-200 bg-slate-50 focus:border-indigo-500 rounded p-1.5 text-xs font-medium text-slate-500" placeholder="CGST" tabindex="-1">
-                    <input type="number" class="inp-sgst w-full border border-slate-200 bg-slate-50 focus:border-indigo-500 rounded p-1.5 text-xs font-medium text-slate-500" placeholder="SGST" tabindex="-1">
+                    <input type="number" class="inp-cgst w-full border border-slate-200 bg-slate-50 focus:border-slate-500 rounded p-1.5 text-xs font-medium text-slate-500" placeholder="CGST" tabindex="-1">
+                    <input type="number" class="inp-sgst w-full border border-slate-200 bg-slate-50 focus:border-slate-500 rounded p-1.5 text-xs font-medium text-slate-500" placeholder="SGST" tabindex="-1">
                 </div>
             </td>
             
-            <td class="p-1 min-w-[120px]"><input type="number" class="inp-net w-full border border-slate-200 bg-slate-50 focus:border-indigo-500 rounded p-1.5 text-sm font-bold text-slate-900 calc-trigger" placeholder="0.00"></td>
+            <td class="p-1 min-w-[120px]"><input type="number" class="inp-net w-full border border-slate-200 bg-slate-50 focus:border-slate-500 rounded p-1.5 text-sm font-bold text-slate-900 calc-trigger" placeholder="0.00"></td>
             
-            <td class="p-1"><input type="text" class="inp-hsn w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm font-mono text-slate-600" placeholder="HSN"></td>
-            <td class="p-1"><input type="text" class="inp-batch w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-slate-600 uppercase" placeholder="Batch"></td>
-            <td class="p-1"><input type="date" class="inp-expiry w-full border border-slate-200 focus:border-indigo-500 rounded p-1.5 text-sm text-slate-600"></td>
+            <td class="p-1"><input type="text" class="inp-hsn w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm font-mono text-slate-600" placeholder="HSN"></td>
+            <td class="p-1"><input type="text" class="inp-batch w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-slate-600 uppercase" placeholder="Batch"></td>
+            <td class="p-1"><input type="date" class="inp-expiry w-full border border-slate-200 focus:border-slate-500 rounded p-1.5 text-sm text-slate-600"></td>
             
             <td class="p-1 text-center">
                 <button type="button" class="delete-row-btn text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Remove Item" tabindex="-1">
@@ -203,7 +203,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
     <div id="manual-bulk-overlay" class="fixed inset-0 z-[200] bg-slate-900 flex flex-col animate-fadeIn">
         <header class="flex justify-between items-center p-6 bg-slate-800 border-b border-slate-700 shadow-lg shrink-0">
             <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-indigo-500/20 text-indigo-400 flex items-center justify-center rounded-2xl shadow-inner">
+                <div class="w-12 h-12 bg-slate-500/20 text-slate-400 flex items-center justify-center rounded-2xl shadow-inner">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                 </div>
                 <div>
@@ -212,12 +212,12 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 </div>
             </div>
             <div class="flex gap-3">
-                <button id="btn-open-guide" class="px-4 py-3 bg-indigo-900/50 text-indigo-300 hover:text-white hover:bg-indigo-700 rounded-xl font-bold transition-colors flex items-center gap-2 border border-indigo-500/30">
+                <button id="btn-open-guide" class="px-4 py-3 bg-slate-900/50 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl font-bold transition-colors flex items-center gap-2 border border-slate-500/30">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Guide
                 </button>
                 <button id="cancel-bulk-btn" class="px-6 py-3 text-slate-300 font-bold hover:text-white hover:bg-slate-700 rounded-xl transition-colors">Discard</button>
-                <button id="confirm-bulk-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-indigo-500/20 transition-all active:scale-95 flex items-center gap-2">
+                <button id="confirm-bulk-btn" class="bg-slate-700 hover:bg-slate-800 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center gap-2">
                     Save to Database
                 </button>
             </div>
@@ -229,9 +229,9 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 pb-3 gap-4">
                     <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier & Invoice Details</h3>
                     
-                    <div class="flex items-center gap-3 bg-indigo-50/50 border border-indigo-100 p-1.5 rounded-xl shadow-sm">
-                        <label class="text-[10px] font-black text-indigo-600 uppercase tracking-wider pl-2">Upload Context:</label>
-                        <select id="bulk-upload-type-select" class="bg-white border border-indigo-200 rounded-lg p-1.5 text-xs font-black text-indigo-700 outline-none cursor-pointer focus:border-indigo-500 transition-colors shadow-sm">
+                    <div class="flex items-center gap-3 bg-slate-50/50 border border-slate-100 p-1.5 rounded-xl shadow-sm">
+                        <label class="text-[10px] font-black text-slate-600 uppercase tracking-wider pl-2">Upload Context:</label>
+                        <select id="bulk-upload-type-select" class="bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-black text-slate-700 outline-none cursor-pointer focus:border-slate-500 transition-colors shadow-sm">
                             <option value="standard">Purchase Invoice (Standard)</option>
                             <option value="non_gst">Local / Non-GST Goods</option>
                         </select>
@@ -239,44 +239,44 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div><label class="text-[10px] font-bold text-slate-500">Dealer Phone</label><input type="text" id="bulk-supplier-phone" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50" placeholder="Search by Phone"></div>
-                    <div><label class="text-[10px] font-bold text-slate-500">Store / Dealer Name *</label><input type="text" id="bulk-supplier-name" list="bulk-dealer-list" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50" placeholder="Required"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">Dealer Phone</label><input type="text" id="bulk-supplier-phone" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50" placeholder="Search by Phone"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">Store / Dealer Name *</label><input type="text" id="bulk-supplier-name" list="bulk-dealer-list" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50" placeholder="Required"></div>
                     <div>
     <label class="text-[10px] font-bold text-slate-500">Supplier GSTIN</label>
     <div class="relative">
-        <input type="text" id="bulk-supplier-gstin" class="w-full border-b border-slate-300 p-1 pr-16 text-sm font-bold uppercase focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50">
-        <button type="button" id="bulk-verify-gstin-btn" class="absolute right-0 bottom-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors hidden bg-slate-50 px-2 py-0.5 rounded">Verify</button>
+        <input type="text" id="bulk-supplier-gstin" class="w-full border-b border-slate-300 p-1 pr-16 text-sm font-bold uppercase focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50">
+        <button type="button" id="bulk-verify-gstin-btn" class="absolute right-0 bottom-1 text-[10px] font-bold text-slate-600 hover:text-slate-800 transition-colors hidden bg-slate-50 px-2 py-0.5 rounded">Verify</button>
     </div>
 </div>
-                    <div><label class="text-[10px] font-bold text-slate-500">Purchase Date</label><input type="date" id="bulk-purchase-date" value="${todayISO}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">Purchase Date</label><input type="date" id="bulk-purchase-date" value="${todayISO}" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50"></div>
                     
-                    <div><label class="text-[10px] font-bold text-slate-500">Supplier PAN</label><input type="text" id="bulk-supplier-pan" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">Supplier PAN</label><input type="text" id="bulk-supplier-pan" class="w-full border-b border-slate-300 p-1 text-sm font-bold uppercase focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50"></div>
                 
-                    <div><label class="text-[10px] font-bold text-slate-500">Invoice Number</label><input type="text" id="bulk-invoice-no" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-indigo-500 outline-none bg-transparent hover:bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">Invoice Number</label><input type="text" id="bulk-invoice-no" class="w-full border-b border-slate-300 p-1 text-sm font-bold focus:border-slate-500 outline-none bg-transparent hover:bg-slate-50"></div>
                 </div>
             </div>
 
             <div class="flex-1 overflow-auto dark-scrollbar bg-slate-50 p-6 relative flex flex-col">
                 
-                <div class="flex items-center justify-between bg-indigo-50/80 p-4 rounded-xl mb-6 border border-indigo-200 shadow-sm shrink-0 gap-4">
+                <div class="flex items-center justify-between bg-slate-50/80 p-4 rounded-xl mb-6 border border-slate-200 shadow-sm shrink-0 gap-4">
                     <div class="flex items-center gap-3 flex-1">
-                        <div class="p-2.5 bg-indigo-100 text-indigo-700 rounded-lg shrink-0">
+                        <div class="p-2.5 bg-slate-100 text-slate-700 rounded-lg shrink-0">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                         </div>
                         <div class="min-w-0">
-                            <h4 class="text-sm font-black text-indigo-900 tracking-tight">Manual Tax Interpretation</h4>
-                            <p class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5 truncate">Flip switch if the rates you are typing already include tax.</p>
+                            <h4 class="text-sm font-black text-slate-900 tracking-tight">Manual Tax Interpretation</h4>
+                            <p class="text-[11px] text-slate-600 font-bold uppercase tracking-wider mt-0.5 truncate">Flip switch if the rates you are typing already include tax.</p>
                         </div>
                     </div>
                     
-                    <div class="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-indigo-100 shadow-sm shrink-0">
+                    <div class="flex items-center gap-3 bg-white px-4 py-2.5 rounded-lg border border-slate-100 shadow-sm shrink-0">
                         <span class="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Exclusive (+GST)</span>
                         <label class="flex items-center cursor-pointer relative z-10">
                             <input type="checkbox" id="bulk-tax-override-toggle" class="sr-only">
                             <div class="w-12 h-6 bg-slate-300 rounded-full transition-colors duration-300 ease-in-out"></div>
                             <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ease-in-out shadow-sm transform translate-x-0"></div>
                         </label>
-                        <span class="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Inclusive (Net)</span>
+                        <span class="text-[11px] font-black text-slate-700 uppercase tracking-widest">Inclusive (Net)</span>
                     </div>
                 </div>
 
@@ -290,14 +290,14 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                             <th class="p-2 min-w-[100px]">
                                 <div class="flex items-center gap-1.5">
                                     <span>MRP</span>
-                                    <button type="button" id="push-mrp-btn" class="text-slate-400 hover:text-indigo-600 bg-transparent hover:bg-indigo-100/80 p-1 rounded-md transition-colors" title="Push MRP into Selling Price">
+                                    <button type="button" id="push-mrp-btn" class="text-slate-400 hover:text-slate-600 bg-transparent hover:bg-slate-100/80 p-1 rounded-md transition-colors" title="Push MRP into Selling Price">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                     </button>
                                 </div>
                             </th>
-                            <th class="p-2 min-w-[120px] text-indigo-600 bg-indigo-50/50">
+                            <th class="p-2 min-w-[120px] text-slate-600 bg-slate-50/50">
                                 <div class="flex items-center gap-1.5">
-                                    <button type="button" id="push-sp-btn" class="text-indigo-400 hover:text-indigo-700 bg-transparent hover:bg-indigo-200/50 p-1 rounded-md transition-colors" title="Push Selling Price into MRP">
+                                    <button type="button" id="push-sp-btn" class="text-slate-400 hover:text-slate-700 bg-transparent hover:bg-slate-200/50 p-1 rounded-md transition-colors" title="Push Selling Price into MRP">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                                     </button>
                                     <span>Selling Price*</span>
@@ -313,7 +313,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                             <th class="p-2 min-w-[110px]">
                                 <div class="flex flex-col gap-1">
                                     <span>Unit Type</span>
-                                    <select id="bulk-unit-select" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded p-1 cursor-pointer outline-none">
+                                    <select id="bulk-unit-select" class="text-[9px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded p-1 cursor-pointer outline-none">
                                         <option value="">-- Bulk --</option>
                                         ${unitOptions.map(u => `<option value="${u.value}">${u.label}</option>`).join('')}
                                     </select>
@@ -323,7 +323,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                             <th class="p-2">
                                 <div class="flex flex-col gap-1">
                                     <span>Type</span>
-                                    <select id="global-type-sync" class="text-[9px] font-bold text-indigo-700 bg-white border border-indigo-200 rounded p-0.5 cursor-pointer">
+                                    <select id="global-type-sync" class="text-[9px] font-bold text-slate-700 bg-white border border-slate-200 rounded p-0.5 cursor-pointer">
                                         <option value="standard">GST Product</option>
                                         <option value="non_gst">Non-GST</option>
                                         <option value="raw_material">Raw Mat.</option>
@@ -338,7 +338,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                             <th class="p-2 min-w-[90px]">
                                 <div class="flex flex-col gap-1">
                                     <span>GST %</span>
-                                    <select id="bulk-gst-select" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded p-1 cursor-pointer outline-none">
+                                    <select id="bulk-gst-select" class="text-[9px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded p-1 cursor-pointer outline-none">
                                         <option value="">- Bulk -</option>
                                         <option value="0">0%</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option><option value="28">28%</option>
                                     </select>
@@ -359,7 +359,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                 </table>
                 
                 <div class="mt-4 flex justify-center pb-8">
-                    <button id="add-bulk-row-btn" class="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-indigo-50 text-indigo-600 font-black tracking-wide rounded-xl transition-colors shadow-sm border border-indigo-100">
+                    <button id="add-bulk-row-btn" class="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-slate-50 text-slate-600 font-black tracking-wide rounded-xl transition-colors shadow-sm border border-slate-100">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         Add 5 More Rows
                     </button>
@@ -372,7 +372,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                         <p class="text-xs text-slate-400 font-medium">✏️ Adjust the <strong class="text-amber-500">Round Off</strong> field to match the physical bill.</p>
                         <div class="flex items-center gap-2 mt-2">
                             <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Payment Mode:</span>
-                            <select id="bulk-payment-method" class="border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-indigo-700 outline-none focus:border-indigo-500 bg-white shadow-sm cursor-pointer">
+                            <select id="bulk-payment-method" class="border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-slate-700 outline-none focus:border-slate-500 bg-white shadow-sm cursor-pointer">
                                 <option value="CASH">Cash</option>
                                 <option value="CHEQUE">Cheque</option>
                                 <option value="UPI">UPI</option>
@@ -405,11 +405,11 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
                     </div>
                 </div>
 
-                <div id="bulk-cheque-details" class="hidden flex gap-3 justify-start items-center bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-                    <span class="text-indigo-800 font-bold text-[10px] uppercase tracking-wide">Cheque Info:</span>
-                    <input type="text" id="bulk-cheque-bank" placeholder="Bank Name" class="border border-indigo-200 rounded p-1.5 text-sm w-40">
-                    <input type="text" id="bulk-cheque-no" placeholder="Cheque No" class="border border-indigo-200 rounded p-1.5 text-sm w-40 font-mono">
-                    <input type="date" id="bulk-cheque-date" class="border border-indigo-200 rounded p-1.5 text-sm text-slate-600">
+                <div id="bulk-cheque-details" class="hidden flex gap-3 justify-start items-center bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                    <span class="text-slate-800 font-bold text-[10px] uppercase tracking-wide">Cheque Info:</span>
+                    <input type="text" id="bulk-cheque-bank" placeholder="Bank Name" class="border border-slate-200 rounded p-1.5 text-sm w-40">
+                    <input type="text" id="bulk-cheque-no" placeholder="Cheque No" class="border border-slate-200 rounded p-1.5 text-sm w-40 font-mono">
+                    <input type="date" id="bulk-cheque-date" class="border border-slate-200 rounded p-1.5 text-sm text-slate-600">
                 </div>
             </div>
 
@@ -569,13 +569,13 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
 
         if (dbName && supName && !supName.value) {
             supName.value = dbName;
-            supName.classList.add('bg-indigo-50', 'transition-colors');
-            setTimeout(() => supName.classList.remove('bg-indigo-50'), 800);
+            supName.classList.add('bg-slate-50', 'transition-colors');
+            setTimeout(() => supName.classList.remove('bg-slate-50'), 800);
         }
         if (dbPhone && supPhone && !supPhone.value) {
             supPhone.value = dbPhone;
-            supPhone.classList.add('bg-indigo-50', 'transition-colors');
-            setTimeout(() => supPhone.classList.remove('bg-indigo-50'), 800);
+            supPhone.classList.add('bg-slate-50', 'transition-colors');
+            setTimeout(() => supPhone.classList.remove('bg-slate-50'), 800);
         }
         if (supGstin && dbGst) supGstin.value = dbGst; 
         if (supPan && dbPan) supPan.value = dbPan; 
@@ -684,6 +684,14 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
     }
 
     
+
+    // Initialize GSTIN Auto-Fill for bulk supplier form
+    try {
+        const { attachGstinAutoFill, GSTIN_FIELD_MAPS } = await import('../utils/gstinAutoFill.js');
+        attachGstinAutoFill(GSTIN_FIELD_MAPS.bulkSupplier);
+    } catch (e) {
+        console.warn('GSTIN AutoFill for bulk supplier failed:', e);
+    }
 
     const uploadTypeSelect = document.getElementById('bulk-upload-type-select');
     if (uploadTypeSelect) {
@@ -1102,8 +1110,8 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
             const setVal = (el, val, triggerMath = false) => { 
                 if (el && val !== undefined && val !== null && el.value !== String(val)) {
                     el.value = val; 
-                    el.classList.add('bg-indigo-50', 'transition-colors');
-                    setTimeout(() => el.classList.remove('bg-indigo-50'), 800);
+                    el.classList.add('bg-slate-50', 'transition-colors');
+                    setTimeout(() => el.classList.remove('bg-slate-50'), 800);
                     if (triggerMath) el.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             };
@@ -1200,7 +1208,7 @@ export function openManualBulkUpload(onSave, dealersCache = [], productsCache = 
 
             if (name !== '') {
                 if (isNaN(price) || price <= 0) {
-                    priceInput.classList.remove('border-indigo-300', 'bg-indigo-50');
+                    priceInput.classList.remove('border-slate-300', 'bg-slate-50');
                     priceInput.classList.add('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-200');
                     hasErrors = true;
                 } else {

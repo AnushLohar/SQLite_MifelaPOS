@@ -41,7 +41,7 @@ describe('LicenceStateManager (real SQLite)', () => {
 
   async function insertLicence(row) {
     const knex = getKnex();
-    const nextDue = row.next_verification_due || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const nextDue = row.next_verification_due || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     await knex('licence_data').insert({
       id: row.id || 'lic-1',
       licence_payload: JSON.stringify({

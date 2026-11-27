@@ -1,9 +1,9 @@
 // src/components/production.js
 
 
-import { 
-    getProductsRef, getTransactionsRef, getCustomersRef, appId, getStoreId, getUserId, 
-    getCurrencyCode, getCurrencySymbol, hasFeatureAccess, getCurrentUserPlan, getCurrentLocationId 
+import {
+    getProductsRef, getTransactionsRef, getCustomersRef, appId, getStoreId, getUserId,
+    getCurrencyCode, getCurrencySymbol, hasFeatureAccess, getCurrentUserPlan, getCurrentLocationId
 } from '../store/state.js';
 import { showModal, showToast } from '../utils/dom.js';
 import { escapeHTML } from '../utils/security.js';
@@ -19,23 +19,23 @@ window.openProductionModal = openProductionModal;
 window.processProductionBatch = processProductionBatch;
 window.autoMergeRawMaterials = autoMergeRawMaterials;
 
-window.removeRecipeComponent = function(index) {
+window.removeRecipeComponent = function (index) {
     currentRecipeComponents.splice(index, 1);
     renderRecipeComponents();
 };
 
 export function initProductionUI(containerElement) {
     const userPlan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
-    
+
     if (!hasFeatureAccess(userPlan, 'manufacturing')) {
         containerElement.innerHTML = `
             <div class="flex flex-col items-center justify-center py-20 px-4 text-center bg-white rounded-2xl shadow-sm border border-gray-200">
-                <div class="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                <div class="w-20 h-20 bg-SLATE-50 text-SLATE-500 rounded-full flex items-center justify-center mb-6 shadow-inner">
                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
                 <h2 class="text-2xl font-black text-gray-800 mb-2 tracking-tight">Manufacturing Locked</h2>
                 <p class="text-gray-500 max-w-md mb-8 font-medium">The Manufacturing & Bill of Materials (BOM) module is exclusively available on the Platinum and Diamond plans.</p>
-                <button onclick="document.querySelector('[data-view=\\'subscription\\']')?.click()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-indigo-200 transition-transform active:scale-95 flex items-center gap-2">
+                <button onclick="document.querySelector('[data-view=\\'subscription\\']')?.click()" class="bg-SLATE-600 hover:bg-SLATE-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-SLATE-200 transition-transform active:scale-95 flex items-center gap-2">
                     <span>⭐</span> View Upgrade Options
                 </button>
             </div>
@@ -116,7 +116,7 @@ function switchTab(activeBtn, tabName) {
     activeBtn.className = "px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg shadow-sm transition-colors";
 
     const contentArea = document.getElementById('production-content-area');
-    
+
     if (tabName === 'raw') renderRawMaterialsTable(contentArea);
     else if (tabName === 'recipes') renderRecipesTable(contentArea);
 }
@@ -148,7 +148,7 @@ function setupProductionListener() {
 
         const activeTabBtn = document.querySelector('#btn-view-recipes').classList.contains('bg-slate-800') ? 'recipes' : 'raw';
         const contentArea = document.getElementById('production-content-area');
-        
+
         if (activeTabBtn === 'raw') renderRawMaterialsTable(contentArea);
         else renderRecipesTable(contentArea);
 
@@ -162,7 +162,7 @@ async function autoMergeRawMaterials() {
     try {
         const productsRef = getProductsRef();
         const batch = writeBatch(db);
-        
+
         const groups = {};
         let mergedCount = 0;
 
@@ -181,12 +181,12 @@ async function autoMergeRawMaterials() {
                 for (let i = 1; i < duplicates.length; i++) {
                     const dup = duplicates[i];
                     totalStock += parseFloat(dup.stockLevel || 0);
-                    
+
                     // Mark duplicate for deletion
                     batch.delete(doc(productsRef, dup.id));
                     mergedCount++;
                 }
-                
+
                 // Update Master with combined stock
                 batch.update(doc(productsRef, master.id), { stockLevel: totalStock });
             }
@@ -227,7 +227,7 @@ function renderRawMaterialsTable(container) {
             <td class="p-4 text-slate-600 font-medium">₹${parseFloat(m.cost || 0).toFixed(2)}</td>
             <td class="p-4 text-slate-500 font-medium">${parseFloat(m.gstSlab || 0)}%</td>
             <td class="p-4 text-right flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onclick="window.viewRawMaterialDetails('${m.id}')" class="text-indigo-600 font-bold text-xs bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">Details</button>
+                <button onclick="window.viewRawMaterialDetails('${m.id}')" class="text-SLATE-600 font-bold text-xs bg-SLATE-50 hover:bg-SLATE-100 px-3 py-1.5 rounded-lg transition-colors">Details</button>
                 <button onclick="window.deleteRawMaterial('${m.id}', '${escapeHTML(m.name)}')" class="text-red-600 font-bold text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">Del</button>
             </td>
         </tr>
@@ -251,7 +251,7 @@ function renderRawMaterialsTable(container) {
     `;
 }
 
-window.viewRawMaterialDetails = function(id) {
+window.viewRawMaterialDetails = function (id) {
     const m = rawMaterials.find(x => x.id === id);
     if (!m) return;
 
@@ -300,7 +300,7 @@ window.viewRawMaterialDetails = function(id) {
     document.body.insertAdjacentHTML('beforeend', html);
 };
 
-window.deleteRawMaterial = async function(id, name) {
+window.deleteRawMaterial = async function (id, name) {
     // Check if this material is used in any active recipes
     const isUsed = recipes.some(r => r.recipe && r.recipe.some(c => c.rawMaterialId === id));
     if (isUsed) {
@@ -313,7 +313,7 @@ window.deleteRawMaterial = async function(id, name) {
             // We now rely on the static imports at the top of the file.
             const productsRef = getProductsRef();
             await deleteDoc(doc(productsRef, id));
-            
+
             if (typeof showToast === 'function') showToast("Deleted", `${name} has been removed.`, "success");
         } catch (e) {
             console.error(e);
@@ -435,12 +435,12 @@ function openRawMaterialModal() {
                         </div>
                     </div>
 
-                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-5">
-                        <h4 class="text-[10px] font-black text-indigo-800 uppercase tracking-widest mb-3">Payment Details (Settlement)</h4>
+                    <div class="bg-SLATE-50 border border-SLATE-100 rounded-xl p-5">
+                        <h4 class="text-[10px] font-black text-SLATE-800 uppercase tracking-widest mb-3">Payment Details (Settlement)</h4>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-slate-500 mb-1">Payment Mode</label>
-                                <select id="raw-payment-method" class="w-full border border-indigo-200 rounded-lg p-2.5 text-sm font-bold text-indigo-700 bg-white focus:ring-indigo-500 outline-none shadow-sm cursor-pointer transition-colors hover:border-indigo-300">
+                                <select id="raw-payment-method" class="w-full border border-SLATE-200 rounded-lg p-2.5 text-sm font-bold text-SLATE-700 bg-white focus:ring-SLATE-500 outline-none shadow-sm cursor-pointer transition-colors hover:border-SLATE-300">
                                     <option value="CREDIT">Credit (Udhaar / Unpaid)</option>
                                     <option value="CASH">Cash (Paid Immediately)</option>
                                     <option value="UPI">UPI / Digital</option>
@@ -449,16 +449,16 @@ function openRawMaterialModal() {
                             </div>
                             <div id="raw-cheque-drawer" class="hidden md:col-span-3 grid-cols-3 gap-3">
                                 <div>
-                                    <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Bank Name</label>
-                                    <input type="text" id="raw-cheque-bank" class="w-full border border-indigo-100 rounded-lg p-2 text-sm outline-none" placeholder="e.g. SBI">
+                                    <label class="block text-[10px] font-bold text-SLATE-400 uppercase mb-1">Bank Name</label>
+                                    <input type="text" id="raw-cheque-bank" class="w-full border border-SLATE-100 rounded-lg p-2 text-sm outline-none" placeholder="e.g. SBI">
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Cheque No.</label>
-                                    <input type="text" id="raw-cheque-no" class="w-full border border-indigo-100 rounded-lg p-2 text-sm font-mono outline-none" placeholder="6 Digits">
+                                    <label class="block text-[10px] font-bold text-SLATE-400 uppercase mb-1">Cheque No.</label>
+                                    <input type="text" id="raw-cheque-no" class="w-full border border-SLATE-100 rounded-lg p-2 text-sm font-mono outline-none" placeholder="6 Digits">
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Clearance Date</label>
-                                    <input type="date" id="raw-cheque-date" class="w-full border border-indigo-100 rounded-lg p-2 text-sm outline-none text-slate-500">
+                                    <label class="block text-[10px] font-bold text-SLATE-400 uppercase mb-1">Clearance Date</label>
+                                    <input type="date" id="raw-cheque-date" class="w-full border border-SLATE-100 rounded-lg p-2 text-sm outline-none text-slate-500">
                                 </div>
                             </div>
                         </div>
@@ -516,7 +516,7 @@ function openRawMaterialModal() {
 
     ['raw-cost', 'raw-stock', 'raw-gst', 'raw-tax-inclusive'].forEach(id => {
         document.getElementById(id).addEventListener('input', calcNet);
-        if(id === 'raw-gst' || id === 'raw-tax-inclusive') {
+        if (id === 'raw-gst' || id === 'raw-tax-inclusive') {
             document.getElementById(id).addEventListener('change', calcNet);
         }
     });
@@ -526,7 +526,7 @@ function openRawMaterialModal() {
     document.getElementById('raw-sup-phone').addEventListener('input', (e) => {
         clearTimeout(fetchDebounce);
         const val = e.target.value.replace(/\D/g, '').slice(-10);
-        
+
         // Wipe fields immediately on change to avoid ghost data
         document.getElementById('raw-sup-id').value = '';
         ['raw-sup-name', 'raw-sup-gstin', 'raw-sup-pan'].forEach(id => {
@@ -541,11 +541,11 @@ function openRawMaterialModal() {
                     // Safely grab the App ID
                     const currentAppId = typeof window !== 'undefined' && window.__app_id ? window.__app_id : appId;
                     const dirRef = collection(db, `artifacts/${currentAppId}/directory_merchants`);
-                    
+
                     const candidates = [`+91${val}`, val, `0${val}`];
                     const q = query(dirRef, where('phone', 'in', candidates), limit(1));
                     const snap = await getDocs(q);
-                    
+
                     if (!snap.empty) {
                         const data = snap.docs[0].data();
                         const setF = (id, v) => {
@@ -555,11 +555,11 @@ function openRawMaterialModal() {
                         setF('raw-sup-name', data.storeName || data.name);
                         setF('raw-sup-gstin', data.gstin);
                         setF('raw-sup-pan', data.pan);
-                        
+
                         document.getElementById('raw-sup-id').value = data.merchantId || snap.docs[0].id;
                         if (typeof showToast === 'function') showToast("Profile Found", "Supplier details loaded.", "success");
                     }
-                } catch(err) { console.error(err); }
+                } catch (err) { console.error(err); }
             }, 600);
         }
     });
@@ -573,17 +573,17 @@ function openRawMaterialModal() {
         const stock = parseFloat(document.getElementById('raw-stock').value) || 0;
         const gst = parseFloat(document.getElementById('raw-gst').value) || 0;
         const isInclusive = document.getElementById('raw-tax-inclusive').checked;
-        
+
         const supPhoneRaw = document.getElementById('raw-sup-phone').value.replace(/\D/g, '').slice(-10);
         const supName = document.getElementById('raw-sup-name').value.trim();
         const supGstin = document.getElementById('raw-sup-gstin').value.trim().toUpperCase();
         const supPan = document.getElementById('raw-sup-pan').value.trim().toUpperCase();
-        
+
         const supInvoice = document.getElementById('raw-sup-invoice').value.trim().toUpperCase();
         let existingSupId = document.getElementById('raw-sup-id').value.trim();
 
         const paymentMethod = document.getElementById('raw-payment-method').value;
-        
+
         let chequeDetails = null;
         if (paymentMethod === 'CHEQUE') {
             chequeDetails = {
@@ -612,7 +612,7 @@ function openRawMaterialModal() {
         try {
             // 🚀 THE FIX: Removed the dynamic 'await import' lines!
             // We now rely on the static imports at the top of the file.
-            
+
             const productsRef = getProductsRef();
             const customersRef = getCustomersRef();
             const transactionsRef = getTransactionsRef();
@@ -620,7 +620,7 @@ function openRawMaterialModal() {
 
             let finalDealerId = existingSupId;
             const normalizedPhone = supPhoneRaw.length === 10 ? `91${supPhoneRaw}` : '';
-            
+
             // Generate an ID if it's a completely new supplier
             if (!finalDealerId && supName) {
                 if (normalizedPhone) {
@@ -639,18 +639,18 @@ function openRawMaterialModal() {
             // even if the ID already existed. This captures updated GSTINs, PANs, etc.
             if (finalDealerId && supName && customersRef) {
                 const supData = {
-                    merchantId: finalDealerId, 
-                    name: supName, 
-                    storeName: supName, 
+                    merchantId: finalDealerId,
+                    name: supName,
+                    storeName: supName,
                     type: 'supplier',
                     isSupplier: true, // Hard-code true for B2B queries
-                    phone: normalizedPhone ? `+${normalizedPhone}` : '', 
-                    gstin: supGstin, 
-                    pan: supPan, 
-                    locationId: typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main', 
+                    phone: normalizedPhone ? `+${normalizedPhone}` : '',
+                    gstin: supGstin,
+                    pan: supPan,
+                    locationId: typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main',
                     updatedAt: serverTimestamp()
                 };
-                
+
                 // Account for Credit Dues
                 if (paymentMethod === 'CREDIT') {
                     supData.dues = increment(-netAmt); // Negative because we OWE them
@@ -658,14 +658,14 @@ function openRawMaterialModal() {
 
                 // Update Local Store
                 batch.set(doc(customersRef, finalDealerId), supData, { merge: true });
-                
+
                 // Update Global Directory
                 if (appId) {
                     batch.set(doc(db, `artifacts/${appId}/directory_merchants/${finalDealerId}`), supData, { merge: true });
                 }
             }
 
-            const existingRaw = rawMaterials.find(m => 
+            const existingRaw = rawMaterials.find(m =>
                 m.name.toLowerCase().trim() === name.toLowerCase() && m.unit === unit && parseFloat(m.cost || 0) === cost && parseFloat(m.gstSlab || 0) === gst
             );
 
@@ -674,7 +674,7 @@ function openRawMaterialModal() {
             const productData = {
                 dealerId: finalDealerId, dealerName: supName, dealerPhone: normalizedPhone ? `+${normalizedPhone}` : '', dealerGstin: supGstin, dealerPan: supPan, supplierInvoice: supInvoice, updatedAt: serverTimestamp()
             };
-            
+
             if (expiry) productData.expirationDate = expiry; // Apply expiry to inventory
 
             if (existingRaw) {
@@ -691,7 +691,7 @@ function openRawMaterialModal() {
             if (stock > 0) {
                 const txRef = doc(transactionsRef);
                 const invId = supInvoice || `RAW-PUR-${Date.now().toString().slice(-6)}`;
-                
+
                 batch.set(txRef, {
                     invoiceId: invId,
                     supplierInvoice: supInvoice,
@@ -707,14 +707,14 @@ function openRawMaterialModal() {
                     summary: {
                         total: -netAmt, // The true payable total including tax
                         profit: 0,
-                        paymentMethod: paymentMethod, 
+                        paymentMethod: paymentMethod,
                         chequeDetails: chequeDetails,
                         reason: 'Raw Material Restock',
                         itemCount: stock,
                         transactionType: 'PURCHASE'
                     },
                     items: [{
-                        id: targetDocRef.id, name: name, quantity: stock, cost: cost, price: 0, taxRate: gst, type: 'raw_material', 
+                        id: targetDocRef.id, name: name, quantity: stock, cost: cost, price: 0, taxRate: gst, type: 'raw_material',
                         subtotal: netAmt, taxableValue: taxableAmt // Deep reporting data
                     }],
                     cashierId: getUserId(),
@@ -723,15 +723,15 @@ function openRawMaterialModal() {
 
                 // 🚀 ACCOUNTING FIX: Always tag as supplier, but only increment dues if bought on Udhaar!
                 if (finalDealerId && customersRef) {
-                    const partyUpdates = { 
+                    const partyUpdates = {
                         isSupplier: true, // Automatically makes them show up in Supplier filters forever
-                        updatedAt: serverTimestamp() 
+                        updatedAt: serverTimestamp()
                     };
-                    
+
                     if (paymentMethod === 'CREDIT') {
                         partyUpdates.dues = increment(-netAmt); // Negative because we OWE them
                     }
-                    
+
                     batch.set(doc(customersRef, finalDealerId), partyUpdates, { merge: true });
                 }
             }
@@ -739,7 +739,7 @@ function openRawMaterialModal() {
             await batch.commit();
             document.getElementById(modalId).remove();
             showToast("Success", "Material saved & Ledger updated.", "success");
-            
+
         } catch (error) {
             console.error("Save Error:", error);
             alert("Failed to save material.");
@@ -762,7 +762,7 @@ function renderRecipesTable(container) {
     let rows = recipes.map(r => {
         let maxPossible = Infinity;
         const components = r.recipe || [];
-        
+
         components.forEach(comp => {
             const rawItem = rawMaterials.find(rm => rm.id === comp.rawMaterialId);
             const available = rawItem ? (parseFloat(rawItem.stockLevel) || 0) : 0;
@@ -791,7 +791,7 @@ function renderRecipesTable(container) {
             </td>
             <td class="p-4 text-slate-600 font-medium">₹${parseFloat(r.cost || 0).toFixed(2)}</td>
             <td class="p-4 text-right flex justify-end gap-2">
-                <button onclick="window.openRecipeBuilderModal('${r.id}')" class="text-indigo-600 font-bold text-xs bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-all border border-indigo-100">Edit</button>
+                <button onclick="window.openRecipeBuilderModal('${r.id}')" class="text-SLATE-600 font-bold text-xs bg-SLATE-50 hover:bg-SLATE-100 px-3 py-2 rounded-lg transition-all border border-SLATE-100">Edit</button>
                 <button onclick="window.openProductionModal('${r.id}')" class="text-white font-bold text-xs bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg shadow-sm active:scale-95 transition-all">Start Batch</button>
             </td>
         </tr>
@@ -816,7 +816,7 @@ function renderRecipesTable(container) {
 
 function openRecipeBuilderModal(existingRecipeId = null) {
     let existingRecipe = null;
-    currentRecipeComponents = []; 
+    currentRecipeComponents = [];
 
     if (existingRecipeId) {
         existingRecipe = recipes.find(r => r.id === existingRecipeId);
@@ -872,7 +872,7 @@ function openRecipeBuilderModal(existingRecipeId = null) {
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
                                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Retail Price (₹)</label>
-                                        <input type="number" id="recipe-price" value="${existingRecipe ? existingRecipe.price : ''}" class="w-full border border-slate-200 rounded-lg p-2.5 text-sm focus:border-purple-500 outline-none font-bold text-indigo-700 bg-indigo-50" placeholder="0.00">
+                                        <input type="number" id="recipe-price" value="${existingRecipe ? existingRecipe.price : ''}" class="w-full border border-slate-200 rounded-lg p-2.5 text-sm focus:border-purple-500 outline-none font-bold text-SLATE-700 bg-SLATE-50" placeholder="0.00">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Output Unit</label>
@@ -950,7 +950,7 @@ function openRecipeBuilderModal(existingRecipeId = null) {
     document.body.insertAdjacentHTML('beforeend', html);
     document.getElementById('close-recipe-btn').onclick = () => document.getElementById(modalId).remove();
     document.getElementById('add-ingredient-btn').onclick = handleAddIngredient;
-    
+
     renderRecipeComponents(); // Initial render for edits
 }
 
@@ -986,7 +986,7 @@ function handleAddIngredient() {
 function renderRecipeComponents() {
     const tbody = document.getElementById('recipe-components-list');
     const costDisplay = document.getElementById('recipe-total-cost');
-    
+
     if (currentRecipeComponents.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400 italic">No ingredients added yet.</td></tr>`;
         costDisplay.textContent = "0.00";
@@ -1016,7 +1016,7 @@ function renderRecipeComponents() {
     costDisplay.textContent = totalMfgCost.toFixed(2);
 }
 
-window.handleSaveRecipe = async function(existingId) {
+window.handleSaveRecipe = async function (existingId) {
     const name = document.getElementById('recipe-name').value.trim();
     const price = parseFloat(document.getElementById('recipe-price').value) || 0;
     const unit = document.getElementById('recipe-unit').value;
@@ -1033,9 +1033,9 @@ window.handleSaveRecipe = async function(existingId) {
 
     try {
         const productsRef = getProductsRef();
-        
+
         const targetDocRef = existingId ? doc(productsRef, existingId) : doc(productsRef);
-        
+
         // 🚀 THE FIX: We explicitly save 'cost: mfgCost' so the POS can use it for Profit calculations!
         const payload = {
             name: name,
@@ -1043,7 +1043,7 @@ window.handleSaveRecipe = async function(existingId) {
             unit: unit,
             price: price,
             cost: mfgCost, // 👈 True ERP: Live BOM Cost becomes the Product's Base Cost
-            gstSlab: gst, 
+            gstSlab: gst,
             hsn: hsn,
             recipe: currentRecipeComponents.map(c => ({
                 rawMaterialId: c.rawMaterialId,
@@ -1053,7 +1053,7 @@ window.handleSaveRecipe = async function(existingId) {
         };
 
         if (!existingId) {
-            payload.stockLevel = 0; 
+            payload.stockLevel = 0;
             payload.sku = `MFG-${Date.now().toString().slice(-6)}`;
             payload.createdAt = new Date().toISOString();
         }
@@ -1171,12 +1171,12 @@ function openProductionModal(recipeId) {
     const calculateBatch = () => {
         const scale = parseFloat(scaleInput.value) || 0;
         let expectedYield = scale; // 1 scale = 1 unit of recipe output
-        
+
         // Auto-update yield if they haven't touched it
         if (!hasManuallyEditedYield) {
             yieldInput.value = expectedYield;
         }
-        
+
         const actualYield = parseFloat(yieldInput.value) || 0;
         const oh = parseFloat(ohInput.value) || 0;
         const taxPct = parseFloat(taxInput.value) || 0;
@@ -1184,25 +1184,25 @@ function openProductionModal(recipeId) {
         // Calculate Raw Materials Cost & Generate Preview
         let totalRawCost = 0;
         let previewHtml = '<div class="font-bold mb-1 border-b border-blue-100 pb-1">Will deduct from stock:</div>';
-        
+
         recipe.recipe.forEach(comp => {
             const rawItem = rawMaterials.find(rm => rm.id === comp.rawMaterialId);
             const rawCost = rawItem ? parseFloat(rawItem.cost || 0) : 0;
             const requiredBase = parseFloat(comp.qtyRequired || 0);
-            
+
             const totalRequired = requiredBase * scale;
             const lineCost = totalRequired * rawCost;
-            
+
             totalRawCost += lineCost;
             previewHtml += `<div class="flex justify-between font-mono"><span>- ${totalRequired.toFixed(2)} ${rawItem ? rawItem.unit : ''} ${rawItem ? escapeHTML(rawItem.name) : 'Unknown'}</span> <span>₹${lineCost.toFixed(2)}</span></div>`;
         });
-        
+
         rawPreviewBox.innerHTML = previewHtml;
 
         // Calculate Overheads
         const ohTotal = oh + (oh * (taxPct / 100));
         const grandTotal = totalRawCost + ohTotal;
-        
+
         // Unit Cost Math! 
         // 🚀 This absorbs all the costs (and losses) into the actual physical yield!
         const finalUnitCost = actualYield > 0 ? (grandTotal / actualYield) : 0;
@@ -1264,7 +1264,7 @@ async function processProductionBatch(recipeId) {
         recipe.recipe.forEach(comp => {
             const rawItem = rawMaterials.find(rm => rm.id === comp.rawMaterialId);
             const rawCost = rawItem ? parseFloat(rawItem.cost || 0) : 0;
-            
+
             const totalRequired = comp.qtyRequired * scale;
             totalRawCost += (totalRequired * rawCost);
 
@@ -1304,18 +1304,18 @@ async function processProductionBatch(recipeId) {
         batch.set(txRef, {
             invoiceId: `MFG-${Date.now().toString().slice(-6)}`,
             storeId: getStoreId(),
-            locationId: 'main', 
+            locationId: 'main',
             timestamp: serverTimestamp(),
-            type: 'PRODUCTION', 
+            type: 'PRODUCTION',
             customer: { id: 'INTERNAL', name: 'Internal Manufacturing', gstin: '' },
             summary: {
-                total: totalBatchCost, 
+                total: totalBatchCost,
                 profit: 0, // Profit is realized at sale, not production
                 paymentMethod: 'SYSTEM',
                 reason: reasonStr,
                 transactionType: 'PRODUCTION',
                 itemCount: actualYield,
-                tax: overhead * (taxPct / 100) 
+                tax: overhead * (taxPct / 100)
             },
             items: [{
                 id: recipe.id,

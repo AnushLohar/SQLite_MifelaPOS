@@ -3,7 +3,7 @@
 
 import {
     userSettingsRef,
-    setDashboardWidgets, 
+    setDashboardWidgets,
     setUserSettingsListener,
     setConvenienceFee,
     setCurrency,
@@ -11,20 +11,20 @@ import {
     userRole,
     userAssignedLocationId,
     getStoreId,
-    setAvailableLocations, 
+    setAvailableLocations,
     registerListener,
     appId as staticAppId,
-    getProductsRef 
+    getProductsRef
 } from './state.js';
 
 import { renderDynamicDashboard } from './dashboard.js';
-import { escapeHTML } from '../utils/security.js'; 
+import { escapeHTML } from '../utils/security.js';
 import { updateNavigationUIForPlan } from '../components/navigation.js';
 import { populateSettingsUI } from '../components/settings.js';
 
-const APP_VERSION = '1.0.0'; 
-let _legacyStores = [];     
-let _collectionStores = []; 
+const APP_VERSION = '1.0.0';
+let _legacyStores = [];
+let _collectionStores = [];
 
 // --- Prevent Multiple Listeners (DOUBLING FIX) ---
 const activeListeners = {
@@ -40,8 +40,8 @@ const activeListeners = {
 export function startAllListeners() {
     console.log("🔌 Initializing Real-time Data Sync...");
     setupUserSettingsListener();
-    setupStoresListener(); 
-    setupInventoryStatsListener(); 
+    setupStoresListener();
+    setupInventoryStatsListener();
     setupGlobalListeners();
 }
 
@@ -52,7 +52,7 @@ export function startAllListeners() {
  */
 function setupInventoryStatsListener() {
     if (activeListeners.inventory) return; // Prevent double registration
-    
+
     const productsRef = getProductsRef();
     if (!productsRef) return;
 
@@ -65,9 +65,9 @@ function setupInventoryStatsListener() {
         // Dashboard Metrics
         let lowStockCount = 0;
         let expiredCount = 0;
-        let valueAtRisk = 0; 
+        let valueAtRisk = 0;
         let totalInventoryValue = 0;
-        
+
         // Collect actual item lists for Dashboard display
         const lowStockList = [];
         const expiredList = [];
@@ -77,7 +77,7 @@ function setupInventoryStatsListener() {
 
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
-            
+
             // 1. Role-Based Access Filter
             if (role !== 'admin' && role !== 'accountant') {
                 if ((data.locationId || 'main') !== assignedLoc) return;
@@ -112,7 +112,7 @@ function setupInventoryStatsListener() {
                     status: isOut ? 'Out' : 'Low'
                 });
             }
-            
+
             if (isExpired && stock > 0) {
                 expiredCount++;
                 expiredList.push({
@@ -121,7 +121,7 @@ function setupInventoryStatsListener() {
                     expiry: expiryStr
                 });
             }
-            
+
             // Value at Risk = Value of stock that is either expired or at reorder point
             if ((isLow || isExpired) && stock > 0) {
                 valueAtRisk += itemValue;
@@ -146,7 +146,7 @@ function setupInventoryStatsListener() {
 
         // Trigger an event so components can react
         window.dispatchEvent(new CustomEvent('inventory-stats-updated', { detail: stats }));
-        
+
         // FIX: Defer execution and use dynamic import to completely eliminate circular dependencies
         setTimeout(async () => {
             try {
@@ -212,7 +212,7 @@ function setupStoresListener() {
         const q = query(storesRef, where("ownerId", "==", auth.currentUser.uid));
         const unsub = onSnapshot(q, (snapshot) => {
             _collectionStores = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
+
             // CRITICAL FIX: Fallback if the root store document is missing for older accounts
             if (_collectionStores.length === 0) {
                 const fallbackId = getStoreId();
@@ -220,22 +220,22 @@ function setupStoresListener() {
                     _collectionStores = [{ id: fallbackId, storeName: 'Main Store', ownerId: auth.currentUser.uid }];
                 }
             }
-            
+
             updateGlobalStoreState();
         });
         registerListener(unsub);
     } else {
-        const targetId = userAssignedLocationId || getStoreId(); 
+        const targetId = userAssignedLocationId || getStoreId();
         if (targetId) {
             const docRef = doc(db, `artifacts/${currentAppId}/stores/${targetId}`);
             const unsub = onSnapshot(docRef, (docSnap) => {
                 _collectionStores = docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
-                
+
                 // CRITICAL FIX: Fallback for staff if root store document is missing
                 if (_collectionStores.length === 0) {
                     _collectionStores = [{ id: targetId, storeName: 'Assigned Store' }];
                 }
-                
+
                 updateGlobalStoreState();
             });
             registerListener(unsub);
@@ -248,9 +248,9 @@ function setupStoresListener() {
 function setupUserSettingsListener() {
     if (activeListeners.settings) return; // Prevent double registration
     if (!userSettingsRef) return;
-    
+
     activeListeners.settings = true;
-    
+
     const unsub = onSnapshot(userSettingsRef, (docSnap) => {
         if (docSnap.exists()) {
             const settings = docSnap.data();
@@ -258,7 +258,7 @@ function setupUserSettingsListener() {
                 if (!document.getElementById('suspended-screen')) {
                     document.body.insertAdjacentHTML('beforeend', `<div id="suspended-screen" class="fixed inset-0 bg-red-900/95 z-[999] flex items-center justify-center text-white text-3xl font-bold">Account Suspended</div>`);
                 }
-                return; 
+                return;
             } else { document.getElementById('suspended-screen')?.remove(); }
 
             setDashboardWidgets(settings.dashboardWidgets || []);
@@ -266,19 +266,19 @@ function setupUserSettingsListener() {
             setCurrency(settings.currency || 'INR');
             setPlan(settings.plan);
             _legacyStores = Array.isArray(settings.locations) ? settings.locations : [];
-            
+
             updateGlobalStoreState();
-            
+
             // FIX: Defeat ReferenceError and Circular Dependencies by dynamically importing UI modules
             setTimeout(async () => {
                 try {
                     updateNavigationUIForPlan();
-                    
+
                     populateSettingsUI(settings, auth.currentUser);
-                    
+
                     const dash = document.getElementById('dashboard');
                     if (dash && !dash.classList.contains('hidden')) {
-                        
+
                         renderDynamicDashboard(true);
                     }
                 } catch (err) {
@@ -287,9 +287,9 @@ function setupUserSettingsListener() {
             }, 0);
         }
     }, (error) => console.warn("Settings Sync Warning:", error.code));
-    
+
     setUserSettingsListener(unsub);
-    registerListener(unsub); 
+    registerListener(unsub);
 }
 
 // --- System Global Listeners ---
@@ -298,19 +298,19 @@ function setupGlobalListeners() {
     if (activeListeners.global) return; // Prevent double registration
     const currentAppId = (typeof window !== 'undefined' && window.__app_id) ? window.__app_id : staticAppId;
     if (!currentAppId) return;
-    
+
     activeListeners.global = true;
-    
+
     try {
         const marketingRef = doc(db, `artifacts/${currentAppId}/public_data/marketing`);
         registerListener(onSnapshot(marketingRef, (snap) => {
             if (snap.exists() && snap.data().active) {
                 const last = localStorage.getItem('mifela_last_ad');
                 if (last !== snap.data().updatedAt) {
-                    const html = `<div id="marketing-modal" class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 relative max-w-sm"><h3>${escapeHTML(snap.data().title)}</h3><p class="text-sm text-gray-500 my-2">${escapeHTML(snap.data().body)}</p><button onclick="this.closest('#marketing-modal').remove()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold">Close</button></div></div>`;
+                    const html = `<div id="marketing-modal" class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 relative max-w-sm"><h3>${escapeHTML(snap.data().title)}</h3><p class="text-sm text-gray-500 my-2">${escapeHTML(snap.data().body)}</p><button onclick="this.closest('#marketing-modal').remove()" class="w-full bg-SLATE-600 text-white py-2 rounded-lg font-bold">Close</button></div></div>`;
                     document.body.insertAdjacentHTML('beforeend', html);
                 }
             }
         }));
-    } catch (e) {}
+    } catch (e) { }
 }

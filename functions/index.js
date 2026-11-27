@@ -215,29 +215,156 @@ exports.checkOrderStatus = functions.https.onRequest((req, res) => {
  * 4. Node Activation (Called after verified Razorpay payment during setup)
  * Verifies payment was received for this node, then marks it ACTIVE so the
  * terminal can generate its local license. Only payment-verified nodes activate.
+ *
+ * FIXED: Uses onRequest with CORS for standard HTTP POST (not onCall).
+ * - Accepts identifier from: hardwareFingerprint, hardwareId, fingerprint, or data.hardwareFingerprint
+ * - Returns 200 OK with complete response matching client expectations
+ * - Checks status === "PAID" (and accepts ACTIVE/VERIFIED as success)
+ * - Updates document with verified markers on successful verification
+ * - Returns: verificationToken, paymentToken, paymentId, hardwareFingerprint, hardwareId, amountPaid, email
  */
-exports.verifyNodeActivation = functions.https.onCall(async (request) => {
-    const { email, node: fingerprint } = request.data;
-    if (!fingerprint) throw new functions.https.HttpsError('invalid-argument', 'Missing fingerprint');
-
-    const nodeDoc = await db.collection('provisioned_nodes').doc(fingerprint).get();
-    if (!nodeDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Node not registered. Complete payment first.');
-    }
-
-    const nodeData = nodeDoc.data();
-    if (nodeData.status !== 'ACTIVE') {
-        throw new functions.https.HttpsError('failed-precondition', 'Payment not detected or incomplete.');
-    }
-
-    return {
-        data: {
-            status: 'ACTIVE',
-            paymentToken: nodeData.paymentToken || 'VERIFIED',
-            email: nodeData.email
+exports.verifyNodeActivation = onRequest({
+    cors: true,
+    region: 'asia-south1',
+    secrets: ['LICENSING_PRIVATE_KEY']
+}, async (req, res) => {
+    try {
+        // Handle CORS preflight
+        if (req.method === 'OPTIONS') {
+            return res.status(204).send('');
         }
-    };
+
+        // Only accept POST
+        if (req.method !== 'POST') {
+            return res.status(405).json({ success: false, error: 'Method not allowed' });
+        }
+
+        const body = req.body || {};
+
+        // Normalize accepted payload keys
+        const fingerprint = body.hardwareFingerprint
+            || body.hardwareId
+            || body.fingerprint
+            || body.node
+            || (body.data && (body.data.hardwareFingerprint || body.data.hardwareId || body.data.fingerprint || body.data.node));
+
+        const email = body.email || (body.data && body.data.email) || '';
+
+        if (!fingerprint) {
+            console.error('verifyNodeActivation: Missing fingerprint in request body:', JSON.stringify(body));
+            return res.status(400).json({
+                success: false,
+                error: 'Missing hardwareFingerprint (expected: hardwareFingerprint, hardwareId, fingerprint, or node)'
+            });
+        }
+
+        // Look up node by document ID first
+        let nodeSnap = await db.collection('provisioned_nodes').doc(fingerprint).get();
+
+        // FALLBACK: If doc doesn't exist by ID, query by hardwareFingerprint field
+        if (!nodeSnap.exists) {
+            try {
+                const { collection, query, where, getDocs } = require('firebase/firestore');
+                const nodeQuery = query(
+                    collection(db, 'provisioned_nodes'),
+                    where('hardwareFingerprint', '==', fingerprint)
+                );
+                const snapshot = await getDocs(nodeQuery);
+                if (!snapshot.empty) {
+                    nodeSnap = snapshot.docs[0];
+                }
+            } catch (e) {
+                console.error('Fallback field query failed:', e.message);
+            }
+        }
+
+        if (!nodeSnap || !nodeSnap.exists) {
+            // DOCUMENT NOT FOUND — Return 200 with clear message
+            console.log('Node not found in provisioned_nodes:', fingerprint);
+            return res.status(200).json({
+                success: true,
+                verified: false,
+                status: 'NOT_REGISTERED',
+                message: 'Node not registered. Complete payment first.',
+                paymentExists: await _paymentExistsForFingerprint(fingerprint)
+            });
+        }
+
+        const nodeData = nodeSnap.data();
+        const nodeRef = nodeSnap.ref;
+        const status = nodeData.status || 'UNKNOWN';
+
+        // FIXED: Check status === "PAID" instead of strict ACTIVE match
+        // Accept PAID, ACTIVE, or VERIFIED as payment confirmed
+        const isPaid = status === 'PAID' || status === 'ACTIVE' || status === 'VERIFIED';
+
+        if (!isPaid) {
+            console.log('Node status is:', status, '— payment not detected/incomplete');
+            return res.status(200).json({
+                success: true,
+                verified: false,
+                status: 'PENDING',
+                message: `Payment not detected or incomplete. Current status: ${status}`,
+                paymentData: _extractPaymentData(nodeData)
+            });
+        }
+
+        // Payment confirmed — mark as fully verified
+        await nodeRef.update({
+            verified: true,
+            verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+            terminalActivated: true
+        });
+
+        // Return complete response matching client expectations
+        return res.status(200).json({
+            success: true,
+            verified: true,
+            status: 'VERIFIED',
+            message: 'Payment verified successfully',
+            verificationToken: nodeData.verificationToken || 'AUTO_VERIFIED',
+            paymentToken: nodeData.paymentToken || 'AUTO_PROVISIONED',
+            paymentId: nodeData.paymentId || null,
+            hardwareFingerprint: fingerprint,
+            hardwareId: fingerprint,
+            amountPaid: nodeData.amountPaid || null,
+            email: nodeData.email || email
+        });
+    } catch (err) {
+        console.error('verifyNodeActivation error:', err);
+        return res.status(500).json({
+            success: false,
+            verified: false,
+            error: err.message || 'Internal server error'
+        });
+    }
 });
+
+// Helper: Check if payment record exists for this fingerprint (for debugging)
+async function _paymentExistsForFingerprint(fingerprint) {
+    try {
+        // Query payments collection for any payment linked to this fingerprint
+        const payments = await db.collection('payments')
+            .where('fingerprint', '==', fingerprint)
+            .limit(1)
+            .get();
+
+        return !payments.empty;
+    } catch (e) {
+        console.error('Payment lookup failed:', e);
+        return false;
+    }
+}
+
+// Helper: Extract payment-related data for clearer error messages
+function _extractPaymentData(nodeData) {
+    return {
+        paymentToken: nodeData.paymentToken || null,
+        amountPaid: nodeData.amountPaid || null,
+        createdAt: nodeData.createdAt?.toDate?.().toISOString() || null,
+        lastVerifiedAt: nodeData.lastVerifiedAt?.toDate?.().toISOString() || null
+    };
+}
 
 /**
  * 3. Secure Node Verification (Called silently by Electron Background Sync)
@@ -262,9 +389,9 @@ exports.verifyNodeLicense = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('permission-denied', 'Subscription expired');
     }
 
-    // Push verification deadline forward 90 days
+    // Push verification deadline forward 30 days
     const nextDue = new Date();
-    nextDue.setDate(nextDue.getDate() + 90);
+    nextDue.setDate(nextDue.getDate() + 30);
 
     // 1. Generate cryptographic payload
     const payload = {
@@ -280,7 +407,12 @@ exports.verifyNodeLicense = functions.https.onCall(async (request) => {
 
     // 2. Sign payload with server's Private Key
     // We sign BEFORE updating the database to ensure we don't mark a node verified if signing fails
-    const privateKey = process.env.LICENSING_PRIVATE_KEY.replace(/\\n/g, '\n');
+    // Normalize key: handle both escaped \n and actual newlines, ensure PEM headers
+    let privateKey = process.env.LICENSING_PRIVATE_KEY || '';
+    privateKey = privateKey.replace(/\\n/g, '\n').trim();
+    if (!privateKey.includes('-----BEGIN')) {
+        privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
+    }
     const signatureBase64 = crypto.sign(null, Buffer.from(JSON.stringify(payload)), privateKey).toString('base64');
 
     // 3. Persist the verification event

@@ -1,13 +1,13 @@
 // src/components/navigation.js
 
-import { DOM, showModal } from '../utils/dom.js'; 
+import { DOM, showModal } from '../utils/dom.js';
 import { renderDynamicDashboard } from './dashboard.js';
 import { loadInventoryPage } from './inventory.js';
 import { loadCustomersPage } from './customers.js';
 import { loadTransactionsPage } from './transactions.js';
-import { loadPosPage } from './pos.js'; 
-import { populateSettingsUI } from './settings.js'; 
-import { getUserRole, hasPermission } from '../store/state.js'; 
+import { loadPosPage } from './pos.js';
+import { populateSettingsUI } from './settings.js';
+import { getUserRole, hasPermission } from '../store/state.js';
 
 // 🚀 THE FIX: Use static imports and wildcard aliases to guarantee Vite bundles them
 import * as ReportsModule from './reports.js';
@@ -33,7 +33,7 @@ export function handleNavigationView() {
     const views = document.querySelectorAll('.view-section');
 
     // Force all tabs to be visible to everyone (RBAC permanently removed)
-    window.showNavItemsForRole = function() {
+    window.showNavItemsForRole = function () {
         tabs.forEach(tab => {
             tab.classList.remove('hidden');
             tab.style.display = 'block';
@@ -54,10 +54,10 @@ export function handleNavigationView() {
 
 export async function attemptNavigation(targetView, tabs, views) {
     // 1. Update UI Tabs
-    tabs.forEach(t => t.classList.remove('active', 'bg-indigo-800', 'border-b-4', 'border-white'));
+    tabs.forEach(t => t.classList.remove('active', 'bg-SLATE-800', 'border-b-4', 'border-white'));
     const activeTab = Array.from(tabs).find(t => t.getAttribute('data-view') === targetView);
     if (activeTab) {
-        activeTab.classList.add('active', 'bg-indigo-800', 'border-b-4', 'border-white');
+        activeTab.classList.add('active', 'bg-SLATE-800', 'border-b-4', 'border-white');
     }
 
     // 2. Hide all views, show target view
@@ -74,7 +74,7 @@ export async function attemptNavigation(targetView, tabs, views) {
 
     // 3. Destroy any cached access denied modals
     const blockedModal = document.getElementById('access-denied-modal');
-    if (blockedModal) blockedModal.remove(); 
+    if (blockedModal) blockedModal.remove();
 
     // 🚀 4. THE FIX: Restore the Dynamic Data Loaders
     // This intelligent router automatically finds and executes the correct fetch/render function for any clicked tab.
@@ -84,11 +84,11 @@ export async function attemptNavigation(targetView, tabs, views) {
             if (mod) {
                 // Loop through all exports in the target file and trigger the loaders
                 for (const [fnName, fn] of Object.entries(mod)) {
-                    if (typeof fn === 'function' && 
-                       (fnName.startsWith('load') || 
-                        fnName.startsWith('render') || 
-                        fnName.startsWith('init') || 
-                        fnName.startsWith('fetch'))) {
+                    if (typeof fn === 'function' &&
+                        (fnName.startsWith('load') ||
+                            fnName.startsWith('render') ||
+                            fnName.startsWith('init') ||
+                            fnName.startsWith('fetch'))) {
                         fn();
                     }
                 }
@@ -104,7 +104,7 @@ export function updateNavigationUIForRole() {
 
     document.querySelectorAll('.tab-button, .mobile-nav-link, .nav-item, [data-view], [data-target]').forEach(btn => {
         const view = btn.dataset.view || btn.dataset.target;
-        if (!view) return; 
+        if (!view) return;
 
         if (!hasPermission(role, view)) {
             btn.classList.add('opacity-50', 'cursor-not-allowed', 'hidden');
@@ -128,7 +128,7 @@ export async function switchView(viewId) {
             sec.classList.remove('active', 'block');
             sec.classList.add('hidden');
         });
-        
+
         const targetSection = document.getElementById(targetSectionId);
         if (targetSection) {
             targetSection.classList.remove('hidden');
@@ -139,16 +139,16 @@ export async function switchView(viewId) {
     }
 
     document.querySelectorAll('.tab-button, .mobile-nav-link, .nav-item, [data-view], [data-target]').forEach(btn => {
-        btn.classList.remove('bg-indigo-800', 'text-white', 'shadow-inner'); 
+        btn.classList.remove('bg-SLATE-800', 'text-white', 'shadow-inner');
         if (btn.classList.contains('tab-button') || btn.classList.contains('nav-item')) {
-            btn.classList.add('text-indigo-100', 'hover:bg-indigo-600');
+            btn.classList.add('text-SLATE-100', 'hover:bg-SLATE-600');
         }
     });
-    
+
     const newBtn = document.querySelector(`[data-view="${viewId}"]`) || document.querySelector(`[data-target="${viewId}"]`);
     if (newBtn) {
-        newBtn.classList.remove('text-indigo-100', 'hover:bg-indigo-600');
-        newBtn.classList.add('bg-indigo-800', 'text-white', 'shadow-inner');
+        newBtn.classList.remove('text-SLATE-100', 'hover:bg-SLATE-600');
+        newBtn.classList.add('bg-SLATE-800', 'text-white', 'shadow-inner');
     }
 
     currentActiveViewId = targetSectionId;
@@ -161,15 +161,15 @@ export async function switchView(viewId) {
             case 'customers': await loadCustomersPage(); break;
             case 'transactions': await loadTransactionsPage(); break;
             // 🚀 THE FIX: Safely route to whatever export name is used in your files!
-            case 'reports': 
+            case 'reports':
                 if (typeof ReportsModule.renderReportLibraryPage === 'function') await ReportsModule.renderReportLibraryPage();
                 else if (typeof ReportsModule.initReports === 'function') await ReportsModule.initReports();
                 break;
-                
-            case 'staff': 
+
+            case 'staff':
                 if (typeof StaffModule.loadStaffList === 'function') await StaffModule.loadStaffList();
                 break;
-                
+
             case 'settings':
             case 'profile':
                 if (typeof populateSettingsUI === 'function') populateSettingsUI({}, null, viewId);

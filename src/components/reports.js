@@ -1,22 +1,22 @@
 // src/components/reports.js
 
 // --- Imports ---
-import { 
-    getStoreId, 
-    appId, 
-    getCurrencySymbol, 
-    getTransactionsRef, 
-    getProductsRef, 
+import {
+    getStoreId,
+    appId,
+    getCurrencySymbol,
+    getTransactionsRef,
+    getProductsRef,
     getUserRole,
-    getCurrentLocationId, 
-    getAvailableLocations, 
+    getCurrentLocationId,
+    getAvailableLocations,
     setCurrentLocation,
     getUserAssignedLocationId,
-    getCurrentUserPlan 
+    getCurrentUserPlan
 } from '../store/state.js';
 
-import { DOM, showModal } from '../utils/dom.js'; 
-import { safeMath } from '../utils/math.js'; 
+import { DOM, showModal } from '../utils/dom.js';
+import { safeMath } from '../utils/math.js';
 import { escapeHTML } from '../utils/security.js';
 
 // --- Helper: Local Time ISO Month ---
@@ -30,12 +30,12 @@ function normalizePlan(planString) {
     if (!planString) return 'free';
     const plan = planString.toLowerCase();
     if (plan === 'standard') return 'silver';
-    if (plan === 'premium') return 'platinum'; 
+    if (plan === 'premium') return 'platinum';
     return plan;
 }
 
 function renderAccessDenied(isAllowedRole) {
-    const grid = DOM.reports.grid; 
+    const grid = DOM.reports.grid;
     if (!grid) return;
 
     grid.innerHTML = `
@@ -59,8 +59,8 @@ export async function initReports() {
 
 export async function renderReportLibraryPage() {
     if (!DOM.reports.grid) return;
-    
-    DOM.reports.grid.innerHTML = ''; 
+
+    DOM.reports.grid.innerHTML = '';
 
     // Security & Access Checks
     const role = getUserRole();
@@ -80,12 +80,12 @@ export async function renderReportLibraryPage() {
     if (!canAccessAllLocations && currentLoc !== assignedLoc) {
         setCurrentLocation(assignedLoc);
         currentLoc = assignedLoc;
-    } 
+    }
 
     // Loading State
     DOM.reports.grid.innerHTML = `
         <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <div class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-100 border-t-indigo-600 mb-4"></div>
+            <div class="animate-spin rounded-full h-10 w-10 border-4 border-SLATE-100 border-t-SLATE-600 mb-4"></div>
             <p class="text-gray-500 font-medium">Analyzing historical data...</p>
         </div>
     `;
@@ -104,7 +104,7 @@ export async function renderReportLibraryPage() {
     } catch (error) {
         if (myGenerationId !== currentGenerationId) return;
         console.error("Reports Error:", error);
-        
+
         DOM.reports.grid.innerHTML = `
             <div class="col-span-full text-center p-10 bg-red-50 rounded-xl border border-red-200 text-red-700 mt-6">
                 <p class="font-bold text-lg mb-2">Report Generation Failed</p>
@@ -112,23 +112,23 @@ export async function renderReportLibraryPage() {
                 <button id="btn-report-retry" class="mt-4 px-6 py-2 bg-white border border-red-300 text-red-700 rounded-lg hover:bg-red-50 font-medium shadow-sm transition">Try Again</button>
             </div>
         `;
-        
+
         const retryBtn = document.getElementById('btn-report-retry');
-        if(retryBtn) retryBtn.onclick = () => renderReportLibraryPage();
+        if (retryBtn) retryBtn.onclick = () => renderReportLibraryPage();
     }
 }
 
 // --- State for Reports ---
 let financials = {
     trading: { sales: 0, purchases: 0, closingStock: 0, openingStock: 0, directExpenses: 0, grossProfit: 0 },
-    pl: { 
-        otherIncome: 0, 
+    pl: {
+        otherIncome: 0,
         expenses: { salaries: 0, rent: 0, utilities: 0, internet: 0, marketing: 0, packaging: 0, repairs: 0, travel: 0, general: 0, depreciation: 0 },
-        customExpenses: [], 
-        netProfit: 0 
+        customExpenses: [],
+        netProfit: 0
     },
     bs: { capital: 0, drawings: 0, securedLoans: 0, unsecuredLoans: 0, reserves: 0, sundryCreditors: 0, fixedAssets: [], sundryDebtors: 0, cashInHand: 0, bankAccounts: 0, closingStockBS: 0 },
-    gstSummary: {}, 
+    gstSummary: {},
     itcSummary: {},
     analytics: { daily: {}, products: {}, lowStock: [] }, // 🚀 NEW: Time-series and Product data for Charts
     anomalies: [], // 🚀 NEW: Array to hold detected issues
@@ -153,26 +153,26 @@ let financials = {
 };
 
 let saveTimeout = null;
-let listenersAttached = false; 
-let currentGenerationId = 0; 
+let listenersAttached = false;
+let currentGenerationId = 0;
 
 function resetFinancials() {
     const pType = financials.periodType;
     const pValue = financials.periodValue;
     const sYear = financials.selectedYear;
-    const currentView = financials.activeReportView || 'all'; 
+    const currentView = financials.activeReportView || 'all';
 
     financials = {
         trading: { sales: 0, purchases: 0, closingStock: 0, openingStock: 0, directExpenses: 0, grossProfit: 0 },
-        pl: { 
-            otherIncome: 0, 
+        pl: {
+            otherIncome: 0,
             expenses: { salaries: 0, rent: 0, utilities: 0, internet: 0, marketing: 0, packaging: 0, repairs: 0, travel: 0, general: 0, depreciation: 0 },
-            customExpenses: [], 
-            netProfit: 0 
+            customExpenses: [],
+            netProfit: 0
         },
         bs: { capital: 0, drawings: 0, securedLoans: 0, unsecuredLoans: 0, reserves: 0, sundryCreditors: 0, fixedAssets: [], sundryDebtors: 0, cashInHand: 0, bankAccounts: 0, closingStockBS: 0 },
-        gstSummary: {}, 
-        itcSummary: {}, 
+        gstSummary: {},
+        itcSummary: {},
         analytics: { daily: {}, products: {}, lowStock: [] }, // 🚀 Reset Chart Data
         anomalies: [], // 🚀 NEW: Array to hold detected issues
         b2bD2c: {
@@ -190,7 +190,7 @@ function resetFinancials() {
 
 async function calculateHistoricalStockValue(targetDate) {
     const today = new Date();
-    if (targetDate >= today.setHours(0,0,0,0)) {
+    if (targetDate >= today.setHours(0, 0, 0, 0)) {
         return calculateCurrentStockValue();
     }
 
@@ -203,12 +203,12 @@ async function calculateHistoricalStockValue(targetDate) {
         products.forEach(p => {
             if (currentLocationId !== 'all' && p.locationId !== currentLocationId) return;
             if (p.type === 'homemade') return;
-            
+
             const created = p.createdAt ? new Date(p.createdAt) : new Date(0);
             if (created <= targetDate) {
                 productMap.set(p.id, {
                     cost: parseFloat(p.costPrice || p.cost) || 0,
-                    histStock: parseFloat(p.stockLevel) || 0 
+                    histStock: parseFloat(p.stockLevel) || 0
                 });
             }
         });
@@ -218,10 +218,10 @@ async function calculateHistoricalStockValue(targetDate) {
         const txs = await window.dbAPI.getTransactionsSince(targetDate.toISOString());
         txs.forEach(tx => {
             if (currentLocationId !== 'all' && tx.locationId !== currentLocationId) return;
-            
+
             // Parse SQLite JSON if necessary
             const items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
-            
+
             items.forEach(item => {
                 if (productMap.has(item.id)) {
                     const p = productMap.get(item.id);
@@ -229,7 +229,7 @@ async function calculateHistoricalStockValue(targetDate) {
 
                     if (tx.type === 'SALE' || tx.type === 'REFUND') {
                         if (tx.type === 'SALE') p.histStock += qty;
-                        else p.histStock -= qty; 
+                        else p.histStock -= qty;
                     } else if (tx.type === 'PURCHASE') {
                         p.histStock -= qty;
                     }
@@ -250,14 +250,14 @@ async function calculateHistoricalStockValue(targetDate) {
 async function calculateCurrentStockValue() {
     let total = 0;
     const currentLocationId = getCurrentLocationId();
-    
+
     // 🚀 THE FIX: Fetch from SQLite
     if (window.dbAPI && window.dbAPI.getProducts) {
         const products = await window.dbAPI.getProducts();
         products.forEach(p => {
             if (currentLocationId !== 'all' && p.locationId !== currentLocationId) return;
-            if (p.type === 'homemade') return; 
-            
+            if (p.type === 'homemade') return;
+
             total = safeMath.add(total, safeMath.multiply(p.stockLevel || 0, p.costPrice || p.cost || 0));
         });
     }
@@ -369,7 +369,7 @@ async function calculateFinancials(genId) {
     if (!storeId) return;
 
     let startDate, endDate;
-    
+
     if (financials.periodType === 'monthly') {
         const [y, m] = financials.periodValue.split('-');
         startDate = new Date(parseInt(y), parseInt(m) - 1, 1, 0, 0, 0, 0);
@@ -379,11 +379,11 @@ async function calculateFinancials(genId) {
         const [y, qStr] = financials.periodValue.split('-');
         const year = parseInt(y);
         let startMonth = 0, endMonth = 2; // Default Q1
-        
+
         if (qStr === 'Q2_CAL') { startMonth = 3; endMonth = 5; }
         else if (qStr === 'Q3_CAL') { startMonth = 6; endMonth = 8; }
         else if (qStr === 'Q4_CAL') { startMonth = 9; endMonth = 11; }
-        
+
         startDate = new Date(year, startMonth, 1, 0, 0, 0, 0);
         endDate = new Date(year, endMonth + 1, 0, 23, 59, 59, 999);
     }
@@ -391,7 +391,7 @@ async function calculateFinancials(genId) {
 
     try {
         const currentLocationId = getCurrentLocationId();
-        
+
         // 🚀 THE FIX: Fetch Transactions via SQLite and filter by Date/Location
         let txs = [];
         if (window.dbAPI && window.dbAPI.getTransactionsSince) {
@@ -409,12 +409,12 @@ async function calculateFinancials(genId) {
         txs.forEach(tx => {
             // Parse SQLite JSON items if necessary
             if (typeof tx.items === 'string') {
-                try { tx.items = JSON.parse(tx.items); } catch(e) { tx.items = []; }
+                try { tx.items = JSON.parse(tx.items); } catch (e) { tx.items = []; }
             }
-            
+
             const txType = (tx.type || tx.summary?.transactionType || 'UNKNOWN').toUpperCase();
-            let total = Math.abs(parseFloat(tx.summary?.total || 0)); 
-            
+            let total = Math.abs(parseFloat(tx.summary?.total || 0));
+
             let homemadeDeduction = 0;
             let pureInventoryCost = 0;
             let pureTaxableSales = 0;
@@ -429,21 +429,21 @@ async function calculateFinancials(genId) {
                     } else if (item.type !== 'bundle') {
                         // Pure Inventory Cost: Base Unit Cost * Quantity
                         pureInventoryCost += (qty * parseFloat(item.cost || item.purchasePrice || item.price || 0));
-                        
+
                         // Pure Taxable Sales: Revenue without GST
                         pureTaxableSales += parseFloat(item.taxableValue || item.taxableAmt || item.subtotal || (qty * parseFloat(item.price || 0)));
                     }
                 });
             }
-            
+
             // Reduce the total by the amount belonging to homemade goods
             total = Math.max(0, total - homemadeDeduction);
-            
+
             // 🚀 TIME-SERIES EXTRACTION FOR CHARTS
             const dateObj = tx.timestamp?.toDate ? tx.timestamp.toDate() : new Date();
             const isoDate = dateObj.toISOString().split('T')[0];
             const displayDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-            
+
             if (!financials.analytics.daily[isoDate]) {
                 financials.analytics.daily[isoDate] = { display: displayDate, sales: 0, purchases: 0, expenses: 0 };
             }
@@ -458,11 +458,11 @@ async function calculateFinancials(genId) {
                     financials.trading.sales = safeMath.add(financials.trading.sales, pureTaxableSales);
                     financials.analytics.daily[isoDate].sales += total;
                 }
-                
+
                 // Track Product Charts
                 tx.items?.forEach(item => {
                     if (item.type === 'homemade' || item.type === 'bundle') return;
-                    if (txType === 'REFUND') return; 
+                    if (txType === 'REFUND') return;
 
                     // Product Sales Chart Data
                     const qty = Math.abs(item.quantity || 0);
@@ -472,13 +472,13 @@ async function calculateFinancials(genId) {
 
                     const slab = parseFloat(item.taxRate || item.gstSlab || item.tax || 0);
                     const cessRate = parseFloat(item.cessRate || item.cess || 0);
-                    
+
                     if (!financials.gstSummary[slab]) financials.gstSummary[slab] = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
-                    
+
                     const itemTotal = safeMath.multiply(item.price || 0, Math.abs(item.quantity || 0));
                     const combinedRate = slab + cessRate;
-                    const taxable = item.taxableValue || (itemTotal / (1 + (combinedRate/100)));
-                    
+                    const taxable = item.taxableValue || (itemTotal / (1 + (combinedRate / 100)));
+
                     const taxAmt = item.taxAmount || (taxable * (slab / 100));
                     const cessAmt = item.cessAmount || (taxable * (cessRate / 100));
 
@@ -492,7 +492,7 @@ async function calculateFinancials(genId) {
                         financials.gstSummary[slab].sgst += taxAmt / 2;
                     }
                 });
-                
+
             } else if (txType === 'PURCHASE') {
                 // 🚀 THE FIX: Trading Account Purchases MUST equal the pure base cost added to stock!
                 // Adding the invoice 'total' includes GST, which instantly creates a phantom loss.
@@ -509,15 +509,15 @@ async function calculateFinancials(genId) {
 
                 tx.items?.forEach(item => {
                     if (item.type === 'homemade' || item.type === 'bundle') return;
-                    const slab = parseFloat(item.taxRate || item.gstSlab || item.tax || 0); 
+                    const slab = parseFloat(item.taxRate || item.gstSlab || item.tax || 0);
                     const cessRate = parseFloat(item.cessRate || item.cess || 0);
-                    
+
                     if (!financials.itcSummary[slab]) financials.itcSummary[slab] = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
-                    
+
                     const itemTotal = safeMath.multiply(item.cost || item.purchasePrice || item.price || 0, Math.abs(item.quantity || 0));
                     const combinedRate = slab + cessRate;
-                    
-                    const taxable = item.taxableValue || (itemTotal / (1 + (combinedRate/100)));
+
+                    const taxable = item.taxableValue || (itemTotal / (1 + (combinedRate / 100)));
                     const taxAmt = item.taxAmount || (taxable * (slab / 100));
                     const cessAmt = item.cessAmount || (taxable * (cessRate / 100));
 
@@ -532,13 +532,13 @@ async function calculateFinancials(genId) {
                     }
                 });
             }
-            
+
             // 2. P&L Expenses
             else if (txType === 'EXPENSE' || txType === 'SALARY') {
                 financials.analytics.daily[isoDate].expenses += total; // 🚀 Chart Data
-                
+
                 let cat = (tx.category || tx.summary?.reason || 'general').toLowerCase();
-                
+
                 // Map common terms to standard buckets
                 if (cat.includes('salary') || txType === 'SALARY') cat = 'salaries';
                 else if (cat.includes('rent')) cat = 'rent';
@@ -548,7 +548,7 @@ async function calculateFinancials(genId) {
                 else if (cat.includes('pack')) cat = 'packaging';
                 else if (cat.includes('repair') || cat.includes('maint')) cat = 'repairs';
                 else if (cat.includes('travel') || cat.includes('transport')) cat = 'travel';
-                
+
                 if (Object.prototype.hasOwnProperty.call(financials.pl.expenses, cat)) {
                     financials.pl.expenses[cat] = safeMath.add(financials.pl.expenses[cat], total);
                 } else {
@@ -563,7 +563,7 @@ async function calculateFinancials(genId) {
         // 3. Stock Values
         financials.trading.openingStock = await calculateHistoricalStockValue(startDate);
         financials.trading.closingStock = await calculateHistoricalStockValue(endDate);
-        
+
         // 🚀 NEW: Scan Inventory for Low Stock Alerts (SQLite Version)
         let liveProducts = [];
         if (window.dbAPI && window.dbAPI.getProducts) {
@@ -574,7 +574,7 @@ async function calculateFinancials(genId) {
         liveProducts.forEach(p => {
             if (p.type === 'homemade') return;
             const stock = parseFloat(p.stockLevel) || 0;
-            const minStock = parseFloat(p.minStockLevel || 5); 
+            const minStock = parseFloat(p.minStockLevel || 5);
             if (stock <= minStock) {
                 financials.analytics.lowStock.push({ name: p.name || p.productName, stock: stock, min: minStock });
             }
@@ -583,7 +583,7 @@ async function calculateFinancials(genId) {
         // =========================================================================
         // 🚀 NEW: THE AUTOMATED ANOMALY & DIAGNOSTIC SCANNER
         // =========================================================================
-        
+
         // Check 1: Orphaned Inventory (Transactions for items that were deleted)
         const liveProductIds = new Set();
         liveProducts.forEach(p => liveProductIds.add(p.id));
@@ -623,33 +623,33 @@ async function calculateFinancials(genId) {
                 });
             }
         });
-        
+
         // Remove duplicate anomalies so we don't spam the user
         financials.anomalies = Array.from(new Set(financials.anomalies.map(a => JSON.stringify(a)))).map(a => JSON.parse(a));
-        
+
         // =========================================================================
         updateComputedTotalsDOM(true);
 
     } catch (e) {
         console.error("Financial Calculation Failed:", e);
-        throw e; 
+        throw e;
     }
 }
 
 async function loadSavedManualInputs() {
     const storeId = getStoreId();
     if (!storeId) return;
-    
+
     try {
         const currentLocationId = getCurrentLocationId();
         const suffix = (currentLocationId === 'all') ? 'main' : currentLocationId;
         const localKey = `mifela_financial_inputs_${storeId}_${financials.periodValue}_${suffix}`;
-        
+
         const rawData = localStorage.getItem(localKey);
-        
+
         if (rawData) {
             const data = JSON.parse(rawData);
-            
+
             if (data.openingStock !== undefined) financials.trading.openingStock = data.openingStock;
             if (data.directExpenses !== undefined) financials.trading.directExpenses = data.directExpenses;
             if (data.otherIncome !== undefined) financials.pl.otherIncome = data.otherIncome;
@@ -662,18 +662,18 @@ async function loadSavedManualInputs() {
             if (data.cashInHand !== undefined) financials.bs.cashInHand = data.cashInHand;
             if (data.bankAccounts !== undefined) financials.bs.bankAccounts = data.bankAccounts;
             if (Array.isArray(data.fixedAssets)) financials.bs.fixedAssets = data.fixedAssets;
-        } 
-    } catch (e) { 
-        console.warn("Load inputs failed:", e); 
+        }
+    } catch (e) {
+        console.warn("Load inputs failed:", e);
     }
 }
 
 function saveInputsToCloud() {
     const storeId = getStoreId();
     if (!storeId) return;
-    
+
     if (saveTimeout) clearTimeout(saveTimeout);
-    
+
     const status = document.getElementById('save-status');
     if (status) status.innerHTML = `<span class="text-amber-600 flex items-center gap-1 text-xs"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...</span>`;
 
@@ -684,10 +684,10 @@ function saveInputsToCloud() {
             const localKey = `mifela_financial_inputs_${storeId}_${financials.periodValue}_${suffix}`;
 
             const saveData = {
-                openingStock: financials.trading.openingStock, 
+                openingStock: financials.trading.openingStock,
                 directExpenses: financials.trading.directExpenses,
                 otherIncome: financials.pl.otherIncome,
-                customExpenses: financials.pl.customExpenses, 
+                customExpenses: financials.pl.customExpenses,
                 capital: financials.bs.capital,
                 drawings: financials.bs.drawings,
                 reserves: financials.bs.reserves,
@@ -701,16 +701,16 @@ function saveInputsToCloud() {
 
             // Save to LocalStorage
             localStorage.setItem(localKey, JSON.stringify(saveData));
-            
+
             if (status) {
                 status.innerHTML = `<span class="text-green-600 text-xs font-bold">Saved Locally</span>`;
-                setTimeout(() => { if(status) status.innerHTML = ''; }, 2000);
+                setTimeout(() => { if (status) status.innerHTML = ''; }, 2000);
             }
         } catch (e) {
             console.error(e);
             if (status) status.innerHTML = `<span class="text-red-600 text-xs">Save Failed</span>`;
         }
-    }, 1500); 
+    }, 1500);
 }
 
 // Inside src/components/reports.js
@@ -718,13 +718,13 @@ function saveInputsToCloud() {
 function getReportHeaderHtml() {
     const role = getUserRole();
     const currentLocationId = getCurrentLocationId();
-    const availLocs = typeof getAvailableLocations === 'function' ? getAvailableLocations() : [{id:'main', name:'Main Store'}];
+    const availLocs = typeof getAvailableLocations === 'function' ? getAvailableLocations() : [{ id: 'main', name: 'Main Store' }];
 
     let locationOpts = `<option value="all">All Locations (Aggregate)</option>`;
     availLocs.forEach(loc => {
         locationOpts += `<option value="${loc.id}" ${loc.id === currentLocationId ? 'selected' : ''}>${loc.name}</option>`;
     });
-    
+
     // 🚀 THE FIX: Removed hasMultiLocationSupport. Just check if they are an admin/accountant.
     const canSwitchLocation = (role === 'admin' || role === 'accountant');
 
@@ -735,7 +735,7 @@ function getReportHeaderHtml() {
         </select>
     ` : `
         <div class="h-5 w-px bg-gray-300 mx-1"></div>
-        <span class="text-sm font-semibold text-gray-600 px-2">${availLocs.find(l=>l.id===currentLocationId)?.name || 'Local Branch'}</span>
+        <span class="text-sm font-semibold text-gray-600 px-2">${availLocs.find(l => l.id === currentLocationId)?.name || 'Local Branch'}</span>
     `;
 
 
@@ -743,7 +743,7 @@ function getReportHeaderHtml() {
         <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 sticky top-0 z-10 border-b border-gray-100">
             <div>
                 <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <svg class="w-6 h-6 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Business Intelligence
                 </h2>
                 <div class="flex items-center gap-2 text-sm text-gray-500 mt-1">
@@ -755,9 +755,9 @@ function getReportHeaderHtml() {
             
             <div class="flex flex-wrap items-center gap-3 bg-gray-50 p-1.5 rounded-lg border shadow-sm">
                 <!-- 🚀 NEW: Report View Selector -->
-                <div class="flex items-center bg-white border border-indigo-100 rounded-md px-2 shadow-inner">
-                    <span class="text-indigo-500 mr-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg></span>
-                    <select id="report-view-type" class="bg-transparent py-1.5 text-sm font-black text-indigo-700 focus:outline-none cursor-pointer">
+                <div class="flex items-center bg-white border border-SLATE-100 rounded-md px-2 shadow-inner">
+                    <span class="text-SLATE-500 mr-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg></span>
+                    <select id="report-view-type" class="bg-transparent py-1.5 text-sm font-black text-SLATE-700 focus:outline-none cursor-pointer">
                         <option value="all" ${financials.activeReportView === 'all' ? 'selected' : ''}>Complete Dashboard</option>
                         <option value="charts" ${financials.activeReportView === 'charts' ? 'selected' : ''}>Visual Charts & Analytics</option>
                         <option value="b2bd2c" ${financials.activeReportView === 'b2bd2c' ? 'selected' : ''}>B2B & D2C Intelligence</option>
@@ -776,7 +776,7 @@ function getReportHeaderHtml() {
                 ${renderPeriodInput()}
                 ${locationFilterHtml}
                 
-                <button id="btn-refresh-financials" class="flex items-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm">
+                <button id="btn-refresh-financials" class="flex items-center gap-2 bg-SLATE-100 text-SLATE-700 hover:bg-SLATE-600 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Fetch
                 </button>
             </div>
@@ -785,10 +785,10 @@ function getReportHeaderHtml() {
 }
 
 function renderFinancialUI() {
-    DOM.reports.grid.className = "block space-y-8"; 
-    
-    updateComputedTotalsDOM(true); 
-    
+    DOM.reports.grid.className = "block space-y-8";
+
+    updateComputedTotalsDOM(true);
+
     const currency = getCurrencySymbol();
     const { trading, pl, bs, gstSummary } = financials;
     const headerHtml = getReportHeaderHtml();
@@ -798,8 +798,8 @@ function renderFinancialUI() {
             <td class="p-4 text-sm font-black text-gray-800">${slab}% GST</td>
             <td class="p-4 text-right font-medium text-gray-600">${currency}${vals.taxable.toFixed(2)}</td>
             <td class="p-4 text-right font-bold text-orange-500">${currency}${vals.igst.toFixed(2)}</td>
-            <td class="p-4 text-right font-bold text-indigo-500">${currency}${vals.cgst.toFixed(2)}</td>
-            <td class="p-4 text-right font-bold text-indigo-500">${currency}${vals.sgst.toFixed(2)}</td>
+            <td class="p-4 text-right font-bold text-SLATE-500">${currency}${vals.cgst.toFixed(2)}</td>
+            <td class="p-4 text-right font-bold text-SLATE-500">${currency}${vals.sgst.toFixed(2)}</td>
             <td class="p-4 text-right font-bold text-red-500">${currency}${vals.cess.toFixed(2)}</td>
         </tr>
     `).join('');
@@ -822,7 +822,7 @@ function renderFinancialUI() {
     // 🚀 THE ULTIMATE ENTERPRISE CSS & HTML CHARTS GENERATOR
     let chartHtml = '';
     if (view === 'all' || view === 'charts') {
-        
+
         // --- 1. SMART Y-AXIS FORMATTER ---
         const formatYAxis = (num) => {
             if (num === 0) return '0';
@@ -836,14 +836,14 @@ function renderFinancialUI() {
         const sortedDays = Object.entries(financials.analytics.daily)
             .sort((a, b) => new Date(a[0]) - new Date(b[0]))
             .slice(-14); // Last 14 days
-            
+
         // Bulletproof Max Value Calculation with 10% headroom
         let maxDailyValue = 100; // Baseline to prevent division by zero
         if (sortedDays.length > 0) {
             const rawMax = Math.max(...sortedDays.map(d => Math.max(d[1].sales || 0, d[1].purchases || 0, d[1].expenses || 0)));
-            if (rawMax > 0) maxDailyValue = rawMax * 1.1; 
+            if (rawMax > 0) maxDailyValue = rawMax * 1.1;
         }
-        
+
         const trendBars = sortedDays.map(([iso, data]) => {
             const hSales = Math.max(1, (data.sales / maxDailyValue) * 100);
             const hPurch = Math.max(1, (data.purchases / maxDailyValue) * 100);
@@ -854,12 +854,12 @@ function renderFinancialUI() {
                         <div class="bg-slate-800 text-white text-xs p-3 rounded-xl shadow-xl whitespace-nowrap border border-slate-700 min-w-[120px]">
                             <span class="block font-bold text-slate-300 mb-2 border-b border-slate-700 pb-1.5 text-[10px] uppercase tracking-widest">${data.display}</span>
                             <div class="flex justify-between items-center gap-4 mb-1">
-                                <span class="flex items-center gap-1.5 text-indigo-300 font-bold"><div class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>Sales</span> 
-                                <span class="font-mono text-sm">${currency}${data.sales.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>
+                                <span class="flex items-center gap-1.5 text-SLATE-300 font-bold"><div class="w-2 h-2 rounded-full bg-SLATE-400 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>Sales</span> 
+                                <span class="font-mono text-sm">${currency}${data.sales.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                             </div>
                             <div class="flex justify-between items-center gap-4">
                                 <span class="flex items-center gap-1.5 text-rose-300 font-bold"><div class="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div>Purch</span> 
-                                <span class="font-mono text-sm">${currency}${data.purchases.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>
+                                <span class="font-mono text-sm">${currency}${data.purchases.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                             </div>
                         </div>
                         <div class="w-3 h-3 bg-slate-800 rotate-45 -mt-1.5 border-r border-b border-slate-700"></div>
@@ -867,7 +867,7 @@ function renderFinancialUI() {
                     
                     <!-- Dual Bars -->
                     <div class="flex items-end justify-center w-full gap-0.5 sm:gap-1 h-full relative z-10">
-                        <div class="w-1/2 max-w-[14px] bg-gradient-to-t from-indigo-700 to-indigo-400 rounded-t-md transition-all duration-300 group-hover:brightness-125 shadow-[0_0_10px_rgba(99,102,241,0.15)]" style="height: ${hSales}%"></div>
+                        <div class="w-1/2 max-w-[14px] bg-gradient-to-t from-SLATE-700 to-SLATE-400 rounded-t-md transition-all duration-300 group-hover:brightness-125 shadow-[0_0_10px_rgba(99,102,241,0.15)]" style="height: ${hSales}%"></div>
                         <div class="w-1/2 max-w-[14px] bg-gradient-to-t from-rose-600 to-rose-300 rounded-t-md transition-all duration-300 group-hover:brightness-125 shadow-[0_0_10px_rgba(244,63,94,0.15)]" style="height: ${hPurch}%"></div>
                     </div>
                     
@@ -880,10 +880,10 @@ function renderFinancialUI() {
         // --- 3. PROFITABILITY BREAKDOWN (Light Theme Financial Summary) ---
         const rev = financials.trading.sales || 0;
         const cogs = Math.max(0, (financials.trading.purchases || 0) + (financials.trading.openingStock || 0) - (financials.trading.closingStock || 0));
-        const exp = Object.values(financials.pl.expenses).reduce((a, b) => a + (Number(b) || 0), 0) + 
-                    financials.pl.customExpenses.reduce((a, b) => a + (Number(b.value) || 0), 0);
-        
-        const safeRev = Math.max(1, rev); 
+        const exp = Object.values(financials.pl.expenses).reduce((a, b) => a + (Number(b) || 0), 0) +
+            financials.pl.customExpenses.reduce((a, b) => a + (Number(b.value) || 0), 0);
+
+        const safeRev = Math.max(1, rev);
         const pctCogs = Math.min(100, Math.max(0, (cogs / safeRev) * 100));
         const pctExp = Math.min(100, Math.max(0, (exp / safeRev) * 100));
         const pctProf = Math.max(0, 100 - pctCogs - pctExp);
@@ -898,12 +898,12 @@ function renderFinancialUI() {
                 <!-- 📈 TREND CHART -->
                 <div class="xl:col-span-2 bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 flex flex-col relative overflow-hidden">
                     <!-- Decorative Background Blur -->
-                    <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -z-10 translate-x-1/2 -translate-y-1/2 opacity-60"></div>
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-SLATE-50 rounded-full blur-3xl -z-10 translate-x-1/2 -translate-y-1/2 opacity-60"></div>
                     
                     <div class="flex justify-between items-start mb-8">
                         <div>
                             <h3 class="font-extrabold text-slate-900 flex items-center gap-2 text-xl tracking-tight">
-                                <span class="p-1.5 bg-indigo-100 rounded-lg text-indigo-600 shadow-sm">
+                                <span class="p-1.5 bg-SLATE-100 rounded-lg text-SLATE-600 shadow-sm">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                                 </span> 
                                 Revenue vs Cost Matrix
@@ -911,7 +911,7 @@ function renderFinancialUI() {
                             <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5">Last 14 Trading Days</p>
                         </div>
                         <div class="flex items-center gap-4 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl shadow-inner">
-                            <div class="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-600 tracking-wider"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_5px_rgba(99,102,241,0.6)]"></span> Sales</div>
+                            <div class="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-600 tracking-wider"><span class="w-2.5 h-2.5 rounded-full bg-SLATE-500 shadow-[0_0_5px_rgba(99,102,241,0.6)]"></span> Sales</div>
                             <div class="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-600 tracking-wider"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_5px_rgba(244,63,94,0.6)]"></span> Purchases</div>
                         </div>
                     </div>
@@ -958,15 +958,15 @@ function renderFinancialUI() {
                         <div class="grid grid-cols-1 gap-3 z-10 relative">
                             <div class="flex justify-between items-center bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 transition-colors hover:bg-rose-50">
                                 <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-rose-400"></div><span class="text-xs font-bold text-slate-700">Cost of Goods</span></div>
-                                <div class="text-right"><span class="block text-sm font-black text-slate-900">${currency}${cogs.toLocaleString('en-IN', {maximumFractionDigits:0})}</span><span class="text-[9px] text-rose-500 font-bold">${pctCogs.toFixed(1)}%</span></div>
+                                <div class="text-right"><span class="block text-sm font-black text-slate-900">${currency}${cogs.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span><span class="text-[9px] text-rose-500 font-bold">${pctCogs.toFixed(1)}%</span></div>
                             </div>
                             <div class="flex justify-between items-center bg-amber-50/50 p-2.5 rounded-xl border border-amber-100 transition-colors hover:bg-amber-50">
                                 <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-amber-400"></div><span class="text-xs font-bold text-slate-700">Overhead/Exp.</span></div>
-                                <div class="text-right"><span class="block text-sm font-black text-slate-900">${currency}${exp.toLocaleString('en-IN', {maximumFractionDigits:0})}</span><span class="text-[9px] text-amber-500 font-bold">${pctExp.toFixed(1)}%</span></div>
+                                <div class="text-right"><span class="block text-sm font-black text-slate-900">${currency}${exp.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span><span class="text-[9px] text-amber-500 font-bold">${pctExp.toFixed(1)}%</span></div>
                             </div>
                             <div class="flex justify-between items-center bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 shadow-sm transition-colors hover:bg-emerald-100/50">
                                 <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div><span class="text-xs font-bold text-emerald-900">Net Profit</span></div>
-                                <div class="text-right"><span class="block text-sm font-black text-emerald-700">${currency}${pl.netProfit.toLocaleString('en-IN', {maximumFractionDigits:0})}</span><span class="text-[9px] text-emerald-600 font-bold">${pctProf.toFixed(1)}% MARGIN</span></div>
+                                <div class="text-right"><span class="block text-sm font-black text-emerald-700">${currency}${pl.netProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span><span class="text-[9px] text-emerald-600 font-bold">${pctProf.toFixed(1)}% MARGIN</span></div>
                             </div>
                         </div>
                     </div>
@@ -985,50 +985,50 @@ function renderFinancialUI() {
     let taxHtml = '';
     if (view === 'all' || view === 'tax') {
         taxHtml = `
-            <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl shadow-md border border-indigo-100 overflow-hidden mb-8 animate-scaleIn">
-                <div class="px-6 py-4 border-b border-indigo-100 bg-white/50 flex justify-between items-center">
-                    <h3 class="font-bold text-indigo-900 text-lg flex items-center gap-2">
+            <div class="bg-gradient-to-r from-SLATE-50 to-blue-50 rounded-xl shadow-md border border-SLATE-100 overflow-hidden mb-8 animate-scaleIn">
+                <div class="px-6 py-4 border-b border-SLATE-100 bg-white/50 flex justify-between items-center">
+                    <h3 class="font-bold text-SLATE-900 text-lg flex items-center gap-2">
                         <span class="text-xl">🇮🇳</span> Tax & Compliance (GST)
                     </h3>
                 </div>
                 <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-xl p-5 shadow-sm border border-indigo-50 hover:shadow-md transition">
+                    <div class="bg-white rounded-xl p-5 shadow-sm border border-SLATE-50 hover:shadow-md transition">
                         <div class="flex justify-between items-start mb-3">
                             <div><h4 class="font-bold text-gray-800">GSTR-1</h4><p class="text-xs text-gray-500 font-medium">Outward Supplies (Sales)</p></div>
-                            <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shadow-sm">📤</div>
+                            <div class="w-8 h-8 bg-SLATE-100 text-SLATE-600 rounded-full flex items-center justify-center shadow-sm">📤</div>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <input type="month" id="gstr1-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                            <button onclick="window.downloadGSTR('1')" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
+                            <input type="month" id="gstr1-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-SLATE-500 outline-none">
+                            <button onclick="window.downloadGSTR('1')" class="bg-SLATE-600 hover:bg-SLATE-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl p-5 shadow-sm border border-indigo-50 hover:shadow-md transition">
+                    <div class="bg-white rounded-xl p-5 shadow-sm border border-SLATE-50 hover:shadow-md transition">
                         <div class="flex justify-between items-start mb-3">
                             <div><h4 class="font-bold text-gray-800">GSTR-2</h4><p class="text-xs text-gray-500 font-medium">Inward Supplies (Purchases)</p></div>
-                            <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shadow-sm">📥</div>
+                            <div class="w-8 h-8 bg-SLATE-100 text-SLATE-600 rounded-full flex items-center justify-center shadow-sm">📥</div>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <input type="month" id="gstr2-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                            <button onclick="window.downloadGSTR('2')" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
+                            <input type="month" id="gstr2-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-SLATE-500 outline-none">
+                            <button onclick="window.downloadGSTR('2')" class="bg-SLATE-600 hover:bg-SLATE-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl p-5 shadow-sm border border-indigo-50 hover:shadow-md transition">
+                    <div class="bg-white rounded-xl p-5 shadow-sm border border-SLATE-50 hover:shadow-md transition">
                         <div class="flex justify-between items-start mb-3">
                             <div><h4 class="font-bold text-gray-800">GSTR-3B / 3R</h4><p class="text-xs text-gray-500 font-medium">Monthly Summary</p></div>
-                            <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shadow-sm">🧾</div>
+                            <div class="w-8 h-8 bg-SLATE-100 text-SLATE-600 rounded-full flex items-center justify-center shadow-sm">🧾</div>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <input type="month" id="gstr3-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                            <button onclick="window.downloadGSTR('3')" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
+                            <input type="month" id="gstr3-month" value="${monthStr}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-SLATE-500 outline-none">
+                            <button onclick="window.downloadGSTR('3')" class="bg-SLATE-600 hover:bg-SLATE-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95">Export CSV</button>
                         </div>
                     </div>
                 </div>
             </div>
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 animate-scaleIn">
-                <div class="bg-white rounded-3xl shadow-xl border border-indigo-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-indigo-50 bg-indigo-50/50 flex justify-between items-center">
-                        <h3 class="font-bold text-indigo-900 flex items-center gap-2"><span>📤</span> Tax Liability (Sales)</h3>
+                <div class="bg-white rounded-3xl shadow-xl border border-SLATE-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-SLATE-50 bg-SLATE-50/50 flex justify-between items-center">
+                        <h3 class="font-bold text-SLATE-900 flex items-center gap-2"><span>📤</span> Tax Liability (Sales)</h3>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
@@ -1076,9 +1076,9 @@ function renderFinancialUI() {
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <!-- TRADING ACCOUNT -->
                 <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden animate-scaleIn">
-                    <div class="bg-indigo-50 px-6 py-3 border-b border-indigo-100 flex justify-between items-center">
-                        <h3 class="font-bold text-indigo-900">Trading Account</h3>
-                        <span class="text-xs font-mono bg-white px-2 py-1 rounded border text-indigo-700 shadow-sm">
+                    <div class="bg-SLATE-50 px-6 py-3 border-b border-SLATE-100 flex justify-between items-center">
+                        <h3 class="font-bold text-SLATE-900">Trading Account</h3>
+                        <span class="text-xs font-mono bg-white px-2 py-1 rounded border text-SLATE-700 shadow-sm">
                             GP: ${currency}<span id="disp-gp-header">${trading.grossProfit.toFixed(2)}</span>
                         </span>
                     </div>
@@ -1126,9 +1126,9 @@ function renderFinancialUI() {
                                 </div>
                                 <div id="custom-exp-list-container" class="space-y-1"></div>
                             </div>
-                            <div class="pt-2 border-t mt-2 flex justify-between items-center bg-indigo-50 p-2 rounded">
-                                <span class="font-bold text-sm text-indigo-800">Net Profit</span>
-                                <span class="font-bold text-indigo-800" id="disp-np-main">${pl.netProfit.toFixed(2)}</span>
+                            <div class="pt-2 border-t mt-2 flex justify-between items-center bg-SLATE-50 p-2 rounded">
+                                <span class="font-bold text-sm text-SLATE-800">Net Profit</span>
+                                <span class="font-bold text-SLATE-800" id="disp-np-main">${pl.netProfit.toFixed(2)}</span>
                             </div>
                         </div>
                         <div class="space-y-3">
@@ -1148,7 +1148,7 @@ function renderFinancialUI() {
                         <h3 class="font-bold text-lg">Balance Sheet</h3>
                         <div class="flex items-center gap-4">
                             <span id="disp-bs-status" class="text-xs bg-gray-700 px-3 py-1 rounded-full text-gray-300">Checking...</span>
-                            <select id="export-actions-dropdown" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded transition shadow font-medium cursor-pointer border-none">
+                            <select id="export-actions-dropdown" class="bg-SLATE-600 hover:bg-SLATE-500 text-white text-xs px-3 py-1.5 rounded transition shadow font-medium cursor-pointer border-none">
                                 <option value="" disabled selected>Export Data</option>
                                 <option value="print">Preview & Print</option>
                                 <option value="xml">Tally XML</option>
@@ -1223,7 +1223,7 @@ function renderFinancialUI() {
         `;
     }
     // Inside renderFinancialUI(), after the Balance Sheet block finishes:
-    
+
     let diagnosticHtml = '';
     if (financials.anomalies.length > 0) {
         const anomalyRows = financials.anomalies.map(anomaly => {
@@ -1282,17 +1282,17 @@ function renderFinancialUI() {
         </div>
     `;
 
-DOM.reports.grid.innerHTML = headerHtml + chartHtml + b2bD2CHtml + taxHtml + financialHtml + footerHtml;
+    DOM.reports.grid.innerHTML = headerHtml + chartHtml + b2bD2CHtml + taxHtml + financialHtml + footerHtml;
     attachListeners();
     if (view === 'all' || view === 'financial') {
         renderAssetRows();
-        renderCustomExpenseRows(); 
-        updateComputedTotalsDOM(); 
+        renderCustomExpenseRows();
+        updateComputedTotalsDOM();
     }
 }
 
 const INPUT_MAP = {
-    'inp-open-stock': 'trading.openingStock', 
+    'inp-open-stock': 'trading.openingStock',
     'inp-direct-exp': 'trading.directExpenses',
     'inp-other-income': 'pl.otherIncome',
     'inp-salaries': 'pl.expenses.salaries',
@@ -1349,17 +1349,17 @@ function attachListeners() {
 
     DOM.reports.grid.addEventListener('change', async (e) => {
         const target = e.target;
-        
+
         // 🚀 NEW: Switch Views instantly!
         if (target.id === 'report-view-type') {
             financials.activeReportView = target.value;
             renderFinancialUI(); // Instantly swaps DOM without querying Firebase!
             return;
         }
-        
+
         if (target.id === 'report-loc-filter') {
-            setCurrentLocation(target.value); 
-            await renderReportLibraryPage(); 
+            setCurrentLocation(target.value);
+            await renderReportLibraryPage();
         } else if (target.id === 'report-period-type') {
             financials.periodType = target.value;
             renderReportLibraryPage();
@@ -1368,7 +1368,7 @@ function attachListeners() {
             if (val === 'xml') generateDetailedTallyXML();
             if (val === 'json') generateJSONExport();
             if (val === 'print') printFinancialStatements();
-            target.value = ""; 
+            target.value = "";
         }
     });
 
@@ -1414,7 +1414,7 @@ function attachListeners() {
     listenersAttached = true;
 }
 
-function rowInput(label, id, value, isReadOnly=false) {
+function rowInput(label, id, value, isReadOnly = false) {
     const readonlyAttr = isReadOnly ? 'readonly' : '';
     const bgClass = isReadOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white';
     const icon = isReadOnly ? '<span class="ml-1 text-xs" title="Auto-Calculated">🧮</span>' : '';
@@ -1422,7 +1422,7 @@ function rowInput(label, id, value, isReadOnly=false) {
         <div class="flex justify-between items-center text-sm">
             <span class="text-gray-700 flex items-center">${label}${icon}</span>
             <input type="number" id="${id}" value="${value}" ${readonlyAttr}
-                   class="w-28 text-right border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${bgClass}" 
+                   class="w-28 text-right border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-SLATE-500 focus:border-SLATE-500 ${bgClass}" 
                    placeholder="0.00">
         </div>
     `;
@@ -1439,21 +1439,21 @@ function rowStatic(label, value) {
 
 function renderPeriodInput() {
     if (financials.periodType === 'monthly') {
-        return `<input type="month" id="report-period-val" value="${financials.periodValue}" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-indigo-500 font-mono shadow-inner bg-white" />`;
+        return `<input type="month" id="report-period-val" value="${financials.periodValue}" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-SLATE-500 font-mono shadow-inner bg-white" />`;
     } else {
-        const yOpts = [0,1,2,3,4].map(i => {
+        const yOpts = [0, 1, 2, 3, 4].map(i => {
             const y = new Date().getFullYear() - i;
-            return `<option value="${y}" ${parseInt(financials.selectedYear)==y?'selected':''}>${y}</option>`;
+            return `<option value="${y}" ${parseInt(financials.selectedYear) == y ? 'selected' : ''}>${y}</option>`;
         }).join('');
         let q = financials.periodValue.includes('Q') ? financials.periodValue.split('-')[1] : 'Q1_CAL';
         return `
             <div class="flex items-center gap-1">
-                <select id="report-year-select" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-indigo-500 shadow-inner bg-white">${yOpts}</select>
-                <select id="report-quarter-select" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-indigo-500 shadow-inner bg-white">
-                    <option value="Q1_CAL" ${q==='Q1_CAL'?'selected':''}>Jan-Mar</option>
-                    <option value="Q2_CAL" ${q==='Q2_CAL'?'selected':''}>Apr-Jun</option>
-                    <option value="Q3_CAL" ${q==='Q3_CAL'?'selected':''}>Jul-Sep</option>
-                    <option value="Q4_CAL" ${q==='Q4_CAL'?'selected':''}>Oct-Dec</option>
+                <select id="report-year-select" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-SLATE-500 shadow-inner bg-white">${yOpts}</select>
+                <select id="report-quarter-select" class="border rounded p-1.5 text-sm text-gray-600 focus:ring-SLATE-500 shadow-inner bg-white">
+                    <option value="Q1_CAL" ${q === 'Q1_CAL' ? 'selected' : ''}>Jan-Mar</option>
+                    <option value="Q2_CAL" ${q === 'Q2_CAL' ? 'selected' : ''}>Apr-Jun</option>
+                    <option value="Q3_CAL" ${q === 'Q3_CAL' ? 'selected' : ''}>Jul-Sep</option>
+                    <option value="Q4_CAL" ${q === 'Q4_CAL' ? 'selected' : ''}>Oct-Dec</option>
                 </select>
             </div>
         `;
@@ -1495,8 +1495,8 @@ function renderCustomExpenseRows() {
 function updateStateByPath(path, value) {
     const parts = path.split('.');
     let obj = financials;
-    for(let i=0; i<parts.length-1; i++) obj = obj[parts[i]];
-    obj[parts[parts.length-1]] = parseFloat(value) || 0;
+    for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+    obj[parts[parts.length - 1]] = parseFloat(value) || 0;
 }
 
 async function handleRefreshClick() {
@@ -1514,7 +1514,7 @@ async function handleRefreshClick() {
 
 function updateComputedTotalsDOM(dryRun = false) {
     const { trading, pl, bs } = financials;
-    
+
     // 🚀 THE FIX: WAC Rounding Anomaly Auto-Reconciliation
     // When calculating massive inventory values, .toFixed(2) unit costs can drift from the exact Purchase Ledger by fractions of a rupee.
     // If there are no sales, we forcefully snap the Closing Stock to match the Purchase Ledger to eliminate phantom profits.
@@ -1532,27 +1532,27 @@ function updateComputedTotalsDOM(dryRun = false) {
     const costSide = safeMath.add(safeMath.add(trading.openingStock, trading.purchases), trading.directExpenses);
     const grossProfit = safeMath.subtract(revSide, costSide);
     trading.grossProfit = grossProfit;
-    
-    const totalStandardExp = Object.values(pl.expenses).reduce((acc, val) => safeMath.add(acc, parseFloat(val)||0), 0);
-    const totalCustomExp = pl.customExpenses.reduce((acc, item) => safeMath.add(acc, parseFloat(item.value)||0), 0);
+
+    const totalStandardExp = Object.values(pl.expenses).reduce((acc, val) => safeMath.add(acc, parseFloat(val) || 0), 0);
+    const totalCustomExp = pl.customExpenses.reduce((acc, item) => safeMath.add(acc, parseFloat(item.value) || 0), 0);
     const totalIndExp = safeMath.add(totalStandardExp, totalCustomExp);
-    
+
     const grossPlusOther = safeMath.add(grossProfit, pl.otherIncome);
     const netProfit = safeMath.subtract(grossPlusOther, totalIndExp);
     pl.netProfit = netProfit;
-    
+
     const netCapital = safeMath.add(safeMath.subtract(bs.capital, bs.drawings), netProfit);
     const totalLiab = safeMath.add(safeMath.add(safeMath.add(netCapital, bs.reserves), safeMath.add(bs.securedLoans, bs.unsecuredLoans)), bs.sundryCreditors);
-    
-    const totalFixed = bs.fixedAssets.reduce((acc, val) => safeMath.add(acc, parseFloat(val.value)||0), 0);
+
+    const totalFixed = bs.fixedAssets.reduce((acc, val) => safeMath.add(acc, parseFloat(val.value) || 0), 0);
     const totalAssets = safeMath.add(safeMath.add(safeMath.add(totalFixed, trading.closingStock), bs.sundryDebtors), safeMath.add(bs.cashInHand, bs.bankAccounts));
-    
+
     const diff = safeMath.subtract(totalAssets, totalLiab);
-    
+
     if (dryRun) return;
-    
-    const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val.toFixed(2); };
-    
+
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val.toFixed(2); };
+
     setText('disp-gp-header', grossProfit);
     setText('disp-gp-main', grossProfit);
     setText('disp-gp-brought', grossProfit);
@@ -1563,7 +1563,7 @@ function updateComputedTotalsDOM(dryRun = false) {
     setText('disp-total-liab', totalLiab);
     setText('disp-total-fixed', totalFixed);
     setText('disp-total-assets', totalAssets);
-    
+
     const statusEl = document.getElementById('disp-bs-status');
     if (statusEl) {
         if (Math.abs(diff) < 1.0) {
@@ -1581,18 +1581,18 @@ function printFinancialStatements() {
     const currency = getCurrencySymbol();
     const periodLabel = financials.periodType === 'monthly' ? financials.periodValue : `${financials.selectedYear} ${financials.periodValue}`;
     const storeName = document.getElementById('dashboard-store-name')?.textContent || 'My Store';
-    const totalFixed = bs.fixedAssets.reduce((acc, val) => safeMath.add(acc, parseFloat(val.value)||0), 0);
+    const totalFixed = bs.fixedAssets.reduce((acc, val) => safeMath.add(acc, parseFloat(val.value) || 0), 0);
     const totalAssets = safeMath.add(safeMath.add(safeMath.add(totalFixed, trading.closingStock), bs.sundryDebtors), safeMath.add(bs.cashInHand, bs.bankAccounts));
     const netCapital = safeMath.add(safeMath.subtract(bs.capital, bs.drawings), pl.netProfit);
     const totalLiab = safeMath.add(safeMath.add(safeMath.add(netCapital, bs.reserves), safeMath.add(bs.securedLoans, bs.unsecuredLoans)), bs.sundryCreditors);
-    
-    const renderPrintRow = (label, val, bold=false) => `
+
+    const renderPrintRow = (label, val, bold = false) => `
         <tr>
-            <td style="padding: 4px 0 4px 10px; ${bold?'font-weight:bold;':''}">${label}</td>
-            <td style="text-align: right; ${bold?'font-weight:bold;':''}">${val !== '' ? currency + parseFloat(val).toFixed(2) : ''}</td>
+            <td style="padding: 4px 0 4px 10px; ${bold ? 'font-weight:bold;' : ''}">${label}</td>
+            <td style="text-align: right; ${bold ? 'font-weight:bold;' : ''}">${val !== '' ? currency + parseFloat(val).toFixed(2) : ''}</td>
         </tr>
     `;
-    
+
     let expenseRows = '';
     Object.entries(pl.expenses).forEach(([key, val]) => {
         if (val > 0) expenseRows += renderPrintRow(key.charAt(0).toUpperCase() + key.slice(1), val);
@@ -1753,7 +1753,7 @@ function printFinancialStatements() {
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 bg-white flex justify-end gap-3 shadow-top">
                     <button id="cancel-print-btn" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">Cancel</button>
-                    <button id="confirm-print-btn" class="px-8 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-md flex items-center gap-2 transition active:scale-95">
+                    <button id="confirm-print-btn" class="px-8 py-2.5 bg-SLATE-600 text-white rounded-lg hover:bg-SLATE-700 font-bold shadow-md flex items-center gap-2 transition active:scale-95">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                         Print Statements
                     </button>
@@ -1812,34 +1812,34 @@ function generateDetailedTallyXML() {
     const { trading, pl, bs } = financials;
     let xml = `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME></REQUESTDESC><REQUESTDATA>`;
     const add = (name, parent, val, type) => {
-        if(!val) return;
-        const amt = (type==='liab' || type==='income') ? -Math.abs(val) : Math.abs(val);
+        if (!val) return;
+        const amt = (type === 'liab' || type === 'income') ? -Math.abs(val) : Math.abs(val);
         xml += `<TALLYMESSAGE xmlns:UDF="TallyUDF"><LEDGER NAME="${escapeHTML(name)}" RESERVEDNAME=""><PARENT>${parent}</PARENT><OPENINGBALANCE>${amt}</OPENINGBALANCE></LEDGER></TALLYMESSAGE>`;
     };
     add('Opening Stock', 'Stock-in-Hand', trading.openingStock, 'asset');
     add('Purchases', 'Purchase Accounts', trading.purchases, 'exp');
     add('Direct Expenses', 'Direct Expenses', trading.directExpenses, 'exp');
     add('Sales', 'Sales Accounts', trading.sales, 'income');
-    add('Closing Stock', 'Stock-in-Hand', trading.closingStock, 'asset'); 
+    add('Closing Stock', 'Stock-in-Hand', trading.closingStock, 'asset');
     Object.entries(pl.expenses).forEach(([k, v]) => {
-        add(k.charAt(0).toUpperCase()+k.slice(1), 'Indirect Expenses', v, 'exp');
+        add(k.charAt(0).toUpperCase() + k.slice(1), 'Indirect Expenses', v, 'exp');
     });
     pl.customExpenses.forEach(exp => {
         add(exp.name, 'Indirect Expenses', exp.value, 'exp');
     });
     add('Other Income', 'Indirect Incomes', pl.otherIncome, 'income');
     add('Capital', 'Capital Account', bs.capital, 'liab');
-    add('Drawings', 'Capital Account', -bs.drawings, 'asset'); 
+    add('Drawings', 'Capital Account', -bs.drawings, 'asset');
     add('Secured Loans', 'Secured Loans', bs.securedLoans, 'liab');
     add('Unsecured Loans', 'Unsecured Loans', bs.unsecuredLoans, 'liab');
     add('Reserves', 'Reserves & Surplus', bs.reserves, 'liab');
-    add('Sundry Creditors', 'Sundry Creditors', bs.sundryCreditors, 'liab'); 
-    add('Sundry Debtors', 'Sundry Debtors', bs.sundryDebtors, 'asset'); 
+    add('Sundry Creditors', 'Sundry Creditors', bs.sundryCreditors, 'liab');
+    add('Sundry Debtors', 'Sundry Debtors', bs.sundryDebtors, 'asset');
     add('Cash', 'Cash-in-Hand', bs.cashInHand, 'asset');
     add('Bank', 'Bank Accounts', bs.bankAccounts, 'asset');
     bs.fixedAssets.forEach(a => add(a.name, 'Fixed Assets', a.value, 'asset'));
     xml += `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`;
-    const blob = new Blob([xml], {type: 'text/xml'});
+    const blob = new Blob([xml], { type: 'text/xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1856,7 +1856,7 @@ function generateJSONExport() {
         }
     };
     const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], {type: 'application/json'});
+    const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1865,7 +1865,7 @@ function generateJSONExport() {
 }
 
 
-window.downloadGSTR = async function(type) {
+window.downloadGSTR = async function (type) {
     const monthInput = document.getElementById(`gstr${type}-month`).value;
     if (!monthInput) {
         showModal('Required', 'Please select a month to generate the report.', 'warning');
@@ -1875,7 +1875,7 @@ window.downloadGSTR = async function(type) {
     const [year, month] = monthInput.split('-');
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-    
+
     const activeStoreId = getStoreId();
     if (!activeStoreId) return;
 
@@ -1898,13 +1898,13 @@ window.downloadGSTR = async function(type) {
                 "E-Commerce GSTIN", "Rate", "Taxable Value", "Cess Amount"
             ];
             csvContent = headers.join(",") + "\n";
-            
+
             let b2bFound = false;
 
             snap.forEach(doc => {
                 const tx = doc.data();
                 const txType = tx.type || tx.summary?.transactionType || 'SALE';
-                
+
                 // Only process SALES where the customer has a valid GSTIN (B2B)
                 if (txType.toUpperCase() === 'SALE' && tx.customer && tx.customer.gstin && tx.customer.gstin.length >= 15) {
                     b2bFound = true;
@@ -1918,24 +1918,24 @@ window.downloadGSTR = async function(type) {
                     const invDate = `${String(dateObj.getDate()).padStart(2, '0')}-${months[dateObj.getMonth()]}-${dateObj.getFullYear()}`;
 
                     const invValue = parseFloat(tx.summary?.total || 0).toFixed(2);
-                    
+
                     // Extract State Code from GSTIN to format Place of Supply
                     const stateCode = gstin.substring(0, 2);
                     const stateName = tx.customer.state || "Unknown";
-                    const pos = `${stateCode}-${stateName}`; 
-                    
+                    const pos = `${stateCode}-${stateName}`;
+
                     const revCharge = "N";
                     const invTypeStr = "Regular";
                     const eComm = "";
 
                     // Inside GSTR-1 Export (type === '1')
                     const rateGroups = {};
-                    
+
                     (tx.items || []).forEach(item => {
                         const rate = parseFloat(item.taxRate || item.gstSlab || 0);
                         const cessRate = parseFloat(item.cessRate || item.cess || 0);
                         const lineTotal = parseFloat(item.subtotal || (item.price * item.quantity));
-                        
+
                         // Extract base Taxable Value using combined rate
                         const combinedRate = rate + cessRate;
                         const taxableValue = item.taxableValue || (lineTotal / (1 + (combinedRate / 100)));
@@ -1953,7 +1953,7 @@ window.downloadGSTR = async function(type) {
 
                         const row = [
                             gstin, name, invNum, invDate, invValue, pos, revCharge, invTypeStr, eComm, rate, taxableVal, cess
-                        ].join(","); 
+                        ].join(",");
 
                         csvContent += row + "\n";
                     });
@@ -1964,25 +1964,25 @@ window.downloadGSTR = async function(type) {
                 showModal('No B2B Data', 'No B2B sales with valid GSTINs were found for this period.', 'info');
                 return; // Stop export
             }
-        } 
+        }
         // ==========================================
         // LEGACY GSTR-2 FORMAT
         // ==========================================
         else if (type === '2') {
             csvContent = "Invoice No,Date,Party Name,GSTIN,State,Total Invoice Value,Taxable Value,IGST,CGST,SGST,CESS\n";
-            
+
             snap.forEach(doc => {
                 const tx = doc.data();
                 const txType = tx.type || tx.summary?.transactionType || 'SALE';
-                
+
                 if (txType.toUpperCase() === 'PURCHASE') {
                     const dateStr = tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleDateString() : '';
                     let partyName = tx.customer?.name || tx.dealer?.name || 'Walk-in';
-                    partyName = partyName.replace(/,/g, ''); 
-                    
+                    partyName = partyName.replace(/,/g, '');
+
                     const gstin = tx.customer?.gstin || tx.dealer?.gstin || '';
                     const state = tx.customer?.state || tx.dealer?.state || '';
-                    
+
                     let totalInvoice = tx.summary?.total || 0;
                     let taxableValue = 0;
                     let igst = 0, cgst = 0, sgst = 0, cess = 0;
@@ -1997,7 +1997,7 @@ window.downloadGSTR = async function(type) {
                             // Standardized Inclusive Math
                             const baseTaxable = itemTotal / (1 + (taxRate / 100));
                             const baseTaxAmt = itemTotal - baseTaxable;
-                            
+
                             taxableValue = safeMath.add(taxableValue, baseTaxable);
                             if (item.type === 'homemade' || item.type === 'bundle') return;
                             if (isOms) {
@@ -2013,20 +2013,20 @@ window.downloadGSTR = async function(type) {
                     csvContent += `"${tx.invoiceId || doc.id}","${dateStr}","${partyName}","${gstin}","${state}",${totalInvoice.toFixed(2)},${taxableValue.toFixed(2)},${igst.toFixed(2)},${cgst.toFixed(2)},${sgst.toFixed(2)},${cess.toFixed(2)}\n`;
                 }
             });
-        } 
+        }
         // ==========================================
         // LEGACY GSTR-3B FORMAT
         // ==========================================
         else if (type === '3') {
             csvContent = "Description,Total Invoice Value,Taxable Value,IGST,CGST,SGST,CESS\n";
-            
+
             let outTotal = 0, outTaxable = 0, outIgst = 0, outCgst = 0, outSgst = 0, outCess = 0;
             let inTotal = 0, inTaxable = 0, inIgst = 0, inCgst = 0, inSgst = 0, inCess = 0;
 
             snap.forEach(doc => {
                 const tx = doc.data();
                 const txType = tx.type || tx.summary?.transactionType || 'SALE';
-                
+
                 let totalInvoice = Math.abs(tx.summary?.total || 0);
                 let taxableValue = 0;
                 let igst = 0, cgst = 0, sgst = 0, cess = 0;
@@ -2041,7 +2041,7 @@ window.downloadGSTR = async function(type) {
                         // 🚀 FIX: Prevent crash by using explicit inclusive math instead of missing utility functions
                         const combinedRate = parseFloat(taxRate) + parseFloat(itemCessRate);
                         const taxable = item.taxableValue || (itemTotal / (1 + (combinedRate / 100)));
-                        
+
                         const baseTaxAmt = item.taxAmount || (taxable * (taxRate / 100));
                         const cessAmt = item.cessAmount || (taxable * (itemCessRate / 100));
 
@@ -2080,7 +2080,7 @@ window.downloadGSTR = async function(type) {
             link.click();
             document.body.removeChild(link);
         }
-        
+
         showModal('Success', `GSTR-${type} Exported Successfully.`, 'success');
 
     } catch (error) {

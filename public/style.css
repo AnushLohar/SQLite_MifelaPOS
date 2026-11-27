@@ -28,7 +28,7 @@ body {
 .tab-button.active {
     opacity: 1;
     background-color: white;
-    color: #4f46e5; /* Indigo-600 */
+    color: #4f46e5; /* SLATE-600 */
     box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
 }
 /* --- Print Styles --- */
@@ -256,7 +256,7 @@ body {
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
 .plan-card.current {
-    border-color: #3f51b5; /* border-indigo-600 */
+    border-color: #3f51b5; /* border-SLATE-600 */
     box-shadow: 0 0 0 3px rgba(63,81,181,0.3);
 }
 

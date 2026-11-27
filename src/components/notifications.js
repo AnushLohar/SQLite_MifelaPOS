@@ -20,37 +20,37 @@ export function setupNotificationDrawer() {
     const toggleDrawer = () => {
         // Check if it's currently off-screen
         const isClosed = sidebar.classList.contains('translate-x-full');
-        
+
         if (isClosed) {
             // OPEN SEQUENCE
             // 1. Remove the display:none so elements are in the DOM (but invisible/offscreen)
             backdrop.classList.remove('hidden');
             sidebar.classList.remove('hidden');
-            
+
             // 2. Force browser to register the display change before animating
-            void sidebar.offsetWidth; 
-            
+            void sidebar.offsetWidth;
+
             // 3. Trigger the animations!
             sidebar.classList.remove('translate-x-full');
             sidebar.classList.add('translate-x-0');
-            
+
             backdrop.classList.remove('opacity-0');
             backdrop.classList.add('opacity-100');
-            
+
             generateSystemAlerts();
-            
+
             const badge = document.getElementById('notif-badge');
             if (badge) badge.classList.add('hidden');
-            
+
         } else {
             // CLOSE SEQUENCE
             // 1. Trigger the slide-out and fade-out animations
             sidebar.classList.remove('translate-x-0');
             sidebar.classList.add('translate-x-full');
-            
+
             backdrop.classList.remove('opacity-100');
             backdrop.classList.add('opacity-0');
-            
+
             // 2. Wait exactly for the 300ms CSS transition to finish, then hide them from DOM
             setTimeout(() => {
                 backdrop.classList.add('hidden');
@@ -62,21 +62,21 @@ export function setupNotificationDrawer() {
     bellBtn.addEventListener('click', toggleDrawer);
     closeBtn.addEventListener('click', toggleDrawer);
     backdrop.addEventListener('click', toggleDrawer);
-    
+
     // --- Event Delegation for Individual Pin & Dismiss ---
     notifList.addEventListener('click', (e) => {
         const userId = typeof getUserId === 'function' ? getUserId() : 'guest';
-        
+
         // 1. Handle Individual Dismiss
         const dismissBtn = e.target.closest('.dismiss-alert-btn');
         if (dismissBtn) {
             const alertKey = dismissBtn.dataset.key;
             const storageKey = `mifela_dismissed_alerts_${userId}`;
             const dismissed = JSON.parse(localStorage.getItem(storageKey) || "[]");
-            
+
             if (!dismissed.includes(alertKey)) dismissed.push(alertKey);
             localStorage.setItem(storageKey, JSON.stringify(dismissed));
-            
+
             // Instantly re-render to cleanly update UI and counts
             generateSystemAlerts();
             return;
@@ -88,14 +88,14 @@ export function setupNotificationDrawer() {
             const alertKey = pinBtn.dataset.key;
             const storageKey = `mifela_pinned_alerts_${userId}`;
             let pinned = JSON.parse(localStorage.getItem(storageKey) || "[]");
-            
+
             if (pinned.includes(alertKey)) {
                 pinned = pinned.filter(k => k !== alertKey); // Unpin
             } else {
                 pinned.push(alertKey); // Pin
             }
             localStorage.setItem(storageKey, JSON.stringify(pinned));
-            
+
             generateSystemAlerts();
         }
     });
@@ -104,7 +104,7 @@ export function setupNotificationDrawer() {
     dismissAllBtn.addEventListener('click', () => {
         const userId = typeof getUserId === 'function' ? getUserId() : 'guest';
         const storageKey = `mifela_dismissed_alerts_${userId}`;
-        
+
         const existingDismissed = JSON.parse(localStorage.getItem(storageKey) || "[]");
         const newDismissed = [...new Set([...existingDismissed, ...currentActiveAlerts])];
         localStorage.setItem(storageKey, JSON.stringify(newDismissed));
@@ -118,7 +118,7 @@ export function setupNotificationDrawer() {
                 <p class="text-xs text-slate-500 mt-1">Alerts have been muted.</p>
             </div>
         `;
-        
+
         const badge = document.getElementById('notif-badge');
         if (badge) badge.classList.add('hidden');
     });
@@ -127,11 +127,11 @@ export async function generateSystemAlerts() {
     // 🚀 THE FIX: Abort silently if the database bridge hasn't connected yet
     if (!window.dbAPI || typeof window.dbAPI.getProducts !== 'function') {
         console.warn("Database API booting. Skipping notification scan.");
-        return []; 
+        return [];
     }
     const list = document.getElementById('notif-list');
-    currentActiveAlerts = []; 
-    let generatedAlerts = []; 
+    currentActiveAlerts = [];
+    let generatedAlerts = [];
 
     try {
         // 🚀 THE FIX: Rip out Firebase getDocs and use the local SQLite API
@@ -145,7 +145,7 @@ export async function generateSystemAlerts() {
         const userId = typeof getUserId === 'function' ? getUserId() : 'guest';
         const dismissedKey = `mifela_dismissed_alerts_${userId}`;
         const pinnedKey = `mifela_pinned_alerts_${userId}`;
-        
+
         const dismissedAlerts = JSON.parse(localStorage.getItem(dismissedKey) || "[]");
         const pinnedAlerts = JSON.parse(localStorage.getItem(pinnedKey) || "[]");
 
@@ -192,9 +192,9 @@ export async function generateSystemAlerts() {
         } else {
             // Sort the array: Pinned alerts float to the top
             generatedAlerts.sort((a, b) => (a.isPinned === b.isPinned) ? 0 : a.isPinned ? -1 : 1);
-            
+
             list.innerHTML = generatedAlerts.map(a => a.html).join('');
-            
+
             const badge = document.getElementById('notif-badge');
             if (badge) badge.classList.remove('hidden');
         }
@@ -210,23 +210,23 @@ function buildAlertCard(alertKey, isPinned, title, message, color) {
     const colorClasses = {
         red: 'bg-red-50 border-red-200 text-red-800',
         orange: 'bg-amber-50 border-amber-200 text-amber-800',
-        indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800'
+        SLATE: 'bg-SLATE-50 border-SLATE-200 text-SLATE-800'
     };
 
     const icons = {
         red: '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>',
         orange: '<svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-        indigo: '<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+        SLATE: '<svg class="w-5 h-5 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
     };
 
-    const theme = colorClasses[color] || colorClasses.indigo;
-    const icon = icons[color] || icons.indigo;
-    
+    const theme = colorClasses[color] || colorClasses.SLATE;
+    const icon = icons[color] || icons.SLATE;
+
     // Pin styling based on active state
-    const pinClass = isPinned ? 'text-indigo-600 fill-indigo-600 opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-indigo-600';
+    const pinClass = isPinned ? 'text-SLATE-600 fill-SLATE-600 opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-SLATE-600';
 
     return `
-        <div class="relative p-4 rounded-xl border shadow-sm flex items-start gap-3 transition-all hover:shadow-md group ${theme} ${isPinned ? 'ring-2 ring-indigo-200 shadow-md' : ''}">
+        <div class="relative p-4 rounded-xl border shadow-sm flex items-start gap-3 transition-all hover:shadow-md group ${theme} ${isPinned ? 'ring-2 ring-SLATE-200 shadow-md' : ''}">
             
             <div class="absolute top-2 right-2 flex items-center gap-1">
                 <button class="pin-alert-btn p-1.5 rounded-lg hover:bg-white/80 transition-all ${pinClass}" data-key="${alertKey}" title="${isPinned ? 'Unpin' : 'Pin to Top'}">

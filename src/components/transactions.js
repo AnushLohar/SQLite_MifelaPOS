@@ -2,12 +2,12 @@
 
 
 
-import { 
-    getTransactionsRef, 
+import {
+    getTransactionsRef,
     getProductsRef,
     getCustomersRef,
     getCurrencySymbol,
-    getCurrentLocationId, 
+    getCurrentLocationId,
     getUserRole,
     getUserId,
     getStoreId,
@@ -21,8 +21,8 @@ import {
 } from '../store/state.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { DOM, showModal } from '../utils/dom.js'; 
-import { buildAndPrintInvoice } from '../utils/print.js'; 
+import { DOM, showModal } from '../utils/dom.js';
+import { buildAndPrintInvoice } from '../utils/print.js';
 import { escapeHTML } from '../utils/security.js';
 import { safeMath } from '../utils/math.js';
 import { generateInvoiceId } from '../utils/ids.js';
@@ -32,9 +32,9 @@ import { generateInvoiceId } from '../utils/ids.js';
 let localTransactionsCache = [];
 let firstVisibleTransaction = null;
 let lastVisibleTransaction = null;
-const TRANSACTIONS_PER_PAGE = 15; 
+const TRANSACTIONS_PER_PAGE = 15;
 let isTransactionsInitialized = false;
-let currentTypeFilter = 'ALL'; 
+let currentTypeFilter = 'ALL';
 let isFetching = false; // Prevents race conditions / doubling
 let currentCustomerDues = 0; // Tracks the active customer's pending balance
 let stagedDuesPayment = 0;
@@ -44,7 +44,7 @@ let stagedDuesPayment = 0;
 export async function loadTransactionsPage() {
     if (isFetching) return;
     isFetching = true;
-    
+
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
     const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
     let currentLoc = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
@@ -72,13 +72,13 @@ export async function loadTransactionsPage() {
 
     if (!isTransactionsInitialized) {
         setupTransactionListeners();
-        setupTypeFilterButtons(); 
+        setupTypeFilterButtons();
         isTransactionsInitialized = true;
     }
 
     DOM.transactions.table.innerHTML = `
         <tr><td colspan="7" class="py-12 text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600 mx-auto mb-2"></div>
             <span class="text-sm font-medium text-gray-500">Fetching local records...</span>
         </td></tr>
     `;
@@ -113,11 +113,11 @@ export async function loadTransactionsPage() {
                 }
                 return tx.customer?.name === rawSearch;
             });
-            
+
             const pseudoSnapshot = { empty: txs.length === 0, docs: txs.map(tx => ({ id: tx.id, data: () => tx })) };
             updateLocalCache(pseudoSnapshot);
             renderTransactionsTable();
-            return; 
+            return;
         }
 
         // 3. Apply Standard Filters
@@ -129,7 +129,7 @@ export async function loadTransactionsPage() {
             if (currentTypeFilter === 'SALE') {
                 txs = txs.filter(tx => tx.summary?.transactionType === "SALE");
             } else if (currentTypeFilter === 'ADJUSTMENT') {
-                txs = txs.filter(tx => tx.type === "ADJUSTMENT" || tx.type === "LOSS"); 
+                txs = txs.filter(tx => tx.type === "ADJUSTMENT" || tx.type === "LOSS");
             } else if (currentTypeFilter === 'LOSS') {
                 txs = txs.filter(tx => tx.type === "LOSS");
             } else {
@@ -203,9 +203,9 @@ function renderTransactionUIStructure() {
 
     // --- Step 3: Admin Location Dropdown Generation (Platinum Check) ---
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
-    const plan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';  
-    const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
-    
+    const plan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
+    const canAccessAllLocations = (role === 'admin' || role === 'accountant');
+
     const availLocs = typeof getAvailableLocations === 'function' ? getAvailableLocations() : [];
     let currentLoc = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
 
@@ -213,7 +213,7 @@ function renderTransactionUIStructure() {
     if (canAccessAllLocations) {
         let optionsHtml = `<option value="all">All Locations</option>`;
         if (availLocs && availLocs.length > 0) {
-            optionsHtml += availLocs.map(loc => 
+            optionsHtml += availLocs.map(loc =>
                 `<option value="${loc.id}" ${loc.id === currentLoc ? 'selected' : ''}>${escapeHTML(loc.name || loc.id)}</option>`
             ).join('');
         } else {
@@ -223,7 +223,7 @@ function renderTransactionUIStructure() {
         locationHtml = `
             <div>
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Location</label>
-                <select id="tx-location-filter" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                <select id="tx-location-filter" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-SLATE-500 focus:bg-white transition-all">
                     ${optionsHtml}
                 </select>
             </div>
@@ -255,12 +255,12 @@ function renderTransactionUIStructure() {
 
                 <div class="p-4 flex flex-col md:flex-row gap-4 items-center justify-between bg-white border-t border-gray-100">
     <div class="relative w-full md:w-80 shrink-0">
-        <input type="text" id="tx-search" placeholder="Search Invoice # or Party..." class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+        <input type="text" id="tx-search" placeholder="Search Invoice # or Party..." class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-SLATE-500 focus:bg-white transition-all">
         <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
     </div>
 
     <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-        <button id="open-tx-filters-btn" class="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs uppercase tracking-wider rounded-lg border border-indigo-100 transition flex items-center gap-2 shadow-sm active:scale-95">
+        <button id="open-tx-filters-btn" class="px-4 py-2.5 bg-SLATE-50 hover:bg-SLATE-100 text-SLATE-700 font-bold text-xs uppercase tracking-wider rounded-lg border border-SLATE-100 transition flex items-center gap-2 shadow-sm active:scale-95">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
             Filter Records
         </button>
@@ -294,7 +294,7 @@ function renderTransactionUIStructure() {
             </div>
         </div>
     `;
-    
+
     DOM.transactions.table = document.getElementById('transactions-table-body');
 }
 
@@ -333,7 +333,7 @@ function setupTransactionListeners() {
         }
         if (target.closest('#prev-tx-page-btn')) loadPrevTransactionsPage();
         if (target.closest('#next-tx-page-btn')) loadNextTransactionsPage();
-        
+
         // 🚀 NEW MODAL TRIGGERS
         if (target.closest('#open-tx-filters-btn')) promptFilterDialog();
         if (target.closest('#open-tx-export-btn')) promptExportDialogWithPreview();
@@ -346,11 +346,11 @@ function setupTransactionListeners() {
 async function triggerMultiFormatExport() {
     const rangeSelect = document.getElementById('tx-export-range');
     const range = rangeSelect ? rangeSelect.value : 'all';
-    
+
     const now = new Date();
     let startDate = null;
 
-    if (range === 'today') startDate = new Date(now.setHours(0,0,0,0));
+    if (range === 'today') startDate = new Date(now.setHours(0, 0, 0, 0));
     else if (range === 'week') startDate = new Date(now.setDate(now.getDate() - 7));
     else if (range === 'month') startDate = new Date(now.setMonth(now.getMonth() - 1));
     else if (range === '3month') startDate = new Date(now.setMonth(now.getMonth() - 3));
@@ -360,7 +360,7 @@ async function triggerMultiFormatExport() {
 
     try {
         if (!window.dbAPI || !window.dbAPI.getTransactionsSince) throw new Error("Offline Database not ready.");
-        
+
         let txs = await window.dbAPI.getTransactionsSince(startDate ? startDate.toISOString() : "2000-01-01T00:00:00Z");
 
         // Sort descending
@@ -386,7 +386,7 @@ async function triggerMultiFormatExport() {
             };
         });
 
-        document.getElementById('custom-modal')?.remove(); 
+        document.getElementById('custom-modal')?.remove();
         promptFormatSelection(exportData, range);
 
     } catch (e) {
@@ -462,12 +462,12 @@ function promptFormatSelection(data, rangeLabel) {
             printFrame.style.border = 'none';
             document.body.appendChild(printFrame);
         }
-        
+
         const frameDoc = printFrame.contentWindow.document;
         frameDoc.open();
         frameDoc.write(printHtml);
         frameDoc.close();
-        
+
         setTimeout(() => {
             printFrame.contentWindow.focus();
             printFrame.contentWindow.print();
@@ -497,11 +497,11 @@ async function triggerBrowserDownload(blob, filename) {
         link.download = filename;
         document.body.appendChild(link);
         link.click();
-        
+
         // CRITICAL: Prevent Memory Leaks in long-running POS sessions
         setTimeout(() => {
             document.body.removeChild(link);
-            URL.revokeObjectURL(url); 
+            URL.revokeObjectURL(url);
         }, 1000);
     }
 }
@@ -535,7 +535,7 @@ function promptFilterDialog() {
                 <div class="p-6 space-y-5">
                     <div>
                         <label class="block text-[11px] font-black tracking-widest text-gray-400 uppercase mb-1.5">Payment Method</label>
-                        <select id="modal-pay-filter" class="w-full p-3 border rounded-xl bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
+                        <select id="modal-pay-filter" class="w-full p-3 border rounded-xl bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-SLATE-500">
                             <option value="all" ${hiddenPay.value === 'all' ? 'selected' : ''}>All Methods</option>
                             <option value="Cash" ${hiddenPay.value === 'Cash' ? 'selected' : ''}>Cash</option>
                             <option value="Card" ${hiddenPay.value === 'Card' ? 'selected' : ''}>Card</option>
@@ -548,18 +548,18 @@ function promptFilterDialog() {
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-[11px] font-black tracking-widest text-gray-400 uppercase mb-1.5">From Date</label>
-                            <input type="date" id="modal-start-date" value="${hiddenStart.value}" class="w-full p-2.5 border rounded-xl text-xs font-mono font-bold bg-slate-50 text-indigo-600">
+                            <input type="date" id="modal-start-date" value="${hiddenStart.value}" class="w-full p-2.5 border rounded-xl text-xs font-mono font-bold bg-slate-50 text-SLATE-600">
                         </div>
                         <div>
                             <label class="block text-[11px] font-black tracking-widest text-gray-400 uppercase mb-1.5">To Date</label>
-                            <input type="date" id="modal-end-date" value="${hiddenEnd.value}" class="w-full p-2.5 border rounded-xl text-xs font-mono font-bold bg-slate-50 text-indigo-600">
+                            <input type="date" id="modal-end-date" value="${hiddenEnd.value}" class="w-full p-2.5 border rounded-xl text-xs font-mono font-bold bg-slate-50 text-SLATE-600">
                         </div>
                     </div>
                 </div>
 
                 <div class="p-4 bg-slate-50 border-t flex gap-3 justify-end">
                     <button id="modal-reset-filters" class="px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition">Clear All</button>
-                    <button onclick="document.getElementById('${modalId}').remove()" class="px-6 py-2.5 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition">Done</button>
+                    <button onclick="document.getElementById('${modalId}').remove()" class="px-6 py-2.5 text-xs font-black text-white bg-SLATE-600 hover:bg-SLATE-700 rounded-xl shadow-md transition">Done</button>
                 </div>
             </div>
         </div>
@@ -603,7 +603,7 @@ export async function promptExportDialogWithPreview() {
     const startDateVal = document.getElementById('tx-start-date')?.value;
     const endDateVal = document.getElementById('tx-end-date')?.value;
     const paymentMethod = document.getElementById('tx-payment-filter')?.value || 'all';
-    
+
     let activeFilterText = "All Time";
     if (startDateVal || endDateVal) {
         activeFilterText = `${startDateVal ? new Date(startDateVal).toLocaleDateString() : 'Start'} to ${endDateVal ? new Date(endDateVal).toLocaleDateString() : 'Today'}`;
@@ -633,7 +633,7 @@ export async function promptExportDialogWithPreview() {
                 <div class="p-6 bg-slate-50 border-b flex justify-between items-center shrink-0">
                     <div>
                         <h3 class="font-black text-gray-800 text-lg">Export Customizer</h3>
-                        <p class="text-xs font-bold text-indigo-600 tracking-wider uppercase mt-1" id="export-dataset-count">Dataset: Fetching records...</p>
+                        <p class="text-xs font-bold text-SLATE-600 tracking-wider uppercase mt-1" id="export-dataset-count">Dataset: Fetching records...</p>
                     </div>
                     <button onclick="document.getElementById('${modalId}').remove(); document.body.classList.remove('overflow-hidden');" class="text-gray-400 hover:text-red-500 transition font-bold p-2 bg-white rounded-full shadow-sm border border-gray-100">✕</button>
                 </div>
@@ -641,13 +641,13 @@ export async function promptExportDialogWithPreview() {
                 <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
                     <div class="w-full md:w-72 border-r border-slate-100 bg-white p-6 shrink-0 overflow-y-auto flex flex-col">
                         
-                        <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6 flex items-start gap-3 shadow-sm">
-                            <div class="bg-indigo-100 text-indigo-600 p-2 rounded-lg shrink-0">
+                        <div class="bg-SLATE-50 border border-SLATE-100 rounded-xl p-4 mb-6 flex items-start gap-3 shadow-sm">
+                            <div class="bg-SLATE-100 text-SLATE-600 p-2 rounded-lg shrink-0">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             </div>
                             <div>
-                                <h4 class="text-xs font-black text-indigo-900 uppercase tracking-wide">Pro Tip</h4>
-                                <p class="text-[11px] text-indigo-700 mt-1 leading-relaxed font-medium">This tool exports exactly what is on your screen. Need a specific month? Close this window and use the <b>Filter Records</b> button first!</p>
+                                <h4 class="text-xs font-black text-SLATE-900 uppercase tracking-wide">Pro Tip</h4>
+                                <p class="text-[11px] text-SLATE-700 mt-1 leading-relaxed font-medium">This tool exports exactly what is on your screen. Need a specific month? Close this window and use the <b>Filter Records</b> button first!</p>
                             </div>
                         </div>
 
@@ -655,8 +655,8 @@ export async function promptExportDialogWithPreview() {
                         <div class="space-y-3 flex-1" id="export-col-toggles">
                             ${Object.entries(cols).map(([key, config]) => `
                                 <label class="flex items-center gap-3 cursor-pointer group">
-                                    <input type="checkbox" data-col="${key}" ${config.active ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 transition">
-                                    <span class="text-sm font-bold text-gray-700 group-hover:text-indigo-600 transition">${config.label}</span>
+                                    <input type="checkbox" data-col="${key}" ${config.active ? 'checked' : ''} class="w-4 h-4 text-SLATE-600 rounded border-gray-300 focus:ring-SLATE-500 transition">
+                                    <span class="text-sm font-bold text-gray-700 group-hover:text-SLATE-600 transition">${config.label}</span>
                                 </label>
                             `).join('')}
                         </div>
@@ -679,7 +679,7 @@ export async function promptExportDialogWithPreview() {
                                 <tbody id="preview-tbody" class="divide-y divide-gray-50">
                                     <tr>
                                         <td colspan="7" class="py-20 text-center">
-                                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-SLATE-600 mb-2"></div>
                                             <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Loading entire dataset...</p>
                                         </td>
                                     </tr>
@@ -696,8 +696,8 @@ export async function promptExportDialogWithPreview() {
                                 <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                                 Save PDF
                             </button>
-                            <button id="dl-pdf-print" disabled class="p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl text-slate-700 font-bold text-[11px] uppercase tracking-wider flex flex-col items-center justify-center gap-2 transition shadow-sm group active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            <button id="dl-pdf-print" disabled class="p-3 bg-white border border-slate-200 hover:border-SLATE-500 hover:bg-SLATE-50 rounded-xl text-slate-700 font-bold text-[11px] uppercase tracking-wider flex flex-col items-center justify-center gap-2 transition shadow-sm group active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <svg class="w-6 h-6 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 Direct Print
                             </button>
                             <button id="dl-json" disabled class="p-3 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl text-slate-700 font-bold text-[11px] uppercase tracking-wider flex flex-col items-center justify-center gap-2 transition shadow-sm group active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -710,7 +710,7 @@ export async function promptExportDialogWithPreview() {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', html);
     document.body.classList.add('overflow-hidden');
 
@@ -721,8 +721,8 @@ export async function promptExportDialogWithPreview() {
 
         // Apply Location Filters
         const locationSelect = document.getElementById('tx-location-filter');
-        
-        const canAccessAllLocations = (role === 'admin' || role === 'accountant') ;
+
+        const canAccessAllLocations = (role === 'admin' || role === 'accountant');
 
         const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
         let filterLoc = canAccessAllLocations ? 'all' : assignedLoc;
@@ -734,7 +734,7 @@ export async function promptExportDialogWithPreview() {
         if (currentTypeFilter !== 'ALL') {
             if (currentTypeFilter === 'CHEQUE') constraints.push(where("summary.paymentMethod", "==", "CHEQUE"));
             else if (currentTypeFilter === 'SALE') constraints.push(where("summary.transactionType", "==", "SALE"));
-            else if (currentTypeFilter === 'ADJUSTMENT') constraints.push(where("type", "in", ["ADJUSTMENT", "LOSS"])); 
+            else if (currentTypeFilter === 'ADJUSTMENT') constraints.push(where("type", "in", ["ADJUSTMENT", "LOSS"]));
             else if (currentTypeFilter === 'LOSS') constraints.push(where("type", "==", "LOSS"));
             else constraints.push(where("type", "==", currentTypeFilter));
         }
@@ -748,10 +748,10 @@ export async function promptExportDialogWithPreview() {
         const searchInput = document.getElementById('tx-search');
         const rawSearch = searchInput ? searchInput.value.trim() : '';
         const searchTerm = rawSearch.toUpperCase();
-        
+
         if (searchTerm) {
             constraints = []; // Reset constraints to isolate the search for export
-            
+
             if (/^(INV|RET|PUR|REV|MAN|OB|MRG)-/.test(searchTerm)) {
                 constraints.push(where('invoiceId', '==', searchTerm));
             } else if (/^(CUST|MERCH)-/.test(searchTerm)) {
@@ -789,7 +789,7 @@ export async function promptExportDialogWithPreview() {
 
         if (data.length === 0) {
             const tbody = document.getElementById('preview-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-red-500 font-bold">No records found for current filters.</td></tr>`;
+            if (tbody) tbody.innerHTML = tableStateRow('empty', { subtitle: 'No records found for current filters.' }, 7);
             return;
         }
 
@@ -815,15 +815,15 @@ export async function promptExportDialogWithPreview() {
             data.forEach(d => {
                 const dateObj = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp || Date.now());
                 bodyHtml += '<tr class="text-xs text-gray-600 hover:bg-slate-50">';
-                
-                if (cols.date.active) bodyHtml += `<td class="px-4 py-2.5">${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>`;
-                if (cols.invoice.active) bodyHtml += `<td class="px-4 py-2.5 font-mono text-indigo-600 font-bold">${d.invoiceId || '-'}</td>`;
+
+                if (cols.date.active) bodyHtml += `<td class="px-4 py-2.5">${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>`;
+                if (cols.invoice.active) bodyHtml += `<td class="px-4 py-2.5 font-mono text-SLATE-600 font-bold">${d.invoiceId || '-'}</td>`;
                 if (cols.type.active) bodyHtml += `<td class="px-4 py-2.5"><span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold uppercase">${d.type || 'SALE'}</span></td>`;
                 if (cols.party.active) bodyHtml += `<td class="px-4 py-2.5 font-bold text-gray-800">${escapeHTML(d.customer?.name || d.dealer?.name || 'Walk-in')}</td>`;
                 if (cols.method.active) bodyHtml += `<td class="px-4 py-2.5 uppercase text-[10px] font-bold">${d.summary?.paymentMethod || '-'}</td>`;
                 if (cols.items.active) bodyHtml += `<td class="px-4 py-2.5 text-center">${d.items ? d.items.length : 0}</td>`;
                 if (cols.total.active) bodyHtml += `<td class="px-4 py-2.5 font-black text-gray-900">${currency}${Math.abs(d.summary?.total || 0).toFixed(2)}</td>`;
-                
+
                 bodyHtml += '</tr>';
             });
             tbody.innerHTML = bodyHtml;
@@ -843,7 +843,7 @@ export async function promptExportDialogWithPreview() {
         // 🚀 STEP 3: CLOSURE HELPERS
         // Because these are defined INSIDE promptExportDialogWithPreview, 
         // they have absolute access to `data`, `cols`, and `activeFilterText`!
-        
+
         const buildExportData = () => {
             return data.map(d => {
                 const dateObj = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp || Date.now());
@@ -881,7 +881,7 @@ export async function promptExportDialogWithPreview() {
         const buildPrintHtmlStr = (mappedData) => {
             const headHtml = Object.keys(mappedData[0]).map(h => `<th>${escapeHTML(h)}</th>`).join('');
             const rowsHtml = mappedData.map((r, i) => `<tr class="${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}">${Object.values(r).map(v => `<td>${escapeHTML(String(v))}</td>`).join('')}</tr>`).join('');
-            
+
             return `
                 <!DOCTYPE html>
                 <html>
@@ -920,27 +920,27 @@ export async function promptExportDialogWithPreview() {
 
         // --- PDF GENERATOR ENGINE ---
         const generatePdfDocObj = async (mappedData) => {
-            
+
             const pdfDoc = new jsPDF('p', 'mm', 'a4');
-            
+
             // Draw Headers
             pdfDoc.setFontSize(18);
             pdfDoc.text("Transactions Report", 14, 20);
-            
+
             pdfDoc.setFontSize(11);
             pdfDoc.setFont("helvetica", "bold");
             pdfDoc.text(storeName, 14, 28);
-            
+
             pdfDoc.setFontSize(9);
             pdfDoc.setFont("helvetica", "normal");
             const detailsLines = pdfDoc.splitTextToSize(storeDetails, 100);
             pdfDoc.text(detailsLines, 14, 33);
-            
+
             const metaY = 33 + (detailsLines.length * 4) + 5;
             pdfDoc.setTextColor(100);
             pdfDoc.text(`Filters: ${activeFilterText}`, 14, metaY);
             pdfDoc.text(`Generated: ${new Date().toLocaleString()}`, 14, metaY + 5);
-            
+
             // Draw Table
             autoTable(pdfDoc, {
                 head: [Object.keys(mappedData[0])],
@@ -956,7 +956,7 @@ export async function promptExportDialogWithPreview() {
             const pageCount = pdfDoc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 pdfDoc.setPage(i);
-                
+
                 // Embedded watermark logic to prevent scope issues
                 const pw = pdfDoc.internal.pageSize.getWidth();
                 const ph = pdfDoc.internal.pageSize.getHeight();
@@ -966,7 +966,7 @@ export async function promptExportDialogWithPreview() {
                 pdfDoc.line(14, ph - 15, pw - 14, ph - 15);
                 pdfDoc.text("Mifela POS | Powered by Mifela Inventory Management", pw / 2, ph - 10, { align: 'center' });
             }
-            
+
             return pdfDoc;
         };
 
@@ -976,7 +976,7 @@ export async function promptExportDialogWithPreview() {
             const headers = Object.keys(mappedData[0]).join(',');
             const rows = mappedData.map(r => Object.values(r).map(val => `"${val}"`).join(',')).join('\n');
             const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
-            
+
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `Mifela_Transactions_${Date.now()}.csv`;
@@ -997,10 +997,10 @@ export async function promptExportDialogWithPreview() {
             const originalHtml = btn.innerHTML;
             btn.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mb-1"></div> Loading...`;
             btn.disabled = true;
-            
+
             try {
                 const mappedData = buildExportData();
-                const pdfInstance = await generatePdfDocObj(mappedData); 
+                const pdfInstance = await generatePdfDocObj(mappedData);
                 pdfInstance.save(`Mifela_Transactions_${Date.now()}.pdf`);
             } catch (e) {
                 console.error("PDF generation failed:", e);
@@ -1014,33 +1014,33 @@ export async function promptExportDialogWithPreview() {
         document.getElementById('dl-pdf-print').onclick = async () => {
             const btn = document.getElementById('dl-pdf-print');
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mb-1"></div> Printing...`;
+            btn.innerHTML = `<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-SLATE-600 mb-1"></div> Printing...`;
             btn.disabled = true;
-            
+
             try {
                 const mappedData = buildExportData();
-                const printHtml = buildPrintHtmlStr(mappedData); 
+                const printHtml = buildPrintHtmlStr(mappedData);
 
                 // 1. Fetch user's print settings
                 let printConfig = { silent: true, invoicePrinter: '' };
-                try { 
+                try {
                     const saved = localStorage.getItem('mifela_printer_settings');
-                    if (saved) printConfig = { ...printConfig, ...JSON.parse(saved) }; 
-                } catch(e) {}
+                    if (saved) printConfig = { ...printConfig, ...JSON.parse(saved) };
+                } catch (e) { }
 
                 const isElectron = typeof window !== 'undefined' && window.electronAPI && window.electronAPI.printSilent;
 
                 // 2. Decide how to print based on environment and user preference
                 if (isElectron && printConfig.silent) {
-    // 🚀 THE FIX: Wrap parameters in the expected object schema
-    window.electronAPI.printSilent({
-        content: printHtml,
-        silent: true,
-        pageSize: 'A4', // Hardcoded to A4 for the Export Report
-        printerName: printConfig.invoicePrinter || ''
-    });
-    if (typeof showToast === 'function') showToast("Printing", "Sent to background printer.", "success");
-} else {
+                    // 🚀 THE FIX: Wrap parameters in the expected object schema
+                    window.electronAPI.printSilent({
+                        content: printHtml,
+                        silent: true,
+                        pageSize: 'A4', // Hardcoded to A4 for the Export Report
+                        printerName: printConfig.invoicePrinter || ''
+                    });
+                    if (typeof showToast === 'function') showToast("Printing", "Sent to background printer.", "success");
+                } else {
                     // Web App OR Electron with Silent Printing Turned OFF (Forces OS Modal)
                     let printFrame = document.getElementById('hidden-web-print-frame');
                     if (!printFrame) {
@@ -1052,12 +1052,12 @@ export async function promptExportDialogWithPreview() {
                         printFrame.style.border = 'none';
                         document.body.appendChild(printFrame);
                     }
-                    
+
                     const frameDoc = printFrame.contentWindow.document;
                     frameDoc.open();
                     frameDoc.write(printHtml);
                     frameDoc.close();
-                    
+
                     setTimeout(() => {
                         printFrame.contentWindow.focus();
                         printFrame.contentWindow.print();
@@ -1086,14 +1086,14 @@ export async function promptExportDialogWithPreview() {
 function addMifelaWatermark(doc) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    
+
     doc.setFontSize(8);
     doc.setTextColor(150); // Muted grey
-    
+
     // Add horizontal line
     doc.setDrawColor(200);
     doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
-    
+
     // Footer text
     doc.text("Mifela Inventory Management | Powered by Mifela POS", pageWidth / 2, pageHeight - 10, {
         align: 'center'
@@ -1107,17 +1107,17 @@ function setupTypeFilterButtons() {
     tabs.forEach(tab => {
         const newTab = tab.cloneNode(true);
         tab.parentNode.replaceChild(newTab, tab);
-        
+
         newTab.addEventListener('click', (e) => {
             const btn = e.target.closest('.tx-tab');
-            
+
             document.querySelectorAll('.tx-tab').forEach(t => {
-                t.classList.remove('active', 'bg-white', 'shadow-md', 'text-indigo-600', 'ring-1', 'ring-indigo-100');
+                t.classList.remove('active', 'bg-white', 'shadow-md', 'text-SLATE-600', 'ring-1', 'ring-SLATE-100');
                 t.classList.add('text-gray-500', 'hover:bg-gray-200/50', 'hover:text-gray-700');
             });
-            
+
             btn.classList.remove('text-gray-500', 'hover:bg-gray-200/50', 'hover:text-gray-700');
-            btn.classList.add('active', 'bg-white', 'shadow-md', 'text-indigo-600', 'ring-1', 'ring-indigo-100');
+            btn.classList.add('active', 'bg-white', 'shadow-md', 'text-SLATE-600', 'ring-1', 'ring-SLATE-100');
 
             const type = btn.getAttribute('data-tx-type');
             if (type) currentTypeFilter = type;
@@ -1128,18 +1128,18 @@ function setupTypeFilterButtons() {
             loadTransactionsPage();
         });
     });
-    
+
     // Set initial active state
     const initialBtn = document.querySelector(`.tx-tab[data-tx-type="${currentTypeFilter}"]`);
-    if(initialBtn) {
+    if (initialBtn) {
         initialBtn.classList.remove('text-gray-500', 'hover:bg-gray-200/50', 'hover:text-gray-700');
-        initialBtn.classList.add('active', 'bg-white', 'shadow-md', 'text-indigo-600', 'ring-1', 'ring-indigo-100');
+        initialBtn.classList.add('active', 'bg-white', 'shadow-md', 'text-SLATE-600', 'ring-1', 'ring-SLATE-100');
     }
 }
 
 // Pagination Logic
 async function loadNextTransactionsPage() {
-    if (!lastVisibleTransaction) return; 
+    if (!lastVisibleTransaction) return;
     executePaginationQuery('next');
 }
 
@@ -1157,12 +1157,12 @@ function updateLocalCache(querySnapshot) {
     // 🚀 THE .EXE SAVIOR: Absolute Javascript Fallback Sorting
     // This forces newly created (pending/null timestamp) transactions to the very top!
     docs.sort((a, b) => {
-        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 
-                     (a.timestamp ? new Date(a.timestamp).getTime() : Date.now());
-                     
-        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 
-                     (b.timestamp ? new Date(b.timestamp).getTime() : Date.now());
-        
+        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() :
+            (a.timestamp ? new Date(a.timestamp).getTime() : Date.now());
+
+        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() :
+            (b.timestamp ? new Date(b.timestamp).getTime() : Date.now());
+
         return timeB - timeA; // Sorts Descending (Newest at the top)
     });
 
@@ -1197,18 +1197,18 @@ export function clearTransactionFilters() {
     if (startInp) startInp.value = '';
     if (endInp) endInp.value = '';
     // Reset location if admin
-    if (locSelect) locSelect.value = 'all'; 
-    
+    if (locSelect) locSelect.value = 'all';
+
     currentTypeFilter = 'ALL';
     const tabs = document.querySelectorAll('.tx-tab');
     if (tabs.length > 0) {
         tabs.forEach(t => {
-            t.classList.remove('active', 'bg-white', 'shadow-md', 'text-indigo-600', 'ring-1', 'ring-indigo-100');
+            t.classList.remove('active', 'bg-white', 'shadow-md', 'text-SLATE-600', 'ring-1', 'ring-SLATE-100');
             t.classList.add('text-gray-500');
         });
         const allBtn = document.getElementById('filter-all-btn');
-        if(allBtn) {
-            allBtn.classList.add('active', 'bg-white', 'shadow-md', 'text-indigo-600', 'ring-1', 'ring-indigo-100');
+        if (allBtn) {
+            allBtn.classList.add('active', 'bg-white', 'shadow-md', 'text-SLATE-600', 'ring-1', 'ring-SLATE-100');
             allBtn.classList.remove('text-gray-500');
         }
     }
@@ -1223,7 +1223,7 @@ export function renderTransactionsTable() {
     if (!tbody) return;
 
     const isRegistryView = currentTypeFilter === 'CHEQUE';
-    const filteredTx = localTransactionsCache; 
+    const filteredTx = localTransactionsCache;
 
     const thead = document.querySelector('#transactions-table-body').previousElementSibling;
     if (isRegistryView) {
@@ -1253,7 +1253,7 @@ export function renderTransactionsTable() {
     }
 
     tbody.innerHTML = '';
-    
+
     if (filteredTx.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -1270,15 +1270,15 @@ export function renderTransactionsTable() {
         const fragment = document.createDocumentFragment();
         filteredTx.forEach(tx => {
             const row = document.createElement('tr');
-            row.className = 'group hover:bg-indigo-50/50 transition-colors duration-150 border-b border-gray-100 last:border-0 cursor-pointer';
-            
+            row.className = 'group hover:bg-SLATE-50/50 transition-colors duration-150 border-b border-gray-100 last:border-0 cursor-pointer';
+
             if (isRegistryView) {
                 const chq = tx.summary?.chequeDetails || {};
                 const status = chq.status || 'PENDING';
                 const rawDate = tx.localTimestamp || tx.timestamp;
                 const dateObj = rawDate?.toDate ? rawDate.toDate() : new Date(rawDate);
                 const dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                
+
                 let statusBadge = '<span class="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-bold uppercase rounded-full">Pending</span>';
                 if (status === 'CLEARED') statusBadge = '<span class="px-2.5 py-1 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-full">Cleared</span>';
                 if (status === 'BOUNCED') statusBadge = '<span class="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-bold uppercase rounded-full">Bounced</span>';
@@ -1290,14 +1290,14 @@ export function renderTransactionsTable() {
                         <p class="text-[10px] uppercase text-gray-500 tracking-wider">${chq.bank || 'Unknown Bank'}</p>
                     </td>
                     <td class="px-6 py-4 text-sm font-medium text-gray-800">${tx.customer?.name || tx.dealer?.name || 'Unknown'}</td>
-                    <td class="px-6 py-4 text-right font-black text-indigo-700">${getCurrencySymbol()}${Math.abs(tx.summary?.total || 0).toFixed(2)}</td>
+                    <td class="px-6 py-4 text-right font-black text-SLATE-700">${getCurrencySymbol()}${Math.abs(tx.summary?.total || 0).toFixed(2)}</td>
                     <td class="px-6 py-4 text-center font-mono text-xs text-gray-600">${chq.clearanceDate || 'N/A'}</td>
                     <td class="px-6 py-4 text-center">${statusBadge}</td>
                     <td class="px-6 py-4 text-center space-x-1">
                         ${status === 'PENDING' ? `
                             <button onclick="window.updateChequeStatus('${tx.id}', 'CLEARED')" class="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm">Clear</button>
                             <button onclick="window.updateChequeStatus('${tx.id}', 'BOUNCED')" class="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm">Bounce</button>
-                        ` : `<button class="view-btn text-indigo-600 font-bold text-[10px] uppercase tracking-wider bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition shadow-sm" data-id="${tx.id}">View Details</button>`}
+                        ` : `<button class="view-btn text-SLATE-600 font-bold text-[10px] uppercase tracking-wider bg-SLATE-50 px-3 py-1.5 rounded-lg hover:bg-SLATE-100 transition shadow-sm" data-id="${tx.id}">View Details</button>`}
                     </td>
                 `;
                 fragment.appendChild(row);
@@ -1311,22 +1311,22 @@ export function renderTransactionsTable() {
 
             const totalItems = tx.items ? tx.items.reduce((acc, item) => acc + Math.abs(item.quantity), 0) : 0;
             const currency = tx.currency?.symbol || getCurrencySymbol();
-            
+
             // 🚀 THE FIX: Always define displayAmt based on the Total Invoice Value, not the Revenue captured
             const totalAmt = tx.summary?.total || 0;
             const revenueAmt = tx.summary?.revenue !== undefined ? tx.summary.revenue : totalAmt;
-            const stagedDuesAmt = tx.summary?.stagedDuesPayment || 0; 
-            
+            const stagedDuesAmt = tx.summary?.stagedDuesPayment || 0;
+
             let displayAmt = totalAmt;
             let duesHtml = '';
-            
+
             let typeStyles = '';
             let typeLabel = '';
             let amountClass = 'text-gray-900 font-semibold';
             let amountPrefix = '';
-            
+
             const type = (tx.type || tx.summary?.transactionType || 'SALE').toUpperCase();
-            
+
             switch (type) {
                 case 'SALE':
                     // If cart was 0 and they only paid dues
@@ -1338,12 +1338,12 @@ export function renderTransactionsTable() {
                         displayAmt = totalAmt;
                         typeLabel = 'Sale';
                         typeStyles = 'bg-green-100 text-green-700 border-green-200';
-                        
+
                         // Tag if past dues were included in this bill
                         if (stagedDuesAmt > 0) {
                             duesHtml += `<div class="text-[10px] text-teal-600 font-bold mt-0.5 tracking-tight">+${currency}${stagedDuesAmt.toFixed(2)} Dues</div>`;
                         }
-                        
+
                         // 🚀 NEW: Clearly flag Unpaid (Credit) portion directly under the total!
                         if (revenueAmt < totalAmt) {
                             const unpaid = totalAmt - revenueAmt;
@@ -1353,22 +1353,22 @@ export function renderTransactionsTable() {
                     amountClass = 'text-green-600 font-bold';
                     amountPrefix = '+';
                     break;
-                case 'REFUND': 
+                case 'REFUND':
                     typeStyles = 'bg-orange-100 text-orange-700 border-orange-200';
                     typeLabel = 'Return';
                     amountClass = 'text-orange-600 font-bold';
                     break;
-                case 'PURCHASE': 
+                case 'PURCHASE':
                     typeStyles = 'bg-blue-50 text-blue-700 border-blue-200';
                     typeLabel = 'Purchase';
-                    amountClass = 'text-gray-700 font-bold'; 
+                    amountClass = 'text-gray-700 font-bold';
                     break;
-                case 'LOSS': 
+                case 'LOSS':
                     typeStyles = 'bg-red-50 text-red-700 border-red-200';
                     typeLabel = 'Loss';
                     amountClass = 'text-red-600 font-bold';
                     break;
-                case 'ADJUSTMENT': 
+                case 'ADJUSTMENT':
                     typeStyles = 'bg-gray-100 text-gray-600 border-gray-200';
                     typeLabel = 'Adj';
                     amountClass = 'text-gray-400 italic';
@@ -1381,7 +1381,7 @@ export function renderTransactionsTable() {
             if (tx.summary?.paymentMethod === 'ADJUSTMENT' && type === 'ADJUSTMENT') {
                 typeLabel = 'Correction';
             }
-            
+
             let chequeBadgeHtml = '';
             if (tx.summary?.paymentMethod === 'CHEQUE') {
                 const chq = tx.summary.chequeDetails || {};
@@ -1389,7 +1389,7 @@ export function renderTransactionsTable() {
                 let badgeColor = 'bg-yellow-100 text-yellow-700 border-yellow-200';
                 if (chqStat === 'CLEARED') badgeColor = 'bg-green-100 text-green-700 border-green-200';
                 if (chqStat === 'BOUNCED') badgeColor = 'bg-red-100 text-red-700 border-red-200';
-                
+
                 chequeBadgeHtml = `
                     <div class="mt-1.5 flex flex-col items-end gap-1">
                         <span class="text-[9px] ${badgeColor} px-1.5 py-0.5 rounded font-black uppercase tracking-wider border shadow-sm">CHQ: ${chqStat}</span>
@@ -1397,12 +1397,12 @@ export function renderTransactionsTable() {
                     </div>
                 `;
             }
-            
+
             let displayParty = tx.dealer?.name || tx.customer?.name;
             let partySubtext = tx.dealer ? 'Dealer' : 'Customer';
             if (!displayParty) {
-                 if (tx.summary?.reason) { displayParty = tx.summary.reason; partySubtext = 'Reason'; }
-                 else { displayParty = 'Walk-in Customer'; }
+                if (tx.summary?.reason) { displayParty = tx.summary.reason; partySubtext = 'Reason'; }
+                else { displayParty = 'Walk-in Customer'; }
             }
 
             row.innerHTML = `
@@ -1412,7 +1412,7 @@ export function renderTransactionsTable() {
                         <span class="text-[10px] text-gray-400 font-medium">${timeStr}</span>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-400 group-hover:text-indigo-600 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-400 group-hover:text-SLATE-600 transition-colors">
                     ${tx.invoiceId || 'N/A'}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -1439,7 +1439,7 @@ export function renderTransactionsTable() {
                     </span>
                 </td>
                 <td class="px-6 py-4 text-center">
-                    <button data-id="${tx.id}" class="view-btn p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="View Details">
+                    <button data-id="${tx.id}" class="view-btn p-2 text-gray-400 hover:text-SLATE-600 hover:bg-SLATE-50 rounded-lg transition-all" title="View Details">
                         <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     </button>
                 </td>
@@ -1447,8 +1447,8 @@ export function renderTransactionsTable() {
             fragment.appendChild(row);
         });
         tbody.appendChild(fragment);
-    } 
-    
+    }
+
     const isSearching = document.getElementById('tx-search')?.value.trim().length > 0;
     const paginationRow = document.createElement('tr');
     paginationRow.innerHTML = `
@@ -1470,7 +1470,7 @@ export function renderTransactionsTable() {
     `;
     tbody.appendChild(paginationRow);
 }
-    
+
 
 
 async function processRefund(txId) {
@@ -1483,12 +1483,12 @@ async function processRefund(txId) {
 
     const currency = tx.currency?.symbol || getCurrencySymbol();
     let itemsHtml = '';
-    
+
     // Build the interactive item list
     tx.items.forEach((item, idx) => {
         const maxQty = Math.abs(item.quantity || 0);
         const unitPrice = parseFloat(item.price || item.cost || 0);
-        
+
         itemsHtml += `
             <div class="flex justify-between items-center py-4 border-b border-gray-100 last:border-0 gap-4 hover:bg-slate-50/50 transition-colors px-4 rounded-xl">
                 <div class="flex-1 min-w-0">
@@ -1552,7 +1552,7 @@ async function processRefund(txId) {
     `;
 
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     const modal = document.getElementById(modalId);
     const closeBtn = document.getElementById('close-refund-modal');
     const cancelBtn = document.getElementById('cancel-refund-btn');
@@ -1566,10 +1566,10 @@ async function processRefund(txId) {
             e.preventDefault();
             e.stopPropagation();
         }
-        
+
         modal.classList.add('opacity-0');
         modal.querySelector('div').classList.add('scale-95');
-        
+
         setTimeout(() => {
             modal.remove();
         }, 250); // Keep this timeout short and sweet
@@ -1586,7 +1586,7 @@ async function processRefund(txId) {
     const calculateTotal = () => {
         refundTotal = 0;
         returnItems = [];
-        
+
         qtyInputs.forEach(input => {
             let qty = parseInt(input.value) || 0;
             const max = parseInt(input.dataset.max);
@@ -1600,11 +1600,11 @@ async function processRefund(txId) {
             if (qty > 0) {
                 const lineTotal = qty * price;
                 refundTotal += lineTotal;
-                
+
                 const originalItem = tx.items[idx];
                 returnItems.push({
                     ...originalItem,
-                    quantity: qty, 
+                    quantity: qty,
                     subtotal: lineTotal
                 });
             }
@@ -1651,8 +1651,8 @@ async function executePartialRefund(tx, returnItems, refundTotal) {
             type: 'REFUND',
             customer: tx.customer,
             summary: {
-                total: Math.abs(refundTotal), 
-                profit: 0, 
+                total: Math.abs(refundTotal),
+                profit: 0,
                 paymentMethod: 'REFUND',
                 originalInvoiceId: tx.invoiceId,
                 // Flag if this was a partial or full return
@@ -1668,7 +1668,7 @@ async function executePartialRefund(tx, returnItems, refundTotal) {
         returnItems.forEach(item => {
             if (item.id) {
                 const productRef = doc(productsRef, item.id);
-                batch.update(productRef, { 
+                batch.update(productRef, {
                     stockLevel: increment(Math.abs(item.quantity)),
                     updatedAt: serverTimestamp()
                 });
@@ -1678,7 +1678,7 @@ async function executePartialRefund(tx, returnItems, refundTotal) {
         // 3. Update Customer Stats and Ledger
         if (tx.customer && tx.customer.id && tx.customer.id !== 'WALK-IN') {
             const customerRef = doc(customersRef, tx.customer.id);
-            
+
             const customerUpdates = {
                 totalSpent: increment(-Math.abs(refundTotal)),
                 lastVisit: refundTimestamp
@@ -1696,18 +1696,18 @@ async function executePartialRefund(tx, returnItems, refundTotal) {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const dailyStatsRef = doc(transactionsRef.parent, 'dailyStats', todayStr);
-        
+
         batch.set(dailyStatsRef, {
             revenue: increment(-Math.abs(refundTotal)),
             lastUpdated: serverTimestamp()
         }, { merge: true });
 
         await batch.commit();
-        
+
         // Remove modals and reload page
         document.getElementById('partial-refund-modal')?.remove();
         document.getElementById('tx-detail-overlay')?.remove();
-        
+
         showModal('Success', `Return processed successfully. ID: ${refundInvoiceId}`, 'success');
         loadTransactionsPage();
 
@@ -1723,21 +1723,21 @@ async function executePartialRefund(tx, returnItems, refundTotal) {
 export async function showTransactionDetails(txId) {
     const tx = localTransactionsCache.find(t => t.id === txId);
     if (!tx) return;
-    
+
     // Nuke any existing phantom modals
     const existingModal = document.getElementById('tx-detail-overlay');
     if (existingModal) existingModal.remove();
-    
+
     // 🚀 STEP 1: INSTANTLY render the blurred background (No fade-in transition on the background!)
     const detailOverlay = document.createElement('div');
     detailOverlay.id = 'tx-detail-overlay';
     // Removed   from here! Kept  .
-    detailOverlay.className = "fixed inset-0 bg-gray-900/60  flex items-center justify-center z-[70]"; 
-    
+    detailOverlay.className = "fixed inset-0 bg-gray-900/60  flex items-center justify-center z-[70]";
+
     // Inject a quick loading state so the window opens instantly
     detailOverlay.innerHTML = `
         <div id="tx-detail-inner-box" class="bg-white rounded-xl shadow-2xl w-full max-w-lg min-h-[300px] m-4 flex flex-col items-center justify-center ">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-4 border-indigo-600 mb-4"></div>
+            <div class="animate-spin rounded-full h-10 w-10 border-b-4 border-SLATE-600 mb-4"></div>
             <p class="text-sm font-bold text-gray-500 uppercase tracking-widest">Loading Details...</p>
         </div>
     `;
@@ -1745,9 +1745,9 @@ export async function showTransactionDetails(txId) {
 
     // 🚀 STEP 2: Defer the heavy math and database lookups so the CSS animation can play smoothly
     setTimeout(async () => {
-        let storeName = document.getElementById('dashboard-store-name')?.textContent 
-                     || document.querySelector('.store-name-display')?.textContent 
-                     || 'Our Store';
+        let storeName = document.getElementById('dashboard-store-name')?.textContent
+            || document.querySelector('.store-name-display')?.textContent
+            || 'Our Store';
         storeName = storeName.trim();
 
         // Async Staff Name Lookup
@@ -1768,40 +1768,40 @@ export async function showTransactionDetails(txId) {
         const currency = tx.currency?.symbol || getCurrencySymbol();
         const payMethod = tx.summary?.paymentMethod || 'SYSTEM';
         const cheque = tx.summary?.chequeDetails;
-        
+
         let headerClass = "text-gray-800";
         let headerBg = "bg-gray-100";
         let totalLabel = "Total Amount";
-        
+
         // DYNAMIC UI STYLING & LABELS
-        if (type === 'SALE') { 
-            headerClass = "text-green-700"; headerBg = "bg-green-50"; 
+        if (type === 'SALE') {
+            headerClass = "text-green-700"; headerBg = "bg-green-50";
             totalLabel = payMethod === 'CREDIT' ? 'Total Bill (Unpaid)' : 'Total Received';
         }
-        else if (type === 'REFUND') { 
-            headerClass = "text-orange-700"; headerBg = "bg-orange-50"; 
+        else if (type === 'REFUND') {
+            headerClass = "text-orange-700"; headerBg = "bg-orange-50";
             totalLabel = 'Total Refunded';
         }
-        else if (type === 'LOSS' || type === 'ADJUSTMENT') { 
-            headerClass = "text-red-700"; headerBg = "bg-red-50"; 
+        else if (type === 'LOSS' || type === 'ADJUSTMENT') {
+            headerClass = "text-red-700"; headerBg = "bg-red-50";
             totalLabel = type === 'LOSS' ? 'Total Loss Value' : 'Adjustment Value';
         }
-        else if (type === 'PURCHASE') { 
-            headerClass = "text-blue-700"; headerBg = "bg-blue-50"; 
+        else if (type === 'PURCHASE') {
+            headerClass = "text-blue-700"; headerBg = "bg-blue-50";
             totalLabel = 'Total Paid';
         }
 
         let itemsHtml = '';
         let calculatedSubtotal = 0;
-        let totalSavings = 0; 
+        let totalSavings = 0;
         const isMathReady = typeof safeMath?.multiply === 'function';
 
         if (tx.items) {
             tx.items.forEach(item => {
                 const qtyAbs = Math.abs(item.quantity || 0);
-                
+
                 let unitRate = 0;
-                let itemMrp = parseFloat(item.mrp || item.price || 0); 
+                let itemMrp = parseFloat(item.mrp || item.price || 0);
 
                 if (type === 'PURCHASE' || type === 'LOSS' || type === 'ADJUSTMENT') {
                     unitRate = parseFloat(item.cost || item.purchasePrice || item.price || 0);
@@ -1811,7 +1811,7 @@ export async function showTransactionDetails(txId) {
                         totalSavings += (itemMrp - unitRate) * qtyAbs;
                     }
                 }
-                
+
                 let lineTotal = 0;
                 if (item.subtotal !== undefined && item.subtotal !== null) {
                     lineTotal = Math.abs(item.subtotal);
@@ -1837,13 +1837,13 @@ export async function showTransactionDetails(txId) {
 
         const displaySubtotal = tx.summary?.subtotal ? Math.abs(tx.summary.subtotal) : calculatedSubtotal;
         const finalTotal = Math.abs(tx.summary?.total || 0);
-        
+
         let paymentHtml = '';
         if (payMethod === 'CHEQUE' && cheque) {
             let statColor = 'text-yellow-600 bg-yellow-50 border-yellow-200';
             if (cheque.status === 'CLEARED') statColor = 'text-green-600 bg-green-50 border-green-200';
             if (cheque.status === 'BOUNCED') statColor = 'text-red-600 bg-red-50 border-red-200';
-            
+
             paymentHtml = `
                 <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 flex flex-col gap-1.5">
                     <div class="flex justify-between items-center mb-1">
@@ -1876,7 +1876,7 @@ export async function showTransactionDetails(txId) {
                 </div>
             `;
         }
-        
+
         let totalsBlock = `
             <div class="flex justify-between text-sm text-gray-600 mb-1">
                 <span>Subtotal</span>
@@ -1913,7 +1913,7 @@ export async function showTransactionDetails(txId) {
         `;
 
         if (type === 'ADJUSTMENT' || type === 'LOSS') {
-             totalsBlock = `
+            totalsBlock = `
                 <div class="flex justify-between items-center border-t border-gray-200 pt-3 mt-2">
                     <span class="font-bold text-gray-900">${totalLabel}</span>
                     <span class="font-black text-xl ${headerClass}">${currency}${finalTotal.toFixed(2)}</span>
@@ -1966,14 +1966,14 @@ export async function showTransactionDetails(txId) {
                 
                 <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100" id="tx-modal-actions">
                     ${type === 'SALE' ? `<button id="btn-refund-tx" class="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded text-sm font-bold hover:bg-red-100 transition">Process Return / Refund</button>` : ''}
-                    <button id="btn-print-tx" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm font-bold hover:bg-indigo-700 shadow transition flex items-center gap-2">
+                    <button id="btn-print-tx" class="px-4 py-2 bg-SLATE-600 text-white rounded text-sm font-bold hover:bg-SLATE-700 shadow transition flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> 
                         Reprint Receipt
                     </button>
                 </div>
             </div>
         `;
-        
+
         // 🚀 STEP 3: Swap out the spinner with the actual content using   so it looks intentional
         const innerBox = document.getElementById('tx-detail-inner-box');
         if (innerBox) {
@@ -1989,31 +1989,31 @@ export async function showTransactionDetails(txId) {
                 </div>
             `;
         }
-        
+
         document.getElementById('close-tx-overlay').onclick = () => detailOverlay.remove();
-        
+
         const printBtn = document.getElementById('btn-print-tx');
         if (printBtn) printBtn.onclick = () => buildAndPrintInvoice(tx, storeName);
-        
+
         const refundBtn = document.getElementById('btn-refund-tx');
         if (refundBtn) refundBtn.onclick = () => processRefund(tx.id);
 
     }, 50); // Just 50ms of breathing room for the GPU!
 }
 
-window.updateChequeStatus = async function(txId, newStatus) {
+window.updateChequeStatus = async function (txId, newStatus) {
     if (!confirm(`Are you sure you want to mark this cheque as ${newStatus}?`)) return;
 
     try {
         const txRef = doc(db, `artifacts/${appId}/stores/${getStoreId()}/transactions`, txId);
-        
+
         // 1. Fetch the exact transaction data
         const snap = await getDoc(txRef);
         if (!snap.exists()) throw new Error("Transaction not found.");
         const txData = snap.data();
-        
+
         const batch = writeBatch(db);
-        
+
         // 2. Update the Cheque Status
         batch.update(txRef, {
             "summary.chequeDetails.status": newStatus,
@@ -2024,16 +2024,16 @@ window.updateChequeStatus = async function(txId, newStatus) {
         if (newStatus === 'BOUNCED') {
             const partyId = txData.customer?.id || txData.dealer?.id;
             const absoluteAmount = Math.abs(txData.summary?.total || 0);
-            
+
             if (partyId) {
                 const partyRef = doc(db, `artifacts/${appId}/stores/${getStoreId()}/customers`, partyId);
-                
+
                 // Add the absolute amount BACK to the party's outstanding dues
                 batch.set(partyRef, {
                     dues: increment(absoluteAmount),
                     updatedAt: serverTimestamp()
                 }, { merge: true });
-                
+
                 // Create a penalty/reversal log for accounting clarity
                 const logRef = doc(collection(db, `artifacts/${appId}/stores/${getStoreId()}/transactions`));
                 batch.set(logRef, {
@@ -2044,7 +2044,7 @@ window.updateChequeStatus = async function(txId, newStatus) {
                     type: 'ADJUSTMENT',
                     customer: { id: partyId, name: txData.customer?.name || txData.dealer?.name },
                     summary: {
-                        total: 0, 
+                        total: 0,
                         dues: absoluteAmount, // Strictly a Dues Increase
                         profit: 0,
                         paymentMethod: 'SYSTEM',
@@ -2064,7 +2064,7 @@ window.updateChequeStatus = async function(txId, newStatus) {
         if (newStatus === 'BOUNCED') alertMsg += ` The amount of ${getCurrencySymbol()}${Math.abs(txData.summary?.total || 0).toFixed(2)} has been added back to the ledger dues.`;
 
         if (typeof showModal === 'function') showModal('Success', alertMsg, 'success');
-        
+
         // Refresh the table and alerts!
         loadTransactionsPage();
 
@@ -2078,7 +2078,7 @@ window.updateChequeStatus = async function(txId, newStatus) {
 async function executePaginationQuery(direction) {
     try {
         if (!window.dbAPI || !window.dbAPI.getTransactionsSince) return;
-        
+
         // 🚀 THE FIX: Pull all transactions from SQLite instead of Firebase query()
         let txs = await window.dbAPI.getTransactionsSince("2000-01-01T00:00:00Z");
 
@@ -2086,7 +2086,7 @@ async function executePaginationQuery(direction) {
         const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
         const canAccessAllLocations = (role === 'admin' || role === 'accountant');
         const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
-        
+
         let filterLoc = canAccessAllLocations ? 'all' : assignedLoc;
         if (canAccessAllLocations && locationSelect) filterLoc = locationSelect.value;
 
@@ -2094,13 +2094,13 @@ async function executePaginationQuery(direction) {
         if (filterLoc !== 'all') {
             txs = txs.filter(tx => (tx.locationId || 'main') === filterLoc);
         }
-        
+
         // 2. In-memory Type Filter
         if (currentTypeFilter !== 'ALL') {
             if (currentTypeFilter === 'SALE') {
                 txs = txs.filter(tx => tx.summary?.transactionType === "SALE");
             } else if (currentTypeFilter === 'ADJUSTMENT') {
-                txs = txs.filter(tx => tx.type === "ADJUSTMENT" || tx.type === "LOSS"); 
+                txs = txs.filter(tx => tx.type === "ADJUSTMENT" || tx.type === "LOSS");
             } else if (currentTypeFilter === 'LOSS') {
                 txs = txs.filter(tx => tx.type === "LOSS");
             } else {
@@ -2129,7 +2129,7 @@ async function executePaginationQuery(direction) {
 
         // Format to match old Firebase snapshot array so updateLocalCache works seamlessly
         const pseudoSnapshot = { empty: txs.length === 0, docs: txs.map(tx => ({ id: tx.id, data: () => tx })) };
-        
+
         if (pseudoSnapshot.empty) {
             showModal('Info', direction === 'next' ? 'No more records.' : 'You are at the start.', 'info');
             return;
@@ -2148,7 +2148,7 @@ async function checkChequeAlerts() {
 
     try {
         if (!window.dbAPI || !window.dbAPI.getPendingCheques) return;
-        
+
         // 🚀 THE FIX: Fetch directly from SQLite instead of Firebase query()
         const pendingCheques = await window.dbAPI.getPendingCheques();
         if (pendingCheques.length === 0) return;
@@ -2197,7 +2197,7 @@ async function checkChequeAlerts() {
                 });
             }
         }
-    } catch(e) {
+    } catch (e) {
         console.error("Cheque alert error:", e);
     }
 }
@@ -2205,11 +2205,11 @@ async function checkChequeAlerts() {
 window.selectExportFormat = (format, data) => {
     window.currentExportData = data;
     window.currentExportFormat = format;
-    
+
     document.getElementById('step-format').classList.add('hidden');
     document.getElementById('step-preview').classList.remove('hidden');
     document.getElementById('export-status').textContent = `Step 2: Preview & Download (${format.toUpperCase()})`;
-    
+
     // Render the table...
     // [Call your updatePreview function here]
 };
@@ -2223,14 +2223,14 @@ document.addEventListener('keydown', (e) => {
         const modals = document.querySelectorAll(
             '[id$="-modal"], [id$="-overlay"], #pos-qr-payment-modal, #tx-detail-overlay'
         );
-        
+
         modals.forEach(el => {
             el.classList.add('hidden');
             setTimeout(() => el.remove(), 50);
         });
 
         document.body.classList.remove('overflow-hidden');
-        
+
         if (typeof setCheckoutLoadingState === 'function') {
             isProcessingCheckout = false;
             setCheckoutLoadingState(false);

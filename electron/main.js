@@ -15,6 +15,7 @@ import { registerDBHandlers } from './database/controllers.js';
 import { LicenseManager } from './security/licenseVerifier.js';
 import { getHardwareFingerprint } from './security/fingerprint.js';
 import { verifyAppIntegrity } from './security/integrity.js';
+import { UniversalPrintEngine } from './UniversalPrintEngine.js';
 import LocalAuthService from './services/LocalAuthService.js';
 import LicenceStateManager from './services/LicenceStateManager.js';
 import ConnectivityMonitor from './services/ConnectivityMonitor.js';
@@ -303,6 +304,21 @@ function registerIpcHandlers() {
       // Load a blank local page (not a data: URL with renderer-controlled HTML)
       printWorker.loadFile(path.join(__dirname, 'printBlank.html'));
     });
+  });
+
+  // ---- print:raw (direct RAW/ZPL/TSPL/ESC-POS to printer) ------------------
+  ipcMain.handle('print:raw', async (_, options) => {
+    try {
+      const { connection, data } = options || {};
+      if (!connection || !data) {
+        return { success: false, error: 'Missing connection or data' };
+      }
+      await UniversalPrintEngine.sendToPrinter(connection, data);
+      return { success: true };
+    } catch (error) {
+      electronLog.error('print:raw failed:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   // ---- system get‑machine‑id ---------------------------------------------

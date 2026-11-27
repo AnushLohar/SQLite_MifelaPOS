@@ -30,7 +30,7 @@ export default class LicenceStateManager {
                 return 'EXPIRED';
             }
 
-            // 4. Check 90-Day Offline Verification Deadline
+            // 4. Check 30-Day Offline Verification Deadline
             const now = new Date();
             const nextDue = new Date(payload.nextVerificationDue);
             const daysUntilDue = (nextDue - now) / (1000 * 60 * 60 * 24);

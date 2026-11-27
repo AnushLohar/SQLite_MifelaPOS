@@ -436,6 +436,44 @@ export function registerDBHandlers() {
         }
     });
 
+    // Generic GSTIN lookup across all entity types (customers, store_settings)
+    ipcMain.handle('db:getEntityByGSTIN', async (event, gstin) => {
+        try {
+            const cleanGstin = gstin.trim().toUpperCase();
+
+            // 1. Check customers table (suppliers, dealers, stores, customers)
+            const customerRow = await knex('customers')
+                .select('data')
+                .whereRaw("UPPER(TRIM(json_extract(data, '$.gstin'))) = ?", [cleanGstin])
+                .orWhereRaw("UPPER(TRIM(json_extract(data, '$.taxId'))) = ?", [cleanGstin])
+                .first();
+
+            if (customerRow) {
+                const data = JSON.parse(customerRow.data);
+                data._entityType = 'customer';
+                return data;
+            }
+
+            // 2. Check store_settings table
+            const storeRow = await knex('store_settings')
+                .select('data')
+                .whereRaw("UPPER(TRIM(json_extract(data, '$.taxId'))) = ?", [cleanGstin])
+                .orWhereRaw("UPPER(TRIM(json_extract(data, '$.gstin'))) = ?", [cleanGstin])
+                .first();
+
+            if (storeRow) {
+                const data = JSON.parse(storeRow.data);
+                data._entityType = 'store';
+                return data;
+            }
+
+            return null;
+        } catch (e) {
+            console.error("Failed to fetch entity by GSTIN:", e);
+            return null;
+        }
+    });
+
     ipcMain.handle('db:logTelemetry', (event, action, data) => {
         try {
             console.log(`[Offline Telemetry] ${action}:`, data);

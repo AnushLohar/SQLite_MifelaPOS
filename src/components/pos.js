@@ -3,15 +3,15 @@
 import { savePosImage, loadPosImage } from '../utils/imageDB.js';
 
 // Add 'increment' to your firebase imports
-import { 
-    getProductsRef, 
-    getTransactionsRef, 
+import {
+    getProductsRef,
+    getTransactionsRef,
     getCustomersRef,
-    getCurrentCart, 
-    setCurrentCart, 
-    addToCart, 
-    getConvenienceFee, 
-    getCurrencySymbol, 
+    getCurrentCart,
+    setCurrentCart,
+    addToCart,
+    getConvenienceFee,
+    getCurrencySymbol,
     getCurrencyCode,
     getUserId,
     getCurrentUserPlan,
@@ -26,23 +26,23 @@ import {
     getStoreId,
     AppState
 } from '../store/state.js';
-import { generateInvoiceId } from '../utils/ids.js'; 
+import { generateInvoiceId } from '../utils/ids.js';
 import { DOM, showModal, showToast } from '../utils/dom.js';
 import { buildAndPrintInvoice, printA3InvoiceHtml, exportPosCartToCsv, exportPosCartToExcel, generatePosPdf, exportLedgerToCsv, exportLedgerToExcel, generateLedgerPdf } from '../utils/print.js';
-import { escapeHTML } from '../utils/security.js'; 
-import { safeMath } from '../utils/math.js'; 
+import { escapeHTML } from '../utils/security.js';
+import { safeMath } from '../utils/math.js';
 import { getExpirationStatus } from './inventory.js';
 import { processEarnedTokens, getLoyaltyConfig } from './customers.js';
 import * as CustomersModule from './customers.js';
 
 // --- State ---
 let isPosInitialized = false;
-let isProcessingCheckout = false; 
+let isProcessingCheckout = false;
 let currentCustomerDues = 0; // NEW: Tracks the active customer's pending balance
 let parkedCarts = [];
 let stagedDuesPayment = 0;
-let localCustomerIndex = []; 
-let localProductIndex = [];  
+let localCustomerIndex = [];
+let localProductIndex = [];
 let currentImageUploadSku = null;
 let activePosContainerId = 'main';
 const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
@@ -57,10 +57,10 @@ let isPaperlessMode = localStorage.getItem('mifela_paperless_mode') === 'true';
 let isAutoPrintEnabled = localStorage.getItem('mifela_auto_print') !== 'false'; // 🚀 NEW: Defaults to true
 function checkPlanLimits(plan, feature) {
     // Offline POS systems operate as a single local node
-    if (feature === 'multi_location') return false; 
-    
+    if (feature === 'multi_location') return false;
+
     // Unlock everything else natively (like Split Payments, Digital Payments)
-    return true; 
+    return true;
 }
 // ============================================================================
 // 🔊 POS AUDIO FEEDBACK (Zero-Latency Web Audio API Beep)
@@ -162,12 +162,12 @@ function setupGlobalHardwareScanner() {
 function setCheckoutLoadingState(isLoading) {
     const checkoutBtn = DOM.pos.checkoutBtn;
     if (!checkoutBtn) return;
-    
+
     if (isLoading) {
         checkoutBtn.disabled = true;
-        checkoutBtn.innerHTML = `<svg class="animate-spin h-6 w-6 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="ml-2">Processing...</span>`; 
+        checkoutBtn.innerHTML = `<svg class="animate-spin h-6 w-6 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="ml-2">Processing...</span>`;
     } else {
-        checkoutBtn.disabled = false; 
+        checkoutBtn.disabled = false;
         checkoutBtn.innerHTML = `<svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <span class="tracking-wide ml-2">COMPLETE SALE (F4)</span>`;
     }
 }
@@ -180,41 +180,41 @@ function resetCustomerPosState() {
         DOM.pos.customer.name.classList.remove('border-emerald-500', 'bg-emerald-50', 'transition-colors');
     }
     if (DOM.pos.customer.phone) DOM.pos.customer.phone.value = '';
-    
+
     currentCustomerDues = 0;
     stagedDuesPayment = 0;
     window.__pendingTokenDeduction = 0;
     if (DOM.pos.totals?.discount) DOM.pos.totals.discount.value = '';
-    
+
     const balanceBadge = document.getElementById('pos-customer-balance-badge');
     if (balanceBadge) {
         balanceBadge.classList.add('hidden');
         const span = balanceBadge.querySelector('span');
         if (span) span.textContent = '0.00';
     }
-    
+
     if (typeof applyB2BRatesToCart === 'function') applyB2BRatesToCart(null);
     if (typeof updateCartSummary === 'function') updateCartSummary();
 }
 
 function applyCustomerPosState(customer, showAlerts = false) {
     if (!customer) return resetCustomerPosState();
-    
+
     if (DOM.pos.customer.id) DOM.pos.customer.id.value = customer.merchantId || customer.id || '';
     if (DOM.pos.customer.name) {
         DOM.pos.customer.name.value = customer.name || '';
         DOM.pos.customer.name.classList.add('border-emerald-500', 'bg-emerald-50', 'transition-colors');
     }
     if (DOM.pos.customer.phone) DOM.pos.customer.phone.value = customer.phone || '';
-    
-    currentCustomerDues = parseFloat(customer.dues || customer.balance || 0); 
-    
+
+    currentCustomerDues = parseFloat(customer.dues || customer.balance || 0);
+
     const balanceBadge = document.getElementById('pos-customer-balance-badge');
     if (balanceBadge) {
         if (currentCustomerDues !== 0) {
             balanceBadge.querySelector('span').textContent = Math.abs(currentCustomerDues).toFixed(2);
             balanceBadge.classList.remove('hidden');
-            
+
             if (showAlerts && typeof showToast === 'function') {
                 if (currentCustomerDues > 0) {
                     showToast('Credit Alert', `Pending dues of ₹${currentCustomerDues.toFixed(2)} added to cart.`, 'warning');
@@ -226,7 +226,7 @@ function applyCustomerPosState(customer, showAlerts = false) {
             balanceBadge.classList.add('hidden');
         }
     }
-    
+
     if (typeof applyB2BRatesToCart === 'function') applyB2BRatesToCart(customer);
     if (typeof updateCartSummary === 'function') updateCartSummary();
 }
@@ -235,11 +235,11 @@ function applyCustomerPosState(customer, showAlerts = false) {
 function executeStockDeduction(productId, quantity, batch, productsRef, processFifoDepletion) {
     if (productId.startsWith('CUSTOM-')) return;
     const productRef = doc(productsRef, productId);
-    const prodUpdate = { 
+    const prodUpdate = {
         stockLevel: increment(-quantity),
         updatedAt: serverTimestamp()
     };
-    
+
     const updatedBatches = processFifoDepletion(productId, quantity);
     if (updatedBatches !== null) prodUpdate.batches = updatedBatches;
 
@@ -263,7 +263,7 @@ function normalizePlan(planString) {
     if (!planString) return 'free';
     const plan = planString.toLowerCase();
     if (plan === 'standard') return 'silver';
-    if (plan === 'premium') return 'platinum'; 
+    if (plan === 'premium') return 'platinum';
     return plan;
 }
 
@@ -272,11 +272,11 @@ function normalizePlan(planString) {
 export function loadPosPage() {
     const rawPlan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
     const plan = normalizePlan(rawPlan);
-    
+
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
     const assignedLoc = typeof getUserAssignedLocationId === 'function' ? getUserAssignedLocationId() : 'main';
     let currentLoc = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
-    
+
     const hasMultiLoc = checkPlanLimits(plan, 'multi_location');
     const canAccessAllLocations = (role === 'admin' || role === 'accountant') && hasMultiLoc;
 
@@ -287,14 +287,14 @@ export function loadPosPage() {
 
     activePosContainerId = currentLoc === 'all' ? 'main' : currentLoc;
 
-    transformPosUI(plan); 
-    
+    transformPosUI(plan);
+
     if (!isPosInitialized) {
         setupPosListeners();
         setupKeyboardShortcuts(); // 🚀 NEW
         isPosInitialized = true;
     }
-    
+
     // --- FIX: Restore User-Specific Cart & Parked Carts ---
     try {
         const storedParked = localStorage.getItem(getParkedKey());
@@ -323,17 +323,17 @@ export function loadPosPage() {
     updateParkedIndicator(plan);
     injectInvoiceDateSelector();
     refreshCustomerIndex();
-    refreshProductIndex(); 
-    injectPaperlessToggle(); 
-    updatePrintModeUI();      
+    refreshProductIndex();
+    injectPaperlessToggle();
+    updatePrintModeUI();
     injectPosCopyright();
-    window.injectCashCalculator(); 
-    if(DOM.pos.manualInput) {
-        DOM.pos.manualInput.setAttribute('autocomplete', 'off'); 
+    window.injectCashCalculator();
+    if (DOM.pos.manualInput) {
+        DOM.pos.manualInput.setAttribute('autocomplete', 'off');
         requestAnimationFrame(() => DOM.pos.manualInput.focus());
     }
     injectVisualGridToggle();
-    
+
     // 🚀 THE FIX: Start the 5-minute idle timer securely when the page loads
     resetCartIdleTimer();
 }
@@ -343,7 +343,7 @@ function injectPosCopyright() {
     if (posSection && !document.getElementById('pos-copyright-footer')) {
         const footer = document.createElement('div');
         footer.id = 'pos-copyright-footer';
-        footer.className = "py-8 text-center border-t border-gray-100 mt-8 col-span-full w-full"; 
+        footer.className = "py-8 text-center border-t border-gray-100 mt-8 col-span-full w-full";
         footer.innerHTML = `
             <div class="flex flex-col items-center gap-1.5">
                 <p class="text-[10px] font-bold text-gray-400 tracking-[0.3em] uppercase">Mifela Inventory Management</p>
@@ -365,7 +365,7 @@ function injectInvoiceDateSelector() {
 
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const minStr = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, '0')}-${String(minDate.getDate()).padStart(2, '0')}`;
-    
+
     const defaultVal = window._mifela_sticky_date || todayStr;
 
     const html = `
@@ -375,10 +375,10 @@ function injectInvoiceDateSelector() {
                    min="${minStr}" 
                    max="${todayStr}" 
                    value="${defaultVal}" 
-                   class="border border-slate-300 rounded-lg p-1.5 text-xs font-mono outline-none focus:border-indigo-500 bg-white text-indigo-700 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors">
+                   class="border border-slate-300 rounded-lg p-1.5 text-xs font-mono outline-none focus:border-SLATE-500 bg-white text-SLATE-700 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors">
         </div>
     `;
-    
+
     finalTotalContainer.insertAdjacentHTML('beforebegin', html);
 
     // 🚀 THE FIX: CSP-Safe Event Listener to remember the date!
@@ -395,19 +395,19 @@ async function renderVisualPosGrid(searchTerm = '') {
 
     let gridWrapper = document.getElementById('visual-pos-grid-wrapper');
     let gridContainer = document.getElementById('visual-pos-grid');
-    
+
     if (!gridWrapper) {
         gridWrapper = document.createElement('div');
         gridWrapper.id = 'visual-pos-grid-wrapper';
         // 🚀 THE SPEED FIX: Removed transition-all, max-h-0, opacity-0. Using pure Tailwind 'hidden'
-        gridWrapper.className = 'w-full mb-4 relative z-0 col-span-full hidden'; 
+        gridWrapper.className = 'w-full mb-4 relative z-0 col-span-full hidden';
 
         gridContainer = document.createElement('div');
         gridContainer.id = 'visual-pos-grid';
         gridContainer.className = "w-full bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar shadow-inner";
-        
+
         gridWrapper.appendChild(gridContainer);
-        
+
         const searchInput = DOM.pos.manualInput;
         if (searchInput) {
             const searchFlexRow = searchInput.closest('.flex');
@@ -428,9 +428,9 @@ async function renderVisualPosGrid(searchTerm = '') {
     const term = searchTerm.toLowerCase();
     let filteredProducts = localProductIndex.filter(p => {
         if (!term) return true;
-        return (p.name || '').toLowerCase().includes(term) || 
-               (p.sku || '').toLowerCase().includes(term) || 
-               (p.barcode || '').toLowerCase().includes(term);
+        return (p.name || '').toLowerCase().includes(term) ||
+            (p.sku || '').toLowerCase().includes(term) ||
+            (p.barcode || '').toLowerCase().includes(term);
     });
 
     if (filteredProducts.length === 0) {
@@ -457,22 +457,22 @@ async function renderVisualPosGrid(searchTerm = '') {
     filteredProducts.forEach((prod, index) => {
         const isExpired = typeof getExpirationStatus === 'function' && getExpirationStatus(prod.expirationDate) === 'expired';
         const isPinned = pinnedProducts.includes(prod.id);
-        
+
         // Calculate the live stock for initial render
         const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
         const cartItem = currentCart.find(i => i.id === prod.id);
         const cartQty = cartItem ? cartItem.quantity : 0;
         const liveStock = (parseFloat(prod.stockLevel) || 0) - cartQty;
         const isLowStock = liveStock <= parseFloat(prod.lowStockThreshold || 0);
-        
+
         // 🚀 THE FIX: Identify the first search result and apply the blue outline
         const isFirstSearchResult = searchTerm.trim().length > 0 && index === 0;
-        let borderClass = 'border-slate-100 hover:border-indigo-200 hover:shadow-md';
-        
+        let borderClass = 'border-slate-100 hover:border-SLATE-200 hover:shadow-md';
+
         if (isFirstSearchResult) {
             borderClass = 'border-blue-500 ring-2 ring-blue-200 shadow-md z-10 first-grid-result transform scale-[1.02]';
         } else if (isPinned) {
-            borderClass = 'border-indigo-200 ring-1 ring-indigo-100';
+            borderClass = 'border-SLATE-200 ring-1 ring-SLATE-100';
         }
 
         const tile = document.createElement('div');
@@ -480,7 +480,7 @@ async function renderVisualPosGrid(searchTerm = '') {
 
         tile.innerHTML = `
             ${isExpired ? '<div class="absolute inset-0 bg-red-500/10 z-20 flex flex-col items-center justify-center rounded-xl border-2 border-red-500/50 pointer-events-none"><span class="bg-red-600 text-white font-black text-[12px] px-3 py-1 rounded-md shadow-2xl uppercase tracking-widest rotate-[-12deg]">Expired</span></div>' : ''}
-            <button class="pin-product-btn absolute top-1.5 right-1.5 z-30 p-1.5 rounded-full bg-white/90 shadow-sm transition-all ${isPinned ? 'text-indigo-500 fill-indigo-500 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-indigo-400'}" title="${isPinned ? 'Unpin Item' : 'Pin to Top'}">
+            <button class="pin-product-btn absolute top-1.5 right-1.5 z-30 p-1.5 rounded-full bg-white/90 shadow-sm transition-all ${isPinned ? 'text-SLATE-500 fill-SLATE-500 opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-SLATE-400'}" title="${isPinned ? 'Unpin Item' : 'Pin to Top'}">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
             </button>
             <div class="w-full h-20 mb-2 bg-slate-50 rounded-lg overflow-hidden flex items-center justify-center relative">
@@ -491,7 +491,7 @@ async function renderVisualPosGrid(searchTerm = '') {
                  <span class="text-[8px] font-mono text-slate-400 truncate max-w-[55%]">${escapeHTML(prod.sku || 'No SKU')}</span>
                  <span id="grid-stock-${prod.id}" class="text-[8px] font-bold ${isLowStock ? 'text-orange-500' : 'text-emerald-500'}">${liveStock} in stock</span>
             </div>
-            <span class="text-indigo-600 font-black mt-2 pt-1.5 border-t border-slate-50 w-full text-xs">${currency}${parseFloat(prod.price || 0).toFixed(2)}</span>
+            <span class="text-SLATE-600 font-black mt-2 pt-1.5 border-t border-slate-50 w-full text-xs">${currency}${parseFloat(prod.price || 0).toFixed(2)}</span>
         `;
 
         tile.onclick = (e) => {
@@ -501,22 +501,22 @@ async function renderVisualPosGrid(searchTerm = '') {
                 let pinned = JSON.parse(localStorage.getItem(pinnedKey) || "[]");
                 pinned = isPinned ? pinned.filter(k => k !== prod.id) : [...pinned, prod.id];
                 localStorage.setItem(pinnedKey, JSON.stringify(pinned));
-                renderVisualPosGrid(searchTerm); 
+                renderVisualPosGrid(searchTerm);
                 return;
             }
-            
+
             // 🚀 THE FIX: Block interaction for expired OR zero-stock items
             const currentStock = parseFloat(prod.stockLevel) || 0;
             if (isExpired) {
-                if(typeof showModal === 'function') showModal('Product Expired', `Cannot sell **${escapeHTML(prod.name)}**...`, 'error');
-                return; 
+                if (typeof showModal === 'function') showModal('Product Expired', `Cannot sell **${escapeHTML(prod.name)}**...`, 'error');
+                return;
             }
-            
+
             if (currentStock <= 0) {
-                if(typeof showToast === 'function') showToast('Out of Stock', `${escapeHTML(prod.name)} is currently unavailable.`, 'warning');
-                return; 
+                if (typeof showToast === 'function') showToast('Out of Stock', `${escapeHTML(prod.name)} is currently unavailable.`, 'warning');
+                return;
             }
-            
+
             // Proceed to the quantity prompt
             if (typeof window.promptForCatalogQuantity === 'function') {
                 window.promptForCatalogQuantity(prod);
@@ -536,7 +536,7 @@ async function renderVisualPosGrid(searchTerm = '') {
     // 6. Async Image Hydration (unchanged, but now targeting live nodes)
     try {
         for (const prod of filteredProducts) {
-            const imageId = prod.sku || prod.id; 
+            const imageId = prod.sku || prod.id;
             loadPosImage(imageId).then(base64 => {
                 if (base64) {
                     const img = document.getElementById(`img-pos-${imageId}`);
@@ -550,16 +550,16 @@ async function renderVisualPosGrid(searchTerm = '') {
 async function refreshProductIndex(retryCount = 0) {
     try {
         let allProducts = [];
-        
+
         // 🚀 THE FIX: Always fetch the live truth directly from SQLite
         if (window.dbAPI && window.dbAPI.getProducts) {
             allProducts = await window.dbAPI.getProducts();
         } else if (typeof fetchAllProducts === 'function') {
             allProducts = await fetchAllProducts();
         }
-        
+
         localProductIndex = allProducts.filter(p => p.permitRetail !== false && p.type !== 'raw_material');
-        
+
         if (localProductIndex.length === 0 && retryCount < 5) {
             setTimeout(() => refreshProductIndex(retryCount + 1), 500);
             return;
@@ -567,10 +567,10 @@ async function refreshProductIndex(retryCount = 0) {
 
         recalculateBundleStocks();
         populateProductDatalist();
-        
+
         if (typeof renderVisualPosGrid === 'function' && isVisualGridEnabled) {
             const searchInput = DOM.pos.manualInput;
-            renderVisualPosGrid(searchInput ? searchInput.value.trim() : ''); 
+            renderVisualPosGrid(searchInput ? searchInput.value.trim() : '');
         }
 
     } catch (e) {
@@ -616,20 +616,20 @@ function populateCustomerDatalists() {
 }
 function transformPosUI(plan) {
     const checkoutBtn = DOM.pos.checkoutBtn;
-    
+
     if (!checkoutBtn) return;
 
     const newCheckoutBtn = checkoutBtn.cloneNode(true);
     checkoutBtn.parentNode.replaceChild(newCheckoutBtn, checkoutBtn);
-    DOM.pos.checkoutBtn = newCheckoutBtn; 
-    
+    DOM.pos.checkoutBtn = newCheckoutBtn;
+
     newCheckoutBtn.addEventListener('click', handleCheckout);
 
     const originalContainer = newCheckoutBtn.parentNode;
     if (!originalContainer) return;
 
     if (originalContainer.id === 'pos-advanced-controls') {
-        updateActivePaymentTab(plan); 
+        updateActivePaymentTab(plan);
         updateParkedIndicator(plan);
         return;
     }
@@ -637,9 +637,9 @@ function transformPosUI(plan) {
     if (plan === 'free') {
         const legacySelect = DOM.pos.paymentMethod;
         if (legacySelect) legacySelect.style.display = 'block';
-        
-        newCheckoutBtn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow transition transform active:scale-95 flex justify-center items-center gap-2 mt-4";
-        return; 
+
+        newCheckoutBtn.className = "w-full bg-SLATE-600 hover:bg-SLATE-700 text-white font-bold py-3 rounded-lg shadow transition transform active:scale-95 flex justify-center items-center gap-2 mt-4";
+        return;
     }
 
     originalContainer.id = 'pos-advanced-controls';
@@ -647,37 +647,37 @@ function transformPosUI(plan) {
 
     const legacySelect = DOM.pos.paymentMethod;
     if (legacySelect) legacySelect.style.display = 'none';
-    
+
     // Unlocked Split Payment for all users
-    const allowSplit = true; 
+    const allowSplit = true;
     const paymentContainer = document.createElement('div');
-    
+
     // Always use 3 columns so all 6 buttons (Cash, Card, UPI, Udhar, Dispatch, Split) fit symmetrically across 2 rows
     paymentContainer.className = "col-span-4 grid grid-cols-3 gap-3 mb-2";
-    
+
     const baseTabClass = "pay-tab py-3 rounded-lg border font-bold text-sm flex flex-col items-center justify-center transition-all duration-200 cursor-pointer select-none group relative overflow-hidden";
-    
+
     const allowDigital = checkPlanLimits(plan, 'digital_payments');
     const disabledClass = "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400";
-    
+
     const digitalAttr = allowDigital ? '' : 'disabled';
     const splitAttr = allowSplit ? '' : 'disabled';
-    
+
     const cardClass = allowDigital ? "bg-white hover:bg-gray-50 border-gray-300 text-gray-600 hover:border-gray-400" : disabledClass;
     const upiClass = allowDigital ? "bg-white hover:bg-gray-50 border-gray-300 text-gray-600 hover:border-gray-400" : disabledClass;
-    const splitClass = allowSplit ? "bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-600 hover:border-indigo-300" : disabledClass;
+    const splitClass = allowSplit ? "bg-white hover:bg-SLATE-50 border-SLATE-200 text-SLATE-600 hover:border-SLATE-300" : disabledClass;
 
     const cashIcon = `<svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>`;
     const cardIcon = `<svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>`;
     const upiIcon = `<svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>`;
-    const splitIcon = `<svg class="w-6 h-6 mb-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>`;
+    const splitIcon = `<svg class="w-6 h-6 mb-1 text-SLATE-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>`;
     const creditIcon = `<svg class="w-6 h-6 mb-1 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>`;
     const transferIcon = `<svg class="w-6 h-6 mb-1 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>`;
 
     let paymentButtonsHtml = `
-        <button type="button" data-method="Cash" class="${baseTabClass} bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm ring-1 ring-indigo-600 ring-opacity-20">
+        <button type="button" data-method="Cash" class="${baseTabClass} bg-SLATE-50 border-SLATE-600 text-SLATE-700 shadow-sm ring-1 ring-SLATE-600 ring-opacity-20">
             ${cashIcon} Cash
-            <div class="absolute bottom-0 left-0 w-full h-1 bg-indigo-600 opacity-0 group-[.active]:opacity-100 transition-opacity"></div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-SLATE-600 opacity-0 group-[.active]:opacity-100 transition-opacity"></div>
         </button>
         <button type="button" data-method="Card" class="${baseTabClass} ${cardClass}" ${digitalAttr}>
             ${cardIcon} Card
@@ -701,9 +701,9 @@ function transformPosUI(plan) {
 
     paymentContainer.querySelectorAll('.pay-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
             e.stopPropagation();
-            
+
             const method = btn.dataset.method;
             if (btn.disabled) {
                 if (method === 'Split') {
@@ -713,7 +713,7 @@ function transformPosUI(plan) {
                 }
                 return;
             }
-            
+
             if (method === 'Split') handleSplitPayment();
             else setActivePaymentMethod(method);
         });
@@ -721,7 +721,7 @@ function transformPosUI(plan) {
 
     const actionRow = document.createElement('div');
     actionRow.className = "col-span-4 flex gap-3 mb-1";
-    
+
     const parkBtn = document.createElement('button');
     parkBtn.type = "button";
     parkBtn.className = "flex-1 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm font-bold hover:bg-amber-100 hover:border-amber-300 transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm";
@@ -735,33 +735,33 @@ function transformPosUI(plan) {
     retrieveBtn.className = "flex-1 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold hover:bg-blue-100 hover:border-blue-300 transition active:scale-95 shadow-sm hidden";
     retrieveBtn.onclick = showParkedSalesList;
     actionRow.appendChild(retrieveBtn);
-    
+
     const newClearBtn = document.createElement('button');
     newClearBtn.type = "button";
     newClearBtn.className = `py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-bold hover:bg-red-100 hover:border-red-300 transition active:scale-95 shadow-sm w-1/4 flex items-center justify-center gap-1`;
     newClearBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Clear`;
     newClearBtn.onclick = () => {
-        if(confirm('Are you sure you want to clear the entire cart?')) clearCart();
+        if (confirm('Are you sure you want to clear the entire cart?')) clearCart();
     };
     actionRow.appendChild(newClearBtn);
-    
+
     const oldClearBtn = DOM.pos.clearBtn;
-    if(oldClearBtn) oldClearBtn.style.display = 'none';
+    if (oldClearBtn) oldClearBtn.style.display = 'none';
 
     originalContainer.insertBefore(actionRow, newCheckoutBtn);
 
-   let printToggleContainer = document.getElementById('pos-print-toggle-container');
+    let printToggleContainer = document.getElementById('pos-print-toggle-container');
     if (!printToggleContainer) {
         printToggleContainer = document.createElement('div');
         printToggleContainer.id = 'pos-print-toggle-container';
         printToggleContainer.className = "col-span-4 flex justify-between items-center mb-2 mt-1 gap-2";
-        
+
         const savedFormat = localStorage.getItem('mifela_pos_export_format') || '80mm';
 
         printToggleContainer.innerHTML = `
             <!-- 🚀 NEW: Integrated Export/Print Dropdown -->
             <div class="relative flex-1">
-                <select id="pos-export-format-selector" class="w-full bg-white border border-slate-200 text-slate-700 text-[11px] font-bold py-2 px-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer appearance-none transition-colors">
+                <select id="pos-export-format-selector" class="w-full bg-white border border-slate-200 text-slate-700 text-[11px] font-bold py-2 px-2.5 rounded-lg shadow-sm focus:ring-2 focus:ring-SLATE-500 outline-none cursor-pointer appearance-none transition-colors">
                     <option value="80mm" ${savedFormat === '80mm' ? 'selected' : ''}>🖨️ 80mm Receipt</option>
                     <option value="print_a3" ${savedFormat === 'print_a3' ? 'selected' : ''}> A3 Invoice Print</option>
                     <option value="pdf_a3" ${savedFormat === 'pdf_a3' ? 'selected' : ''}> A3 Invoice PDF</option>
@@ -774,9 +774,9 @@ function transformPosUI(plan) {
             </div>
 
             <!-- 🚀 NEW: "Get Invoice" Checkbox -->
-            <label class="flex items-center cursor-pointer gap-1.5 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-200 shadow-sm hover:bg-indigo-100 transition-colors select-none shrink-0" title="Generate the selected format upon checkout">
-                <input type="checkbox" id="auto-print-toggle" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer" ${isAutoPrintEnabled ? 'checked' : ''}>
-                <span class="text-[10px] font-black text-indigo-800 uppercase tracking-widest">Get Invoice</span>
+            <label class="flex items-center cursor-pointer gap-1.5 bg-SLATE-50 px-3 py-2 rounded-lg border border-SLATE-200 shadow-sm hover:bg-SLATE-100 transition-colors select-none shrink-0" title="Generate the selected format upon checkout">
+                <input type="checkbox" id="auto-print-toggle" class="w-4 h-4 text-SLATE-600 rounded border-gray-300 focus:ring-SLATE-500 cursor-pointer" ${isAutoPrintEnabled ? 'checked' : ''}>
+                <span class="text-[10px] font-black text-SLATE-800 uppercase tracking-widest">Get Invoice</span>
             </label>
         `;
         originalContainer.insertBefore(printToggleContainer, newCheckoutBtn);
@@ -786,7 +786,7 @@ function transformPosUI(plan) {
             isAutoPrintEnabled = e.target.checked;
             localStorage.setItem('mifela_auto_print', isAutoPrintEnabled);
         });
-        
+
         // When changing the dropdown, auto-check the Get Invoice box
         document.getElementById('pos-export-format-selector').addEventListener('change', (e) => {
             localStorage.setItem('mifela_pos_export_format', e.target.value);
@@ -799,7 +799,7 @@ function transformPosUI(plan) {
         });
     }
 
-    newCheckoutBtn.className = "col-span-4 w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-[0.98] flex justify-center items-center gap-3";
+    newCheckoutBtn.className = "col-span-4 w-full bg-gradient-to-r from-SLATE-600 to-SLATE-700 hover:from-SLATE-700 hover:to-SLATE-800 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-[0.98] flex justify-center items-center gap-3";
     newCheckoutBtn.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> <span class="tracking-wide">COMPLETE SALE (F4)</span>`;
     if (newCheckoutBtn.parentNode !== originalContainer) {
         originalContainer.appendChild(newCheckoutBtn);
@@ -825,21 +825,21 @@ async function handlePosExportSelection(e) {
         if (typeof showModal === 'function') showModal('Generating...', `Preparing ${format.toUpperCase()} export...`, 'info');
 
         const { total, subtotal, tax, discount, cartTotal, dues, fee } = calculateTotals();
-        
+
         const storeName = document.getElementById('setting-store-name')?.value || document.getElementById('dashboard-store-name')?.textContent || 'STORE';
         const storeAddress = document.getElementById('setting-store-address')?.value || '';
         const storePhone = document.getElementById('setting-store-phone')?.value || '';
         const storeGstin = document.getElementById('setting-store-tax-id')?.value || '';
         const storePan = document.getElementById('setting-store-pan')?.value || '';
         const storeLogo = document.getElementById('setting-store-logo')?.value || document.getElementById('logo-preview-img')?.src || '';
-        
+
         // 🚀 THE FIX: Safely extract Customer metadata from Local Memory
         const rawId = document.getElementById('pos-cust-id')?.value.trim();
         const rawName = document.getElementById('pos-cust-name')?.value.trim();
         const rawPhone = document.getElementById('pos-cust-phone')?.value.trim();
-        
+
         let activeCustomer = {};
-        
+
         if (rawId) {
             activeCustomer = localCustomerIndex.find(c => c.id === rawId || c.merchantId === rawId) || {};
         } else if (rawPhone) {
@@ -867,11 +867,11 @@ async function handlePosExportSelection(e) {
                 gstin: activeCustomer.gstin || '',
                 pan: activeCustomer.pan || ''
             },
-            storeDetails: { 
-                name: storeName, 
-                address: storeAddress, 
-                phone: storePhone, 
-                gstin: storeGstin, 
+            storeDetails: {
+                name: storeName,
+                address: storeAddress,
+                phone: storePhone,
+                gstin: storeGstin,
                 pan: storePan,
                 logo: storeLogo,
                 branch: typeof activePosContainerId !== 'undefined' ? activePosContainerId : 'main'
@@ -882,7 +882,7 @@ async function handlePosExportSelection(e) {
                 taxRate: item.taxRate || 0, cessRate: item.cess || 0, hsn: item.hsn || '',
                 batch: item.batch || '', mfd: item.mfd || '', expiry: item.expiry || '',
                 subtotal: item.price * item.quantity,
-                taxableValue: (item.price * item.quantity) / (1 + ((item.taxRate || 0)/100))
+                taxableValue: (item.price * item.quantity) / (1 + ((item.taxRate || 0) / 100))
             })),
             summary: {
                 total: total, subtotal: subtotal, tax: tax, discount: discount,
@@ -892,23 +892,23 @@ async function handlePosExportSelection(e) {
         };
 
         if (format === 'print_a3') {
-            document.getElementById('generic-modal')?.remove(); 
+            document.getElementById('generic-modal')?.remove();
             if (typeof printA3InvoiceHtml === 'function') {
-                printA3InvoiceHtml(simulatedTx, storeName); 
+                printA3InvoiceHtml(simulatedTx, storeName);
             }
-        } 
+        }
         else if (format === 'pdf_a3') {
             document.getElementById('generic-modal')?.remove();
             if (typeof generatePosPdf === 'function') {
                 await generatePosPdf(simulatedTx, storeName);
             }
-        } 
+        }
         else if (format === 'excel') {
             document.getElementById('generic-modal')?.remove();
             if (typeof exportPosCartToExcel === 'function') {
                 await exportPosCartToExcel(simulatedTx, storeName);
             }
-        } 
+        }
         else if (format === 'csv') {
             document.getElementById('generic-modal')?.remove();
             if (typeof exportPosCartToCsv === 'function') {
@@ -918,10 +918,10 @@ async function handlePosExportSelection(e) {
         else if (format === '80mm') {
             document.getElementById('generic-modal')?.remove();
             if (typeof buildAndPrintInvoice === 'function') {
-                buildAndPrintInvoice(simulatedTx, storeName); 
+                buildAndPrintInvoice(simulatedTx, storeName);
             }
         }
-        
+
     } catch (error) {
         console.error("Export Error:", error);
         document.getElementById('generic-modal')?.remove();
@@ -932,7 +932,7 @@ async function handlePosExportSelection(e) {
 }
 export async function findAndAddToCart(queryStr, qty = 1) {
     if (!queryStr) return;
-    
+
     // 🚀 1. SANITIZE BARCODE: Strip scanner prefixes/suffixes (AIM identifiers, \r, \n, whitespace)
     let term = queryStr.toString().trim();
     term = term.replace(/^\][A-Za-z0-9]{2}/, ''); // Remove AIM 2D Symbology Identifiers (e.g. ]C1, ]e0)
@@ -940,8 +940,8 @@ export async function findAndAddToCart(queryStr, qty = 1) {
     if (!term) return;
 
     // 🚀 2. NFC / Loyalty Card Scanner Intercept
-    const customerMatch = localCustomerIndex.find(c => 
-        (c.nfcCardId && c.nfcCardId.trim() === term) || 
+    const customerMatch = localCustomerIndex.find(c =>
+        (c.nfcCardId && c.nfcCardId.trim() === term) ||
         (c.cardNumber && c.cardNumber.trim() === term)
     );
 
@@ -960,15 +960,15 @@ export async function findAndAddToCart(queryStr, qty = 1) {
         let localMatches = localProductIndex.filter(p => {
             const b = (p.barcode || '').toString().trim().toLowerCase();
             const s = (p.sku || '').toString().trim().toLowerCase();
-            
+
             // Exact match on standard or without leading zeros
             return b === cleanTerm || s === cleanTerm ||
-                   (cleanTerm.length > 7 && b.replace(/^0+/, '') === cleanTerm.replace(/^0+/, ''));
+                (cleanTerm.length > 7 && b.replace(/^0+/, '') === cleanTerm.replace(/^0+/, ''));
         });
 
         // 🚀 4. FUZZY MATCH FALLBACK (Product Name)
         if (localMatches.length === 0) {
-            localMatches = localProductIndex.filter(p => 
+            localMatches = localProductIndex.filter(p =>
                 (p.name || '').trim().toLowerCase() === cleanTerm
             );
         }
@@ -980,7 +980,7 @@ export async function findAndAddToCart(queryStr, qty = 1) {
                 if (val.seconds) return val.seconds * 1000;
                 return new Date(val).getTime() || 0;
             };
-            
+
             // Sort by creation date (Oldest first) for FIFO depletion
             localMatches.sort((a, b) => getTime(a.createdAt) - getTime(b.createdAt));
 
@@ -1069,7 +1069,7 @@ function setupPosListeners() {
     });
 
     if (DOM.pos.totals?.discount) DOM.pos.totals.discount.addEventListener('input', updateCartSummary);
-    
+
     // 🚀 INITIALIZE GLOBAL HARDWARE BARCODE INTERCEPTOR
     setupGlobalHardwareScanner();
 
@@ -1086,10 +1086,10 @@ function setupPosListeners() {
     if (manualBtn) manualBtn.addEventListener('click', handleManualAdd);
 
     if (DOM.pos.customer.id) DOM.pos.customer.id.addEventListener('change', handleCustomerIdLookup);
-    
+
     if (DOM.pos.customer.name) {
-        DOM.pos.customer.name.addEventListener('input', handleCustomerNameInput); 
-        DOM.pos.customer.name.addEventListener('change', handleCustomerNameLookup); 
+        DOM.pos.customer.name.addEventListener('input', handleCustomerNameInput);
+        DOM.pos.customer.name.addEventListener('change', handleCustomerNameLookup);
 
         // 🚀 MOVED FROM GLOBAL SCOPE TO HERE:
         DOM.pos.customer.name.addEventListener('focus', (e) => {
@@ -1107,7 +1107,7 @@ function setupPosListeners() {
             const dropdown = document.getElementById('pinned-customers-dropdown');
             if (dropdown) dropdown.classList.add('hidden');
         }
-        
+
         const btn = e.target.closest('button') || e.target.closest('a') || e.target;
         if (btn && btn.textContent.trim().toUpperCase() === 'CHANGE') {
             e.preventDefault();
@@ -1122,8 +1122,8 @@ function setupPosListeners() {
             if (isChecked) {
                 const isReady = await verifyWhatsAppSetup();
                 if (!isReady) {
-                    e.target.checked = false; 
-                    if(typeof startWhatsAppSetupFlow === 'function') startWhatsAppSetupFlow(e.target); 
+                    e.target.checked = false;
+                    if (typeof startWhatsAppSetupFlow === 'function') startWhatsAppSetupFlow(e.target);
                     return;
                 }
             }
@@ -1131,7 +1131,7 @@ function setupPosListeners() {
             isPaperlessMode = isChecked;
             localStorage.setItem('mifela_paperless_mode', isPaperlessMode);
             updatePrintModeUI();
-            if(typeof showToast === 'function') showToast('Mode Updated', isPaperlessMode ? 'WhatsApp Enabled' : 'Paper Enabled', 'info');
+            if (typeof showToast === 'function') showToast('Mode Updated', isPaperlessMode ? 'WhatsApp Enabled' : 'Paper Enabled', 'info');
         }
     });
 
@@ -1143,31 +1143,31 @@ function setupPosListeners() {
         let phoneDebounceTimer;
         phoneInputEl.addEventListener('input', (e) => {
             clearTimeout(phoneDebounceTimer);
-            
+
             // Format phone number immediately as user types
-            let val = e.target.value.replace(/[^\d+]/g, ''); 
+            let val = e.target.value.replace(/[^\d+]/g, '');
             if (val.startsWith('+91')) val = val.substring(3);
             else if (val.startsWith('91') && val.length > 10) val = val.substring(2);
             if (val.length > 10) val = val.substring(0, 10);
-            
+
             if (e.target.value !== val) e.target.value = val;
 
             // Wait until they stop typing to run the lookup
             phoneDebounceTimer = setTimeout(async () => {
                 if (val.length === 10) {
                     let match = localCustomerIndex.find(c => c.phone && c.phone.replace(/\D/g, '').includes(val));
-                    
+
                     if (!match) {
                         try {
                             const currentAppId = typeof window !== 'undefined' && window.__app_id ? window.__app_id : appId;
                             const dirRef = collection(db, `artifacts/${currentAppId}/directory_merchants`);
-                            const candidates = [`+91${val}`, val, `0${val}`, `+91 ${val.slice(0,5)} ${val.slice(5)}`];
+                            const candidates = [`+91${val}`, val, `0${val}`, `+91 ${val.slice(0, 5)} ${val.slice(5)}`];
                             const q = query(dirRef, where("phone", "in", candidates), limit(1));
                             const snap = await getDocs(q);
-                            
+
                             if (!snap.empty) {
                                 match = { id: snap.docs[0].id, ...snap.docs[0].data(), name: snap.docs[0].data().storeName || snap.docs[0].data().name };
-                                localCustomerIndex.push(match); 
+                                localCustomerIndex.push(match);
                             }
                         } catch (err) {
                             console.warn("Fetch failed:", err);
@@ -1183,15 +1183,15 @@ function setupPosListeners() {
                     // Put the partial phone number back so they can finish typing
                     e.target.value = val;
                 }
-            }, 600); 
+            }, 600);
         });
     }
     AppState.subscribe('products_updated', async () => {
         await refreshProductIndex(); // Pulls the fresh SQLite data
-        
+
         // 1. Update Visual Grid
         if (typeof updateVisualGridStock === 'function') updateVisualGridStock();
-        
+
         // 2. Re-hydrate the Cart with live data (Sync Prices, Names, and Stock Limits)
         const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
         if (currentCart.length > 0) {
@@ -1199,10 +1199,10 @@ function setupPosListeners() {
             const syncedCart = currentCart.map(cartItem => {
                 const liveProduct = localProductIndex.find(p => p.id === cartItem.id);
                 if (!liveProduct) return cartItem; // Product was deleted, ignore or handle removal
-                
+
                 if (
-                    cartItem.name !== liveProduct.name || 
-                    cartItem.originalPrice !== liveProduct.price || 
+                    cartItem.name !== liveProduct.name ||
+                    cartItem.originalPrice !== liveProduct.price ||
                     cartItem.stock !== liveProduct.stockLevel
                 ) {
                     hasCartChanges = true;
@@ -1230,7 +1230,7 @@ function setupPosListeners() {
     // 🚀 REACTIVITY: Listen for Customer / Ledger Changes
     AppState.subscribe('customers_updated', async () => {
         await refreshCustomerIndex();
-        
+
         // If a customer is currently selected in the POS, check if their dues changed
         const activeCustId = DOM.pos?.customer?.id?.value;
         if (activeCustId) {
@@ -1251,7 +1251,7 @@ let isShortcutsAttached = false;
 
 function setupKeyboardShortcuts() {
     if (isShortcutsAttached) return;
-    
+
     document.addEventListener('keydown', (e) => {
         // Prevent shortcuts from triggering if a modal (like Split Payment) is open
         if (document.getElementById('split-pay-modal') || document.getElementById('custom-prompt-modal')) return;
@@ -1275,14 +1275,14 @@ function setupKeyboardShortcuts() {
             if (DOM.pos.manualInput) DOM.pos.manualInput.focus();
         }
     });
-    
+
     isShortcutsAttached = true;
 }
 
-window.injectCashCalculator = function() {
+window.injectCashCalculator = function () {
     const checkoutBtn = DOM.pos.checkoutBtn;
     if (!checkoutBtn) return;
-    
+
     const container = checkoutBtn.parentNode;
     if (!container || document.getElementById('cash-calculator-block')) return;
 
@@ -1306,7 +1306,7 @@ window.injectCashCalculator = function() {
             
         </div>
     `;
-    
+
     // Insert it directly above the Complete Sale button
     container.insertBefore(document.createRange().createContextualFragment(calcHtml), checkoutBtn);
 
@@ -1314,7 +1314,7 @@ window.injectCashCalculator = function() {
     document.getElementById('cash-tendered-input').addEventListener('input', window.updateCashChange);
 };
 
-window.updateCashChange = function() {
+window.updateCashChange = function () {
     const input = document.getElementById('cash-tendered-input');
     const display = document.getElementById('cash-change-display');
     const calcBlock = document.getElementById('cash-calculator-block');
@@ -1324,16 +1324,16 @@ window.updateCashChange = function() {
     const tendered = parseFloat(input.value) || 0;
     const change = tendered - total;
     const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
-    
+
     // Base CSS classes to keep the text aligned and prevent it from breaking the layout
     const baseClasses = "text-2xl font-black truncate w-full text-right leading-none tracking-tight ";
-    
+
     const labelEl = calcBlock ? calcBlock.querySelector('div.flex-1.items-end label') : null;
 
     if (tendered === 0) {
         if (labelEl) labelEl.textContent = "Change Due";
         display.textContent = `${currency}0.00`;
-        display.className = baseClasses + "text-slate-400"; 
+        display.className = baseClasses + "text-slate-400";
     } else if (change < -0.01) {
         // Negative: Amount still due
         if (labelEl) labelEl.textContent = "Amount Short";
@@ -1353,13 +1353,13 @@ window.updateCashChange = function() {
 };
 
 function updateActivePaymentTab(plan) {
-    if (plan === 'free') return; 
+    if (plan === 'free') return;
 
-    const activeClass = "pay-tab py-3 rounded-lg border-2 border-indigo-600 bg-indigo-50 text-indigo-700 font-bold text-sm flex flex-col items-center justify-center shadow-md transform scale-[1.02] transition-all";
+    const activeClass = "pay-tab py-3 rounded-lg border-2 border-SLATE-600 bg-SLATE-50 text-SLATE-700 font-bold text-sm flex flex-col items-center justify-center shadow-md transform scale-[1.02] transition-all";
     const inactiveClass = "pay-tab py-3 rounded-lg border border-gray-200 bg-white text-gray-500 font-medium text-sm flex flex-col items-center justify-center hover:bg-gray-50 hover:border-gray-300 transition-all";
 
     document.querySelectorAll('.pay-tab').forEach(btn => {
-        if (btn.disabled) return; 
+        if (btn.disabled) return;
         if (btn.dataset.method === activePaymentMethod) {
             btn.className = activeClass;
         } else {
@@ -1399,12 +1399,12 @@ function persistCart() {
 //     if (isProcessingCheckout) return; 
 
 //     const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
-    
+
 //     if (currentCart.length === 0 && currentCustomerDues <= 0) {
 //         showModal('Empty Cart', 'Please add items or select a customer with pending dues before checking out.', 'error');
 //         return;
 //     }
-    
+
 //     const plan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
 //     let method = activePaymentMethod;
 //     if (plan === 'free' || plan === 'free-tier') {
@@ -1419,9 +1419,9 @@ function persistCart() {
 
 //     const customerName = DOM.pos.customer.name ? DOM.pos.customer.name.value.trim() : '';
 //     const customerPhone = DOM.pos.customer.phone ? DOM.pos.customer.phone.value.trim().replace(/\D/g, '') : '';
-    
+
 //     let isCreditSale = false;
-    
+
 //     if (method === 'Credit') {
 //         isCreditSale = true;
 //     } else if (method === 'Split' && splitPaymentDetails) {
@@ -1449,12 +1449,12 @@ function persistCart() {
 //     // =========================================================
 //     let overrideDate = null;
 //     const dateInput = document.getElementById('pos-custom-date');
-    
+
 //     if (dateInput && dateInput.value) {
 //         const selectedDate = dateInput.value;
 //         const now = new Date();
 //         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        
+
 //         // Only trigger an override if they actually changed it
 //         if (selectedDate !== todayStr) {
 //             overrideDate = selectedDate;
@@ -1466,17 +1466,17 @@ function persistCart() {
 //     // =========================================================
 //     if (method === 'UPI' || method === 'Card') {
 //         const { total } = calculateTotals();
-        
+
 //         let isRazorpaySetup = false;
 //         const rzpNode = document.getElementById('setting-razorpay-key');
-        
+
 //         if (rzpNode && rzpNode.value.trim().length > 5) {
 //             isRazorpaySetup = true;
 //         } else {
 //             try {
 //                 const sId = typeof getStoreId === 'function' ? getStoreId() : window.primaryStoreId;
 //                 const aId = typeof window !== 'undefined' && window.__app_id ? window.__app_id : (appId || "electron-mifela-inventory");
-                
+
 //                 if (sId) {
 //                     const snap = await getDoc(doc(db, `artifacts/${aId}/stores/${sId}/settings/profile`));
 //                     if (snap.exists() && snap.data().razorpayKeyId) isRazorpaySetup = true;
@@ -1514,18 +1514,18 @@ function persistCart() {
 // }
 
 export async function handleCheckout() {
-    if (isProcessingCheckout) return; 
+    if (isProcessingCheckout) return;
     isProcessingCheckout = true;
     setCheckoutLoadingState(true);
 
     try {
         const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
-        
+
         if (currentCart.length === 0 && currentCustomerDues <= 0) {
             showModal('Empty Cart', 'Please add items or select a customer with pending dues before checking out.', 'error');
             return;
         }
-        
+
         let method = activePaymentMethod;
 
         // 🚀 SMART SPLIT INTERCEPTOR: Automatically convert Cash shortage to Credit (Udhaar)
@@ -1534,7 +1534,7 @@ export async function handleCheckout() {
             if (tenderedInput && tenderedInput.value !== '') {
                 const tendered = parseFloat(tenderedInput.value) || 0;
                 const { total } = calculateTotals();
-                
+
                 if (tendered < total) {
                     const shortage = total - tendered;
                     method = 'Split';
@@ -1545,7 +1545,7 @@ export async function handleCheckout() {
         }
 
         if (method === 'Split' && !splitPaymentDetails) {
-            await handleSplitPayment(); 
+            await handleSplitPayment();
             if (!splitPaymentDetails) return; // Stop if user cancelled the split modal
         }
 
@@ -1556,19 +1556,19 @@ export async function handleCheckout() {
 
         const customerName = DOM.pos.customer.name ? DOM.pos.customer.name.value.trim() : '';
         const customerPhone = DOM.pos.customer.phone ? DOM.pos.customer.phone.value.trim().replace(/\D/g, '') : '';
-        
+
         let isCreditSale = method === 'Credit' || (method === 'Split' && splitPaymentDetails && parseFloat(splitPaymentDetails.credit) > 0);
 
         if (isCreditSale) {
             if (!customerName || customerPhone.length < 10) {
                 showModal('Missing Information', 'Customer Name and a valid 10-digit Phone Number are strictly required to issue Credit (Udhaar).', 'error');
-                if(DOM.pos.customer.name && !customerName) DOM.pos.customer.name.classList.add('border-red-500', 'bg-red-50', 'animate-pulse');
-                if(DOM.pos.customer.phone && customerPhone.length < 10) DOM.pos.customer.phone.classList.add('border-red-500', 'bg-red-50', 'animate-pulse');
+                if (DOM.pos.customer.name && !customerName) DOM.pos.customer.name.classList.add('border-red-500', 'bg-red-50', 'animate-pulse');
+                if (DOM.pos.customer.phone && customerPhone.length < 10) DOM.pos.customer.phone.classList.add('border-red-500', 'bg-red-50', 'animate-pulse');
                 setTimeout(() => {
-                    if(DOM.pos.customer.name) DOM.pos.customer.name.classList.remove('border-red-500', 'bg-red-50', 'animate-pulse');
-                    if(DOM.pos.customer.phone) DOM.pos.customer.phone.classList.remove('border-red-500', 'bg-red-50', 'animate-pulse');
+                    if (DOM.pos.customer.name) DOM.pos.customer.name.classList.remove('border-red-500', 'bg-red-50', 'animate-pulse');
+                    if (DOM.pos.customer.phone) DOM.pos.customer.phone.classList.remove('border-red-500', 'bg-red-50', 'animate-pulse');
                 }, 3000);
-                return; 
+                return;
             }
         }
 
@@ -1603,7 +1603,7 @@ export async function handleCheckout() {
                         const snap = await getDoc(doc(db, `artifacts/${aId}/stores/${sId}/settings/profile`));
                         if (snap.exists() && snap.data().razorpayKeyId) isRazorpaySetup = true;
                     }
-                } catch(e) { console.warn("Razorpay check fallback failed", e); }
+                } catch (e) { console.warn("Razorpay check fallback failed", e); }
             }
 
             if (!isRazorpaySetup) {
@@ -1654,7 +1654,7 @@ async function resolveAndCreateCustomer(ops) {
     const name = nameInput ? nameInput.value.trim() : '';
     const phone = phoneInput ? phoneInput.value.trim().replace(/\s/g, '') : '';
     const id = idInput ? idInput.value.trim() : '';
-    
+
     // Fallback to Walk-In if empty
     if (!name || name.toLowerCase() === 'walk-in customer') {
         return { id: 'WALK-IN', name: 'Walk-in Customer', phone: '' };
@@ -1663,7 +1663,7 @@ async function resolveAndCreateCustomer(ops) {
     // Match by ID
     if (id) {
         const localMatch = localCustomerIndex.find(c => c.id === id || c.merchantId === id);
-        if (localMatch) return { ...localMatch, name, phone }; 
+        if (localMatch) return { ...localMatch, name, phone };
         return { id, name, phone };
     }
 
@@ -1676,37 +1676,37 @@ async function resolveAndCreateCustomer(ops) {
     }
 
     // Create New Customer on the fly
-    const newId = `CUST-${Date.now().toString().slice(-8)}`; 
+    const newId = `CUST-${Date.now().toString().slice(-8)}`;
     const newCustomer = {
-        id: newId, 
+        id: newId,
         name: name,
         phone: phone || '',
-        type: 'customer', 
-        tradeType: 'D2C', 
+        type: 'customer',
+        tradeType: 'D2C',
         createdAt: new Date().toISOString(),
         totalVisits: 0,
         totalSpent: 0,
         lastVisit: null,
-        locationId: typeof activePosContainerId !== 'undefined' ? activePosContainerId : 'main' 
+        locationId: typeof activePosContainerId !== 'undefined' ? activePosContainerId : 'main'
     };
 
     ops.push({ type: 'set', col: 'customers', id: newId, data: newCustomer });
     localCustomerIndex.push(newCustomer);
-    
-    if(typeof populateCustomerDatalists === 'function') populateCustomerDatalists(); 
-    if(idInput) idInput.value = newId;
+
+    if (typeof populateCustomerDatalists === 'function') populateCustomerDatalists();
+    if (idInput) idInput.value = newId;
 
     return newCustomer;
 }
 
 async function processCheckout(method, overrideDate = null) {
     if (!window.dbAPI || !window.dbAPI.executeBatch) throw new Error("Offline Database not ready.");
-    const ops = []; 
+    const ops = [];
     const { subtotal, tax, cess, total, discount, fee, dues, totalCost, profit, cartTotal } = calculateTotals();
     const currencyCode = typeof getCurrencyCode === 'function' ? getCurrencyCode() : 'INR';
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
     const userId = typeof getUserId === 'function' ? getUserId() : 'SYSTEM';
-    
+
     const cashierName = 'Terminal User';
 
     const finalCustomerData = await resolveAndCreateCustomer(ops);
@@ -1725,10 +1725,10 @@ async function processCheckout(method, overrideDate = null) {
         if (method === 'Cash' || method === 'UPI' || method === 'Card') {
             totalPaidNow = total;
         } else if (method === 'Split' && splitPaymentDetails) {
-            totalPaidNow = (parseFloat(splitPaymentDetails.cash) || 0) + 
-                           (parseFloat(splitPaymentDetails.card) || 0) + 
-                           (parseFloat(splitPaymentDetails.upi) || 0);
-        } 
+            totalPaidNow = (parseFloat(splitPaymentDetails.cash) || 0) +
+                (parseFloat(splitPaymentDetails.card) || 0) +
+                (parseFloat(splitPaymentDetails.upi) || 0);
+        }
 
         const ledgerChange = cartTotal - totalPaidNow;
 
@@ -1754,7 +1754,7 @@ async function processCheckout(method, overrideDate = null) {
     const storeLogo = document.getElementById('setting-store-logo')?.value || document.getElementById('logo-preview-img')?.src || '';
     const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
 
-    const transactionId = typeof generateInvoiceId === 'function' ? generateInvoiceId() : `INV-${Date.now()}`; 
+    const transactionId = typeof generateInvoiceId === 'function' ? generateInvoiceId() : `INV-${Date.now()}`;
 
     const realNow = new Date();
     let effectiveDate = realNow;
@@ -1762,7 +1762,7 @@ async function processCheckout(method, overrideDate = null) {
         const [y, m, d] = overrideDate.split('-');
         effectiveDate = new Date(y, m - 1, d, realNow.getHours(), realNow.getMinutes(), realNow.getSeconds());
     }
-    const localTimestamp = effectiveDate.toISOString(); 
+    const localTimestamp = effectiveDate.toISOString();
 
     let finalRevenue = 0;
     if (method === 'Cash' || method === 'UPI' || method === 'Card') finalRevenue = total;
@@ -1832,7 +1832,7 @@ async function processCheckout(method, overrideDate = null) {
         const localMatch = localProductIndex.find(p => p.id === productId);
         if (!localMatch) return null;
 
-        let currentBatches = localMatch.batches ? JSON.parse(JSON.stringify(localMatch.batches)).sort((a, b) => (a.timestamp||0) - (b.timestamp||0)) : [];
+        let currentBatches = localMatch.batches ? JSON.parse(JSON.stringify(localMatch.batches)).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)) : [];
         let qtyToRemove = qtyToDeduct;
 
         for (let i = 0; i < currentBatches.length; i++) {
@@ -1845,9 +1845,9 @@ async function processCheckout(method, overrideDate = null) {
                 qtyToRemove = 0;
             }
         }
-        
+
         currentBatches = currentBatches.filter(b => b.qty > 0);
-        localMatch.batches = currentBatches; 
+        localMatch.batches = currentBatches;
         return currentBatches;
     };
 
@@ -1855,34 +1855,34 @@ async function processCheckout(method, overrideDate = null) {
         if (item.id) {
             if (item.type === 'bundle' && Array.isArray(item.bundleComponents) && item.bundleComponents.length > 0) {
                 item.bundleComponents.forEach(comp => {
-                    const totalDeduction = comp.qty * item.quantity; 
-                    
+                    const totalDeduction = comp.qty * item.quantity;
+
                     const updatedBatches = processFifoDepletion(comp.id, totalDeduction);
-                    
+
                     // 🚀 THE FIX: Look up real stock from the local index, as components aren't fully in the cart
                     const realComp = localProductIndex.find(p => p.id === comp.id);
                     const currentStock = realComp ? (parseFloat(realComp.stockLevel) || 0) : 0;
-                    
+
                     const pData = { stockLevel: currentStock - totalDeduction };
-                    
+
                     if (updatedBatches !== null) pData.batches = updatedBatches;
-                    
+
                     ops.push({ type: 'update', col: 'products', id: comp.id, data: pData });
-                    
+
                     // Update UI Memory
                     if (realComp) realComp.stockLevel = currentStock - totalDeduction;
                 });
-                if(typeof recalculateBundleStocks === 'function') recalculateBundleStocks();
+                if (typeof recalculateBundleStocks === 'function') recalculateBundleStocks();
             } else {
                 const updatedBatches = processFifoDepletion(item.id, item.quantity);
-                
+
                 // 🚀 THE FIX: Read 'item.stock' instead of 'item.stockLevel' for cart items
                 const pData = { stockLevel: (parseFloat(item.stock) || 0) - item.quantity };
-                
+
                 if (updatedBatches !== null) pData.batches = updatedBatches;
-                
+
                 ops.push({ type: 'update', col: 'products', id: item.id, data: pData });
-                
+
                 // Update UI Memory
                 const localMatch = localProductIndex.find(p => p.id === item.id);
                 if (localMatch) localMatch.stockLevel = (parseFloat(localMatch.stockLevel) || 0) - item.quantity;
@@ -1892,7 +1892,7 @@ async function processCheckout(method, overrideDate = null) {
 
     // Push everything to SQLite!
     await window.dbAPI.executeBatch(ops);
-if (typeof AppState !== 'undefined') {
+    if (typeof AppState !== 'undefined') {
         AppState.notify('products_updated');
         AppState.notify('transactions_updated');
         if (finalCustomerData.id !== 'WALK-IN') {
@@ -1900,8 +1900,8 @@ if (typeof AppState !== 'undefined') {
         }
     }
 
-    transactionData.timestamp = new Date(); 
-    
+    transactionData.timestamp = new Date();
+
     // Print Handler
     if (isAutoPrintEnabled) {
         const formatSelector = document.getElementById('pos-export-format-selector');
@@ -1909,7 +1909,7 @@ if (typeof AppState !== 'undefined') {
 
         try {
             if (selectedFormat === '80mm') {
-                if (typeof buildAndPrintInvoice === 'function') buildAndPrintInvoice(transactionData, storeName); 
+                if (typeof buildAndPrintInvoice === 'function') buildAndPrintInvoice(transactionData, storeName);
             } else if (selectedFormat === 'print_a3') {
                 if (typeof window.printA3InvoiceHtml === 'function') window.printA3InvoiceHtml(transactionData, storeName);
             } else if (selectedFormat === 'pdf_a3') {
@@ -1945,7 +1945,7 @@ async function updateParkedIndicator(plan) {
         const locationId = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
         const parkedStr = localStorage.getItem(`mifela_parked_${locationId}`) || '[]';
         const parkedCarts = JSON.parse(parkedStr);
-        
+
         if (parkedCarts.length > 0) {
             btn.classList.remove('hidden');
             btn.classList.add('flex', 'items-center', 'justify-center', 'gap-1');
@@ -1962,24 +1962,24 @@ async function handleParkSale() {
     const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
 
     if (plan === 'free') {
-        if(typeof showModal === 'function') showModal('Upgrade Plan', 'Parking sales is available on Silver, Gold, and Platinum plans.', 'info');
+        if (typeof showModal === 'function') showModal('Upgrade Plan', 'Parking sales is available on Silver, Gold, and Platinum plans.', 'info');
         return;
     }
-    
+
     if (currentCart.length === 0) {
-        if(typeof showModal === 'function') showModal('Empty Cart', 'Cannot park an empty cart.', 'error');
+        if (typeof showModal === 'function') showModal('Empty Cart', 'Cannot park an empty cart.', 'error');
         return;
     }
-    
+
     const locationId = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
 
     let label = `Order #${Date.now().toString().slice(-4)}`;
     if (typeof promptForInput === 'function') {
         const userInput = await promptForInput('Park Sale', "Enter a reference name (e.g. Cart 5):", label);
-        if (userInput === null) return; 
+        if (userInput === null) return;
         label = userInput;
     }
-    
+
     try {
         const newParked = {
             id: `park_${Date.now()}`,
@@ -1997,9 +1997,9 @@ async function handleParkSale() {
         parkedCarts.push(newParked);
         localStorage.setItem(`mifela_parked_${locationId}`, JSON.stringify(parkedCarts));
 
-        if(typeof clearCart === 'function') clearCart(); 
-        if(typeof updateParkedIndicator === 'function') updateParkedIndicator(plan); 
-        
+        if (typeof clearCart === 'function') clearCart();
+        if (typeof updateParkedIndicator === 'function') updateParkedIndicator(plan);
+
         if (typeof showToast === 'function') showToast('Parked', 'Sale put on hold.', 'success');
     } catch (e) {
         console.error("Failed to park sale locally:", e);
@@ -2011,11 +2011,11 @@ async function showParkedSalesList() {
     if (plan === 'free') return;
 
     const locationId = typeof getCurrentLocationId === 'function' ? getCurrentLocationId() : 'main';
-    
+
     try {
         const parkedStr = localStorage.getItem(`mifela_parked_${locationId}`) || '[]';
         let cloudCarts = JSON.parse(parkedStr);
-        
+
         if (cloudCarts.length === 0) {
             if (typeof showModal === 'function') showModal('No Parked Sales', 'There are no sales currently on hold for this branch.', 'info');
             if (typeof updateParkedIndicator === 'function') updateParkedIndicator(plan);
@@ -2029,14 +2029,14 @@ async function showParkedSalesList() {
 
         let listHtml = '';
         cloudCarts.forEach((data, i) => {
-            let timeStr = new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const customerBadge = data.customerName ? `<span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold ml-2 truncate max-w-[120px] inline-block align-bottom pointer-events-none">${escapeHTML(data.customerName)}</span>` : '';
+            let timeStr = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const customerBadge = data.customerName ? `<span class="bg-SLATE-100 text-SLATE-700 px-2 py-0.5 rounded text-[10px] font-bold ml-2 truncate max-w-[120px] inline-block align-bottom pointer-events-none">${escapeHTML(data.customerName)}</span>` : '';
 
             listHtml += `
-                <button class="retrieve-parked-btn w-full text-left p-4 border border-slate-200 rounded-xl mb-3 hover:border-indigo-500 hover:shadow-md transition-all group bg-white" data-index="${i}">
+                <button class="retrieve-parked-btn w-full text-left p-4 border border-slate-200 rounded-xl mb-3 hover:border-SLATE-500 hover:shadow-md transition-all group bg-white" data-index="${i}">
                     <div class="flex justify-between items-start pointer-events-none">
                         <div class="min-w-0 pr-4">
-                            <h4 class="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition-colors truncate">${escapeHTML(data.label)}</h4>
+                            <h4 class="font-black text-slate-800 text-lg group-hover:text-SLATE-600 transition-colors truncate">${escapeHTML(data.label)}</h4>
                             <div class="flex items-center mt-1">
                                 <span class="text-xs text-slate-500 font-medium whitespace-nowrap">${data.cart?.length || 0} items</span>
                                 ${customerBadge}
@@ -2078,37 +2078,37 @@ async function showParkedSalesList() {
             if (!btn) return;
 
             const index = parseInt(btn.getAttribute('data-index'), 10);
-            
+
             if (index >= 0 && index < cloudCarts.length) {
                 const sale = cloudCarts[index];
                 const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
-                
+
                 if (currentCart.length > 0) {
-                    if(!confirm("Current cart will be cleared. Continue?")) return;
+                    if (!confirm("Current cart will be cleared. Continue?")) return;
                 }
-                
+
                 modalNode.remove();
 
-                if (typeof setCurrentCart === 'function') setCurrentCart(sale.cart || []); 
-                if (typeof persistCart === 'function') persistCart(); 
-                
+                if (typeof setCurrentCart === 'function') setCurrentCart(sale.cart || []);
+                if (typeof persistCart === 'function') persistCart();
+
                 if (sale.customerId && DOM.pos?.customer?.id) {
                     applyCustomerPosState({
                         id: sale.customerId,
                         name: sale.customerName,
                         phone: sale.customerPhone,
-                        dues: 0 
+                        dues: 0
                     });
                 } else {
                     resetCustomerPosState();
                 }
-                
+
                 if (typeof renderCart === 'function') renderCart();
-                
+
                 // 🚀 Remove from LocalStorage directly
                 cloudCarts.splice(index, 1);
                 localStorage.setItem(`mifela_parked_${locationId}`, JSON.stringify(cloudCarts));
-                
+
                 if (typeof updateParkedIndicator === 'function') updateParkedIndicator(plan);
                 if (typeof showToast === 'function') showToast('Loaded', `Retrieved: ${escapeHTML(sale.label)}`, 'success');
             }
@@ -2125,7 +2125,7 @@ async function handleSplitPayment() {
         showModal('Upgrade Required', 'Split payments are available to Gold and Platinum users.', 'info');
         return;
     }
-    
+
     if (currentCart.length === 0) {
         showModal('Error', 'Cart is empty.', 'error');
         return;
@@ -2133,7 +2133,7 @@ async function handleSplitPayment() {
 
     const totalAmount = parseFloat(DOM.pos.totals.final.textContent.replace(/[^0-9.-]+/g, '') || '0');
     const result = await promptForSplitPayment(totalAmount);
-    
+
     if (result) {
         splitPaymentDetails = result;
         setActivePaymentMethod('Split');
@@ -2144,21 +2144,21 @@ async function handleSplitPayment() {
 
 export function clearCart() {
     setCurrentCart([]);
-    persistCart(); 
+    persistCart();
     setActivePaymentMethod('Cash');
     splitPaymentDetails = null;
-    
+
     const tenderedInput = document.getElementById('cash-tendered-input');
     if (tenderedInput) tenderedInput.value = '';
     if (typeof window.updateCashChange === 'function') window.updateCashChange();
-    
+
     resetCustomerPosState(); // Replaces 16 lines of duplicated cleanup code
-    
+
     if (isVisualGridEnabled) {
         const searchInput = DOM.pos.manualInput;
         renderVisualPosGrid(searchInput ? searchInput.value.trim() : '');
     }
-    
+
     renderCart();
 
     if (typeof updateVisualGridStock === 'function') updateVisualGridStock();
@@ -2180,7 +2180,7 @@ export async function handleManualAdd(e) {
     // 🚀 THE FIX: Check if the grid is open and has an auto-focused search result
     const gridWrapper = document.getElementById('visual-pos-grid-wrapper');
     const firstResult = document.querySelector('.first-grid-result');
-    
+
     // If the blue outline is active, click it!
     if (gridWrapper && gridWrapper.style.display !== 'none' && firstResult) {
         firstResult.click();
@@ -2189,19 +2189,19 @@ export async function handleManualAdd(e) {
 
     let qtyToAdd = parseFloat(DOM.pos.quantityInput?.value || 1);
     if (isNaN(qtyToAdd) || qtyToAdd === 0) qtyToAdd = 1; // 🚀 THE FIX: Allowed negatives
-    
+
     await findAndAddToCart(query, qtyToAdd);
-    
+
     DOM.pos.manualInput.value = '';
     DOM.pos.quantityInput.value = '1';
-    
+
     // Force native input event so Clear button hides AND Catalog Auto-Closes
     DOM.pos.manualInput.dispatchEvent(new Event('input', { bubbles: true }));
-    
+
     DOM.pos.manualInput.focus();
 }
 
-window.openCustomProductModal = function() {
+window.openCustomProductModal = function () {
     const modalId = 'custom-pos-product-modal';
     if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
@@ -2215,8 +2215,8 @@ window.openCustomProductModal = function() {
         <div id="${modalId}" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[250]   p-4">
             <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 transform animate-scaleIn">
                 <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-                    <h3 class="text-xl font-black text-indigo-900 flex items-center gap-2">
-                        <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    <h3 class="text-xl font-black text-SLATE-900 flex items-center gap-2">
+                        <svg class="w-6 h-6 text-SLATE-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                         Add Custom Item
                     </h3>
                     <button type="button" id="close-custom-item-btn" class="text-slate-400 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-2 rounded-full">
@@ -2227,33 +2227,33 @@ window.openCustomProductModal = function() {
                 <div class="space-y-4 mb-6">
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Item Name</label>
-                        <input type="text" id="custom-item-name" value="Other" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-800 focus:border-indigo-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white" onfocus="this.select()">
+                        <input type="text" id="custom-item-name" value="Other" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-800 focus:border-SLATE-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white" onfocus="this.select()">
                     </div>
                     <div class="flex gap-3">
                         <div class="flex-1">
                             <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Price</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">${currencySymbol}</span>
-                                <input type="number" id="custom-item-price" placeholder="0.00" min="0" step="0.01" class="w-full pl-7 border-2 border-slate-200 rounded-xl p-3 text-lg font-black text-indigo-700 focus:border-indigo-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white">
+                                <input type="number" id="custom-item-price" placeholder="0.00" min="0" step="0.01" class="w-full pl-7 border-2 border-slate-200 rounded-xl p-3 text-lg font-black text-SLATE-700 focus:border-SLATE-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white">
                             </div>
                         </div>
                         <div class="w-1/3">
                             <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Qty</label>
-                            <input type="number" id="custom-item-qty" value="${defaultQty}" step="0.01" class="w-full border-2 border-slate-200 rounded-xl p-3 text-lg font-black text-slate-800 text-center focus:border-indigo-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white">
+                            <input type="number" id="custom-item-qty" value="${defaultQty}" step="0.01" class="w-full border-2 border-slate-200 rounded-xl p-3 text-lg font-black text-slate-800 text-center focus:border-SLATE-500 outline-none transition-colors shadow-inner bg-slate-50 focus:bg-white">
                             </div>
                     </div>
                 </div>
 
                 <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
                     <button id="cancel-custom-item" class="flex-1 px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors">Cancel</button>
-                    <button id="confirm-custom-item" class="flex-[1.5] px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95">Add to Cart</button>
+                    <button id="confirm-custom-item" class="flex-[1.5] px-5 py-3.5 bg-SLATE-600 hover:bg-SLATE-700 text-white font-black rounded-xl shadow-lg shadow-SLATE-200 transition-all active:scale-95">Add to Cart</button>
                 </div>
             </div>
         </div>
     `;
 
     document.body.insertAdjacentHTML('beforeend', html);
-    
+
     const modal = document.getElementById(modalId);
     const nameInput = document.getElementById('custom-item-name');
     const priceInput = document.getElementById('custom-item-price');
@@ -2294,10 +2294,10 @@ window.openCustomProductModal = function() {
             price: price,
             cost: 0, // No cost tracking for custom items
             stockLevel: 9999, // Infinite stock so it doesn't throw warnings
-            taxRate: 0, 
+            taxRate: 0,
             cess: 0,
             type: 'standard',
-            locationId: typeof activePosContainerId !== 'undefined' ? activePosContainerId : 'main' 
+            locationId: typeof activePosContainerId !== 'undefined' ? activePosContainerId : 'main'
         };
 
         // Add to local cache so the Checkout loop validator accepts it
@@ -2309,7 +2309,7 @@ window.openCustomProductModal = function() {
         if (typeof addProductToCart === 'function') {
             addProductToCart(customId, customProduct, qty);
         }
-        
+
         if (DOM.pos && DOM.pos.quantityInput) DOM.pos.quantityInput.value = '1';
 
         cleanup();
@@ -2357,7 +2357,7 @@ function applyB2BRatesToCart(customer) {
         setCurrentCart(updatedCart);
         persistCart();
         renderCart(); // Force UI update
-        
+
         if (customer) {
             if (typeof showToast === 'function') showToast('B2B Rates Applied', `Cart prices updated for ${customer.name}.`, 'info');
         } else {
@@ -2376,7 +2376,7 @@ async function refreshCustomerIndex() {
         }
 
         const customers = await window.dbAPI.getCustomers();
-        
+
         // 🚀 THE FIX: Populate local cache from SQLite, filtering out system docs
         localCustomerIndex = customers.filter(c => {
             const cid = c.id || c.docId || '';
@@ -2394,13 +2394,13 @@ async function refreshCustomerIndex() {
 export async function handleCustomerIdLookup(e) {
     const id = e.target.value.trim();
     if (!id) return resetCustomerPosState();
-    
-    const localMatch = localCustomerIndex.find(c => 
+
+    const localMatch = localCustomerIndex.find(c =>
         c.id === id || c.merchantId === id || c.docId === id || c.nfcCardId === id || c.cardNumber === id
     );
 
     if (localMatch) return applyCustomerPosState(localMatch);
-    
+
     try {
         if (window.dbAPI && window.dbAPI.getDoc) {
             const data = await window.dbAPI.getDoc('customers', id);
@@ -2412,7 +2412,7 @@ export async function handleCustomerIdLookup(e) {
 export async function handleCustomerNameLookup(e) {
     const name = e.target.value.trim();
     if (!name) return resetCustomerPosState();
-    
+
     const match = localCustomerIndex.find(c => c.name === name);
     if (match) applyCustomerPosState(match);
 }
@@ -2431,12 +2431,12 @@ function promptForSplitPayment(total) {
                 <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full  border border-gray-100 transform scale-100">
                     <div class="flex justify-between items-center mb-4 border-b pb-3">
                         <h3 class="text-xl font-bold text-gray-800">Split Payment</h3>
-                        <div class="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold uppercase tracking-wider">Options</div>
+                        <div class="text-sm bg-SLATE-100 text-SLATE-700 px-2 py-1 rounded font-bold uppercase tracking-wider">Options</div>
                     </div>
                     
-                    <div class="bg-indigo-50 p-4 rounded-xl mb-6 text-center border border-indigo-100">
-                         <span class="text-xs text-indigo-500 uppercase font-bold tracking-wider">Total Due</span>
-                         <p class="text-3xl font-bold text-indigo-700 mt-1">${currencySymbol}${total.toFixed(2)}</p>
+                    <div class="bg-SLATE-50 p-4 rounded-xl mb-6 text-center border border-SLATE-100">
+                         <span class="text-xs text-SLATE-500 uppercase font-bold tracking-wider">Total Due</span>
+                         <p class="text-3xl font-bold text-SLATE-700 mt-1">${currencySymbol}${total.toFixed(2)}</p>
                     </div>
                     
                     <div class="space-y-4 mb-6">
@@ -2444,21 +2444,21 @@ function promptForSplitPayment(total) {
                             <span class="w-12 text-2xl flex justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg></span>
                             <div class="flex-1">
                                 <label class="text-xs text-gray-500 font-semibold uppercase">Cash</label>
-                                <input type="number" id="split-cash" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="0.00">
+                                <input type="number" id="split-cash" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none transition-all" placeholder="0.00">
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="w-12 text-2xl flex justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg></span>
                              <div class="flex-1">
                                 <label class="text-xs text-gray-500 font-semibold uppercase">Card</label>
-                                <input type="number" id="split-card" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="0.00">
+                                <input type="number" id="split-card" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none transition-all" placeholder="0.00">
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="w-12 text-2xl flex justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg></span>
                              <div class="flex-1">
                                 <label class="text-xs text-gray-500 font-semibold uppercase">UPI</label>
-                                <input type="number" id="split-upi" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="0.00">
+                                <input type="number" id="split-upi" class="split-input w-full border border-gray-300 p-2 rounded-lg text-right font-medium focus:ring-2 focus:ring-SLATE-500 focus:border-SLATE-500 outline-none transition-all" placeholder="0.00">
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
@@ -2477,7 +2477,7 @@ function promptForSplitPayment(total) {
 
                     <div class="flex justify-end gap-3">
                         <button id="split-cancel" class="px-5 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-bold transition">Cancel</button>
-                        <button id="split-confirm" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none transition" disabled>Confirm Split</button>
+                        <button id="split-confirm" class="px-5 py-2.5 bg-SLATE-600 text-white rounded-xl hover:bg-SLATE-700 font-bold shadow-lg shadow-SLATE-200 disabled:opacity-50 disabled:shadow-none transition" disabled>Confirm Split</button>
                     </div>
                 </div>
             </div>
@@ -2494,10 +2494,10 @@ function promptForSplitPayment(total) {
         const updateCalc = () => {
             let sum = 0;
             inputs.forEach(i => sum += parseFloat(i.value || 0));
-            
+
             const rem = typeof safeMath?.subtract === 'function' ? safeMath.subtract(total, sum) : total - sum;
             remainEl.textContent = rem.toFixed(2);
-            
+
             if (Math.abs(rem) < 0.1) {
                 remainEl.className = "font-bold text-lg text-green-600";
                 remainEl.textContent = "Balanced ✓";
@@ -2533,25 +2533,25 @@ function promptForInput(title, message, defaultValue = '') {
                 <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full  border border-gray-100">
                     <h3 class="text-xl font-bold text-gray-800 mb-2">${escapeHTML(title)}</h3>
                     <p class="text-sm text-gray-600 mb-5 whitespace-pre-wrap leading-relaxed">${escapeHTML(message)}</p>
-                    <input type="text" id="custom-prompt-input" value="${escapeHTML(defaultValue)}" class="w-full border-2 border-indigo-100 bg-indigo-50/30 p-3 rounded-xl mb-6 text-lg focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner">
+                    <input type="text" id="custom-prompt-input" value="${escapeHTML(defaultValue)}" class="w-full border-2 border-SLATE-100 bg-SLATE-50/30 p-3 rounded-xl mb-6 text-lg focus:outline-none focus:border-SLATE-500 focus:bg-white transition-all shadow-inner">
                     <div class="flex justify-end space-x-3">
                         <button id="custom-prompt-cancel" class="px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-600 font-bold hover:bg-gray-50 transition">Cancel</button>
-                        <button id="custom-prompt-confirm" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">Confirm</button>
+                        <button id="custom-prompt-confirm" class="px-5 py-2.5 bg-SLATE-600 text-white rounded-xl font-bold hover:bg-SLATE-700 shadow-lg shadow-SLATE-200 transition">Confirm</button>
                     </div>
                 </div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
+
         const modal = document.getElementById('custom-prompt-modal');
         const input = document.getElementById('custom-prompt-input');
-        
+
         input.select();
         input.focus();
-        
+
         document.getElementById('custom-prompt-cancel').onclick = () => { modal.remove(); resolve(null); };
         document.getElementById('custom-prompt-confirm').onclick = () => { modal.remove(); resolve(input.value.trim()); };
-        
+
         input.onkeydown = (e) => {
             if (e.key === 'Enter') document.getElementById('custom-prompt-confirm').click();
             if (e.key === 'Escape') document.getElementById('custom-prompt-cancel').click();
@@ -2568,7 +2568,7 @@ function addProductToCart(id, product, qty) {
     const currentCart = getCurrentCart();
     const existingIndex = currentCart.findIndex(item => item.id === id);
     const currentQtyInCart = existingIndex > -1 ? currentCart[existingIndex].quantity : 0;
-    
+
     // 🚀 THE FIX: Only block if we are SELLING (qty > 0) more than we have. Returns (qty < 0) are always allowed.
     if (qty > 0 && (product.stockLevel || 0) < (currentQtyInCart + qty)) {
         if (typeof showToast === 'function') {
@@ -2579,14 +2579,14 @@ function addProductToCart(id, product, qty) {
             input.classList.add('animate-shake', 'border-red-500', 'ring-red-200');
             setTimeout(() => input.classList.remove('animate-shake', 'border-red-500', 'ring-red-200'), 500);
         }
-        return; 
+        return;
     }
 
     // 🚀 THE FIX: EXTRACT ACTIVE SELLING BATCH (FEFO / FIFO)
     let activeBatch = null;
     if (Array.isArray(product.batches) && product.batches.length > 0) {
         const todayTime = new Date().setHours(0, 0, 0, 0);
-        
+
         // Filter out expired quarantine stock, then sort by Earliest Expiry
         const sellableBatches = product.batches.filter(b => {
             if (!b.expirationDate) return true;
@@ -2610,13 +2610,13 @@ function addProductToCart(id, product, qty) {
     let basePrice = activeBatch?.price !== undefined && activeBatch?.price !== null ? activeBatch.price : product.price;
     let baseCost = activeBatch?.cost !== undefined && activeBatch?.cost !== null ? activeBatch.cost : product.cost;
     let baseMrp = activeBatch?.mrp !== undefined && activeBatch?.mrp !== null ? activeBatch.mrp : (product.mrp || basePrice);
-    
+
     let batchNo = activeBatch?.batchNo || activeBatch?.batch || product.batch || product.batchNo || '-';
     let mfd = activeBatch?.date || activeBatch?.packagedDate || activeBatch?.mfgDate || product.mfgDate || product.packagedDate || '-';
     let expiry = activeBatch?.expirationDate || activeBatch?.expiry || product.expirationDate || product.expiry || '-';
 
     let finalPrice = parseFloat(basePrice) || 0;
-    
+
     // B2B Override Check
     const customerId = DOM.pos.customer.id ? DOM.pos.customer.id.value.trim() : null;
     if (customerId) {
@@ -2631,8 +2631,8 @@ function addProductToCart(id, product, qty) {
 
     if (existingIndex > -1) {
         const updatedCart = [...currentCart];
-        updatedCart[existingIndex] = { 
-            ...updatedCart[existingIndex], 
+        updatedCart[existingIndex] = {
+            ...updatedCart[existingIndex],
             quantity: updatedCart[existingIndex].quantity + qty
         };
         setCurrentCart(updatedCart);
@@ -2643,7 +2643,7 @@ function addProductToCart(id, product, qty) {
             sku: product.sku || product.barcode || '',
             originalPrice: basePrice, // Protects the batch rate from being wiped during B2B toggling
             mrp: parseFloat(baseMrp) || 0,
-            price: finalPrice, 
+            price: finalPrice,
             cost: parseFloat(baseCost) || 0,
             quantity: qty,
             stock: product.stockLevel || 0,
@@ -2663,7 +2663,7 @@ function addProductToCart(id, product, qty) {
         row.classList.add('bg-emerald-100');
         setTimeout(() => row.classList.remove('bg-emerald-100'), 300);
     }
-    persistCart(); 
+    persistCart();
     renderCart();
 }
 
@@ -2671,7 +2671,7 @@ function removeFromCart(id) {
     const currentCart = getCurrentCart();
     const newCart = currentCart.filter(item => item.id !== id);
     setCurrentCart(newCart);
-    persistCart(); 
+    persistCart();
     renderCart();
 
     // 🚀 THE FIX: Tell the visual grid to instantly recalculate!
@@ -2682,7 +2682,7 @@ function removeFromCart(id) {
         const searchInput = DOM.pos.manualInput;
         renderVisualPosGrid(searchInput ? searchInput.value.trim() : '');
     }
-    
+
 }
 
 function handleQtyChange(id, newQty, skipRender = false) {
@@ -2690,7 +2690,7 @@ function handleQtyChange(id, newQty, skipRender = false) {
     const index = currentCart.findIndex(i => i.id === id);
     if (index > -1) {
         const item = currentCart[index];
-        
+
         // 🚀 THE FIX: Allow negative quantities for instant POS returns
         const requestedQty = parseFloat(newQty) || 0;
 
@@ -2702,15 +2702,15 @@ function handleQtyChange(id, newQty, skipRender = false) {
         // Only block if we are SELLING more than we have in stock
         if (requestedQty > 0 && requestedQty > item.stock) {
             if (typeof showToast === 'function') showToast('Limit Reached', `Max stock for ${item.name} is ${item.stock}`, 'warning');
-            if (!skipRender) renderCart(); 
+            if (!skipRender) renderCart();
             return;
         }
 
         const updatedCart = [...currentCart];
         updatedCart[index] = { ...updatedCart[index], quantity: requestedQty };
         setCurrentCart(updatedCart);
-        persistCart(); 
-        
+        persistCart();
+
         if (skipRender) {
             updateCartSummary();
             const row = document.querySelector(`tr[data-id="${id}"]`);
@@ -2734,8 +2734,8 @@ function handlePriceChange(id, newPrice, skipRender = false) {
         const updatedCart = [...currentCart];
         updatedCart[index] = { ...updatedCart[index], price: parseFloat(newPrice) || 0 };
         setCurrentCart(updatedCart);
-        persistCart(); 
-        
+        persistCart();
+
         if (skipRender) {
             updateCartSummary();
             const row = document.querySelector(`tr[data-id="${id}"]`);
@@ -2752,8 +2752,8 @@ function calculateTotals() {
     let subtotal = 0;
     let totalCost = 0;
     let includedGst = 0;
-    let includedCess = 0; 
-    let itemSavings = 0; 
+    let includedCess = 0;
+    let itemSavings = 0;
     const currentCart = getCurrentCart();
 
     const isMathReady = typeof safeMath?.multiply === 'function';
@@ -2761,10 +2761,10 @@ function calculateTotals() {
     currentCart.forEach(item => {
         const lineTotal = isMathReady ? safeMath.multiply(item.price, item.quantity) : (item.price * item.quantity);
         const lineCost = isMathReady ? safeMath.multiply(item.cost || 0, item.quantity) : ((item.cost || 0) * item.quantity);
-        
+
         subtotal = isMathReady ? safeMath.add(subtotal, lineTotal) : subtotal + lineTotal;
         totalCost = isMathReady ? safeMath.add(totalCost, lineCost) : totalCost + lineCost;
-        
+
         const itemMrp = parseFloat(item.mrp || item.price || 0);
         if (itemMrp > item.price) {
             const savingsOnThisItem = (itemMrp - item.price) * item.quantity;
@@ -2772,26 +2772,26 @@ function calculateTotals() {
         }
 
         const itemGstRate = parseFloat(item.taxRate || item.gstSlab || 0);
-        const itemCessRate = parseFloat(item.cess || 0); 
+        const itemCessRate = parseFloat(item.cess || 0);
 
         if (itemGstRate > 0 || itemCessRate > 0) {
-             const combinedRate = itemGstRate + itemCessRate;
-             const basePrice = lineTotal / (1 + (combinedRate / 100));
-             
-             const gstAmount = basePrice * (itemGstRate / 100);
-             const cessAmount = basePrice * (itemCessRate / 100);
-             
-             includedGst = isMathReady ? safeMath.add(includedGst, gstAmount) : includedGst + gstAmount;
-             includedCess = isMathReady ? safeMath.add(includedCess, cessAmount) : includedCess + cessAmount;
+            const combinedRate = itemGstRate + itemCessRate;
+            const basePrice = lineTotal / (1 + (combinedRate / 100));
+
+            const gstAmount = basePrice * (itemGstRate / 100);
+            const cessAmount = basePrice * (itemCessRate / 100);
+
+            includedGst = isMathReady ? safeMath.add(includedGst, gstAmount) : includedGst + gstAmount;
+            includedCess = isMathReady ? safeMath.add(includedCess, cessAmount) : includedCess + cessAmount;
         }
     });
 
     const discountInput = DOM.pos.totals.discount;
     const discountVal = parseFloat(discountInput ? discountInput.value : 0) || 0;
-    
+
     const netSubtotal = isMathReady ? safeMath.subtract(subtotal, discountVal) : subtotal - discountVal;
-    
-    const feePercentage = getConvenienceFee() || 0; 
+
+    const feePercentage = getConvenienceFee() || 0;
     const feeVal = isMathReady ? safeMath.multiply(netSubtotal, feePercentage / 100) : netSubtotal * (feePercentage / 100);
 
     // 🚀 THE FIX: Isolate the Cart Goods Total vs the Final Payable Total
@@ -2803,16 +2803,16 @@ function calculateTotals() {
 
     const profit = isMathReady ? safeMath.subtract(netSubtotal, totalCost) : netSubtotal - totalCost;
 
-    return { 
-        subtotal, tax: includedGst, cess: includedCess, 
+    return {
+        subtotal, tax: includedGst, cess: includedCess,
         total, cartTotal, // <-- Exposing both totals
-        discount: discountVal, fee: feeVal, dues: currentCustomerDues, 
-        totalCost, profit, itemSavings 
+        discount: discountVal, fee: feeVal, dues: currentCustomerDues,
+        totalCost, profit, itemSavings
     };
 }
 
 export function updateCartSummary() {
-    const { subtotal, tax, cess, total, fee, dues, itemSavings } = calculateTotals(); 
+    const { subtotal, tax, cess, total, fee, dues, itemSavings } = calculateTotals();
     const currencySymbol = getCurrencySymbol();
 
     const t = DOM.pos.totals;
@@ -2820,7 +2820,7 @@ export function updateCartSummary() {
     if (t.tax) t.tax.textContent = `${currencySymbol}${tax.toFixed(2)}`;
     if (t.fee) t.fee.textContent = `${currencySymbol}${fee.toFixed(2)}`;
     if (t.final) t.final.textContent = `${currencySymbol}${total.toFixed(2)}`;
-    
+
     let savingsRow = document.getElementById('pos-savings-summary-row');
     if (itemSavings > 0) {
         if (!savingsRow && t.sub) {
@@ -2902,7 +2902,7 @@ export function updateCartSummary() {
             const feeRow = t.fee.closest('.flex');
             stagedRow = document.createElement('div');
             stagedRow.id = 'pos-staged-dues-row';
-            stagedRow.className = "flex justify-between items-center text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-lg font-bold mb-2 mt-2 shadow-sm  ";
+            stagedRow.className = "flex justify-between items-center text-sm text-SLATE-700 bg-SLATE-50 border border-SLATE-100 px-3 py-2 rounded-lg font-bold mb-2 mt-2 shadow-sm  ";
             stagedRow.innerHTML = stagedHtml;
             feeRow.parentNode.insertBefore(stagedRow, feeRow.nextSibling);
         } else if (stagedRow) {
@@ -2911,7 +2911,7 @@ export function updateCartSummary() {
     } else if (stagedRow) {
         stagedRow.remove();
     }
-   
+
     const badge = document.getElementById('cart-item-count-badge');
     if (badge) {
         const cart = getCurrentCart();
@@ -2943,7 +2943,7 @@ export function updateCartSummary() {
                 loyaltyBadgeContainer.querySelector('button').setAttribute('onclick', `window.triggerTokenRedemption(${tokens})`);
             }
         } else if (loyaltyBadgeContainer) {
-            loyaltyBadgeContainer.remove(); 
+            loyaltyBadgeContainer.remove();
         }
     } else if (loyaltyBadgeContainer) {
         loyaltyBadgeContainer.remove();
@@ -2955,8 +2955,8 @@ export function updateCartSummary() {
 }
 
 // 🚀 POS-Specific Dues Prompt
-window.promptPosDuesPayment = function() {
-    if (currentCustomerDues <= 0) return; 
+window.promptPosDuesPayment = function () {
+    if (currentCustomerDues <= 0) return;
 
     const absBalance = Math.abs(currentCustomerDues);
     const currency = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
@@ -2995,14 +2995,14 @@ window.promptPosDuesPayment = function() {
         const val = parseFloat(input.value);
         if (isNaN(val) || val <= 0) return alert("Enter a valid amount");
         if (val > absBalance) return alert("Cannot pay more than pending dues!");
-        
+
         stagedDuesPayment = val;
         updateCartSummary();
         document.getElementById(modalId).remove();
     };
 };
 
-window.clearStagedDues = function() {
+window.clearStagedDues = function () {
     stagedDuesPayment = 0;
     updateCartSummary();
 };
@@ -3010,7 +3010,7 @@ window.clearStagedDues = function() {
 
 
 // --- High-Performance State ---
-const cartNodeMap = new Map(); 
+const cartNodeMap = new Map();
 
 function renderCart() {
     if (!DOM.pos.cartBody) return;
@@ -3042,9 +3042,9 @@ function renderCart() {
                 </td>
             </tr>`;
         updateCartSummary();
-        
+
         if (typeof updateVisualGridStock === 'function') updateVisualGridStock();
-        return; 
+        return;
     }
 
     if (cartNodeMap.size === 0) DOM.pos.cartBody.innerHTML = '';
@@ -3065,24 +3065,24 @@ function renderCart() {
             const qtyInput = row.querySelector('.qty-input');
             const totalCell = row.querySelector('.row-total-cell');
             const priceInput = row.querySelector('.price-input');
-            
+
             if (qtyInput && parseFloat(qtyInput.value) !== item.quantity) qtyInput.value = item.quantity;
             if (priceInput && parseFloat(priceInput.value) !== item.price) priceInput.value = (item.price || 0).toFixed(2);
             if (totalCell) totalCell.textContent = ((item.price || 0) * item.quantity).toFixed(2);
-            
+
         } else {
             const row = document.createElement('tr');
-            row.className = "border-b border-gray-100 hover:bg-indigo-50/30 transition-colors  ";
+            row.className = "border-b border-gray-100 hover:bg-SLATE-50/30 transition-colors  ";
             row.dataset.id = item.id;
 
             row.innerHTML = `
                 <td class="px-4 py-3 text-sm text-gray-800"><div class="font-bold">${escapeHTML(item.name)}</div></td>
                 <td class="px-4 py-3 text-sm text-gray-500 font-mono">${escapeHTML(item.sku || '-')}</td>
                 <td class="px-4 py-3 text-right">
-                    <input type="number" class="price-input w-24 border border-indigo-200 bg-indigo-50 text-indigo-900 font-bold rounded-md px-2 py-1.5 text-right text-sm focus:border-indigo-500 focus:bg-white outline-none transition-colors" data-id="${item.id}" value="${(item.price || 0).toFixed(2)}" step="0.01">
+                    <input type="number" class="price-input w-24 border border-SLATE-200 bg-SLATE-50 text-SLATE-900 font-bold rounded-md px-2 py-1.5 text-right text-sm focus:border-SLATE-500 focus:bg-white outline-none transition-colors" data-id="${item.id}" value="${(item.price || 0).toFixed(2)}" step="0.01">
                 </td>
                 <td class="px-4 py-3 text-center">
-                    <input type="number" class="qty-input w-20 border border-gray-200 rounded-md py-1.5 text-center text-sm font-bold text-indigo-700" data-id="${item.id}" value="${item.quantity}" step="0.01">
+                    <input type="number" class="qty-input w-20 border border-gray-200 rounded-md py-1.5 text-center text-sm font-bold text-SLATE-700" data-id="${item.id}" value="${item.quantity}" step="0.01">
                 </td>
                 <td class="px-4 py-3 text-right font-bold text-gray-900 text-sm row-total-cell">${((item.price || 0) * item.quantity).toFixed(2)}</td>
                 <td class="px-4 py-3 text-center">
@@ -3104,7 +3104,7 @@ function injectPosLocationSelector() {
     const role = typeof getUserRole === 'function' ? getUserRole() : 'manager';
     const plan = normalizePlan(typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free');
     const hasMultiLoc = checkPlanLimits(plan, 'multi_location');
-    
+
     if ((role !== 'admin' && role !== 'accountant') || !hasMultiLoc) return;
 
     const section = DOM.pos.section || document.getElementById('pos');
@@ -3113,7 +3113,7 @@ function injectPosLocationSelector() {
     const availLocs = typeof getAvailableLocations === 'function' ? getAvailableLocations() : [];
     let optionsHtml = '';
     if (availLocs && availLocs.length > 0) {
-        optionsHtml = availLocs.map(loc => 
+        optionsHtml = availLocs.map(loc =>
             `<option value="${loc.id}" ${loc.id === activePosContainerId ? 'selected' : ''}>${escapeHTML(loc.name || loc.id)}</option>`
         ).join('');
     } else {
@@ -3122,13 +3122,13 @@ function injectPosLocationSelector() {
 
     const container = document.createElement('div');
     container.id = 'pos-location-selector-container';
-    container.className = "mb-4 bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex items-center justify-between shadow-sm col-span-full";
+    container.className = "mb-4 bg-SLATE-50 p-3 rounded-lg border border-SLATE-100 flex items-center justify-between shadow-sm col-span-full";
     container.innerHTML = `
         <div class="flex items-center gap-2">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            <span class="text-sm font-bold text-indigo-900">Active Register Location:</span>
+            <svg class="w-5 h-5 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <span class="text-sm font-bold text-SLATE-900">Active Register Location:</span>
         </div>
-        <select id="pos-location-selector" class="ml-2 text-sm border-gray-300 rounded-md p-1.5 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm font-medium text-gray-700 bg-white">
+        <select id="pos-location-selector" class="ml-2 text-sm border-gray-300 rounded-md p-1.5 focus:ring-SLATE-500 focus:border-SLATE-500 shadow-sm font-medium text-gray-700 bg-white">
             ${optionsHtml}
         </select>
     `;
@@ -3145,27 +3145,27 @@ function injectPosLocationSelector() {
             const currentCart = getCurrentCart();
             if (currentCart.length > 0) {
                 if (!confirm("Switching locations will clear the current cart. Continue?")) {
-                    e.target.value = activePosContainerId; 
+                    e.target.value = activePosContainerId;
                     return;
                 }
                 clearCart();
             }
-            
+
             let productList = document.getElementById('pos-product-search-list');
             if (productList) productList.innerHTML = '';
 
             activePosContainerId = newLoc;
             setCurrentLocation(newLoc);
-            refreshProductIndex(); 
+            refreshProductIndex();
             showModal('Location Switched', `Active POS location is now: ${e.target.options[e.target.selectedIndex].text}`, 'success');
         }
     });
 }
 // 1. Trigger the hidden file picker
-window.triggerPosImageUpload = function(sku) {
+window.triggerPosImageUpload = function (sku) {
     currentImageUploadSku = sku;
     let input = document.getElementById('hidden-pos-image-input');
-    
+
     // Create the hidden input if it doesn't exist yet
     if (!input) {
         input = document.createElement('input');
@@ -3178,7 +3178,7 @@ window.triggerPosImageUpload = function(sku) {
         input.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file || !currentImageUploadSku) return;
-            
+
             if (typeof window.showModal === 'function') {
                 window.showModal('Processing...', 'Optimizing image for POS...', 'info');
             }
@@ -3186,17 +3186,17 @@ window.triggerPosImageUpload = function(sku) {
             try {
                 // Auto-compress the image using an HTML Canvas
                 const compressedBase64 = await compressImageForPos(file);
-                
+
                 // Save it to IndexedDB
                 await savePosImage(currentImageUploadSku, compressedBase64);
-                
+
                 // Refresh the table to show the new picture!
                 if (typeof renderInventoryTable === 'function') renderInventoryTable();
-                
+
                 // Close the modal
                 const modal = document.getElementById('custom-modal');
                 if (modal) modal.remove();
-                
+
             } catch (error) {
                 console.error("Image save failed:", error);
                 alert("Failed to save image.");
@@ -3205,7 +3205,7 @@ window.triggerPosImageUpload = function(sku) {
             }
         });
     }
-    
+
     input.click();
 };
 
@@ -3220,22 +3220,23 @@ function compressImageForPos(file) {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 // Force a perfectly square aspect ratio for the POS tiles (e.g., 300x300)
-                const size = 300; 
+                const size = 300;
                 canvas.width = size;
                 canvas.height = size;
-                
+
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = "#F8FAFC"; // Light slate background for transparent PNGs
                 ctx.fillRect(0, 0, size, size);
-                
+
                 // Crop and center the image
                 const scale = Math.max(size / img.width, size / img.height);
                 const x = (size / 2) - (img.width / 2) * scale;
                 const y = (size / 2) - (img.height / 2) * scale;
                 ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                
+
                 // Export as a lightweight JPEG (0.7 quality)
-resolve(canvas.toDataURL('image/png'));            };
+                resolve(canvas.toDataURL('image/png'));
+            };
             img.onerror = error => reject(error);
         };
         reader.onerror = error => reject(error);
@@ -3243,8 +3244,8 @@ resolve(canvas.toDataURL('image/png'));            };
 }
 
 // --- Visual Grid State ---
-let isVisualGridEnabled = false; 
-let isCatalogPinned = false;     
+let isVisualGridEnabled = false;
+let isCatalogPinned = false;
 
 function syncCatalogVisibility(searchTerm = '', skipDOMRebuild = false) {
     const toggleBtn = document.getElementById('toggle-catalog-btn');
@@ -3252,11 +3253,11 @@ function syncCatalogVisibility(searchTerm = '', skipDOMRebuild = false) {
 
     // Truth table: Show if user pinned it ON, or if they are actively typing a search
     const shouldShow = isCatalogPinned || term.length > 0;
-    isVisualGridEnabled = shouldShow; 
+    isVisualGridEnabled = shouldShow;
 
     // Instant UI paint for the toggle button
     if (toggleBtn) {
-        toggleBtn.classList.toggle('bg-indigo-600', isCatalogPinned);
+        toggleBtn.classList.toggle('bg-SLATE-600', isCatalogPinned);
         toggleBtn.classList.toggle('text-white', isCatalogPinned);
         toggleBtn.classList.toggle('bg-slate-100', !isCatalogPinned);
         toggleBtn.classList.toggle('text-slate-600', !isCatalogPinned);
@@ -3280,12 +3281,12 @@ function injectVisualGridToggle() {
     const searchInput = DOM.pos.manualInput || document.getElementById('pos-manual-input');
     if (!searchInput || document.getElementById('toggle-catalog-btn')) return;
 
-    const searchFlexRow = searchInput.closest('.flex'); 
+    const searchFlexRow = searchInput.closest('.flex');
 
     // 🚀 THE FIX: Wrap the input in a relative container so the absolute 'x' button positions correctly
     const inputWrapper = document.createElement('div');
     inputWrapper.className = "relative flex-grow w-full";
-    
+
     // Insert wrapper where input is, then move input inside it
     searchInput.parentNode.insertBefore(inputWrapper, searchInput);
     inputWrapper.appendChild(searchInput);
@@ -3300,7 +3301,7 @@ function injectVisualGridToggle() {
     // 🚀 Positioned perfectly relative to the new wrapper
     clearBtn.className = "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 hidden transition-all p-1 z-10 cursor-pointer bg-transparent rounded-md";
     clearBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>`;
-    
+
     inputWrapper.appendChild(clearBtn);
 
     const toggleBtn = document.createElement('button');
@@ -3316,7 +3317,7 @@ function injectVisualGridToggle() {
     toggleBtn.onclick = () => {
         const gridWasAlreadyVisible = isVisualGridEnabled;
         isCatalogPinned = !isCatalogPinned;
-        
+
         // If grid was already showing because they were typing, SKIP rebuilding the heavy HTML!
         const bypassHTMLGeneration = gridWasAlreadyVisible && isCatalogPinned;
         syncCatalogVisibility(searchInput.value, bypassHTMLGeneration);
@@ -3339,23 +3340,23 @@ function injectVisualGridToggle() {
 // 🚀 THE FIX: Dynamic POS Bundle Recalculator
 function recalculateBundleStocks() {
     if (!localProductIndex || localProductIndex.length === 0) return;
-    
+
     localProductIndex.forEach(product => {
         if (product.type === 'bundle' && Array.isArray(product.bundleComponents) && product.bundleComponents.length > 0) {
             let maxBundlesPossible = Infinity;
-            
+
             product.bundleComponents.forEach(comp => {
                 const realProduct = localProductIndex.find(p => p.id === comp.id);
                 const realStockAvailable = realProduct ? parseFloat(realProduct.stockLevel || 0) : 0;
-                
+
                 const possibleWithThisItem = Math.floor(realStockAvailable / comp.qty);
                 if (possibleWithThisItem < maxBundlesPossible) {
                     maxBundlesPossible = possibleWithThisItem;
                 }
             });
-            
+
             if (maxBundlesPossible === Infinity) maxBundlesPossible = 0;
-            
+
             // Override the POS memory stock level for this bundle!
             product.stockLevel = maxBundlesPossible;
         }
@@ -3366,23 +3367,23 @@ export function updateVisualGridStock() {
     const gridWrapper = document.getElementById('visual-pos-grid-wrapper');
     // 🚀 Check physical style instead of Tailwind classes
     const isOpen = gridWrapper && gridWrapper.style.display !== 'none';
-    
+
     if (!isOpen || !localProductIndex) return;// Halt safely if grid is closed
-    
+
     const currentCart = getCurrentCart();
-    
+
     localProductIndex.forEach(prod => {
         const stockSpan = document.getElementById(`grid-stock-${prod.id}`);
         if (stockSpan) {
             // Find how many of this item are currently in the cart
             const cartItem = currentCart.find(i => i.id === prod.id);
             const cartQty = cartItem ? cartItem.quantity : 0;
-            
+
             // Calculate live remaining stock
             const liveStock = (parseFloat(prod.stockLevel) || 0) - cartQty;
-            
+
             stockSpan.textContent = `${liveStock} in stock`;
-            
+
             // Update color if it drops below low stock threshold
             const threshold = parseFloat(prod.lowStockThreshold || 0);
             if (liveStock <= threshold) {
@@ -3401,7 +3402,7 @@ function injectPaperlessToggle() {
     const wrapper = document.createElement('div');
     wrapper.id = 'paperless-toggle-wrapper';
     wrapper.className = "mt-4 pt-3 border-t border-slate-100 flex items-center justify-between  ";
-    
+
     wrapper.innerHTML = `
         <div id="print-mode-label" class="flex flex-col"></div>
         <label class="relative inline-flex items-center cursor-pointer group">
@@ -3417,7 +3418,7 @@ function updatePrintModeUI() {
     const checkoutBtn = DOM.pos.checkoutBtn;
     if (!label) return;
 
-    label.innerHTML = isPaperlessMode 
+    label.innerHTML = isPaperlessMode
         ? `<span class="text-green-600 flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wider">
             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.347-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
             WhatsApp Mode
@@ -3430,11 +3431,11 @@ function updatePrintModeUI() {
     // 🚀 NEW: Dynamic Button Coloring
     if (checkoutBtn) {
         if (isPaperlessMode) {
-            checkoutBtn.classList.replace('from-indigo-600', 'from-green-600');
-            checkoutBtn.classList.replace('to-indigo-700', 'to-green-700');
+            checkoutBtn.classList.replace('from-SLATE-600', 'from-green-600');
+            checkoutBtn.classList.replace('to-SLATE-700', 'to-green-700');
         } else {
-            checkoutBtn.classList.replace('from-green-600', 'from-indigo-600');
-            checkoutBtn.classList.replace('to-green-700', 'to-indigo-700');
+            checkoutBtn.classList.replace('from-green-600', 'from-SLATE-600');
+            checkoutBtn.classList.replace('to-green-700', 'to-SLATE-700');
         }
     }
 }
@@ -3451,10 +3452,10 @@ async function sendWhatsAppInBackground(transactionData, customerPhone) {
 
         const safeStoreName = transactionData.storeDetails?.name || 'Mifela POS';
         const customerName = transactionData.customer?.name || 'Valued Customer';
-        
+
         // 🚀 THE UPGRADE: Bundle the cart into a multi-line string
         const cartItems = transactionData.items || [];
-        let itemListString = cartItems.map(item => 
+        let itemListString = cartItems.map(item =>
             `▪ ${item.quantity}x ${item.name}`
         ).join('\n');
 
@@ -3467,13 +3468,13 @@ async function sendWhatsAppInBackground(transactionData, customerPhone) {
         if (!itemListString) itemListString = "▪ Custom Payment / Dues";
 
         const payload = {
-            phone: String(cleanPhone), 
-            storeName: String(safeStoreName), 
-            invoiceId: String(transactionData.id), 
+            phone: String(cleanPhone),
+            storeName: String(safeStoreName),
+            invoiceId: String(transactionData.id),
             customerName: String(customerName),
             itemList: String(itemListString), // 🚀 Pushing the bundled list
-            total: String(parseFloat(transactionData.summary.total).toFixed(2)), 
-            storeId: String(storeId) 
+            total: String(parseFloat(transactionData.summary.total).toFixed(2)),
+            storeId: String(storeId)
         };
 
         await whatsappCaller(payload);
@@ -3492,7 +3493,7 @@ async function sendWhatsAppInBackground(transactionData, customerPhone) {
 async function verifyWhatsAppSetup() {
     try {
         const plan = typeof getCurrentUserPlan === 'function' ? getCurrentUserPlan() : 'free';
-        
+
         // Example: Only allow WhatsApp billing on higher tiers
         if (plan === 'free') {
             console.warn("WhatsApp billing requires a premium plan.");
@@ -3525,20 +3526,20 @@ function promptForPaymentRoute(method, total) {
                 <div class="bg-white p-8 rounded-[2rem] shadow-2xl max-w-sm w-full border border-slate-100 transform animate-scaleIn">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-2xl font-black text-slate-800 tracking-tight">Process ${method}</h3>
-                        <div class="bg-indigo-50 text-indigo-600 p-2 rounded-xl">
+                        <div class="bg-SLATE-50 text-SLATE-600 p-2 rounded-xl">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                         </div>
                     </div>
                     <p class="text-sm font-medium text-slate-500 mb-8">Choose how the customer is paying the <span class="font-bold text-slate-800">${currencySymbol}${total.toFixed(2)}</span> total.</p>
                     
                     <div class="space-y-4">
-                        <button id="route-internal" class="w-full p-4 bg-white border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 rounded-2xl flex items-center gap-4 transition-all text-left group shadow-sm">
-                            <div class="bg-indigo-100 p-3 rounded-xl shadow-inner group-hover:scale-110 transition-transform">
-                                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        <button id="route-internal" class="w-full p-4 bg-white border-2 border-slate-200 hover:border-SLATE-600 hover:bg-SLATE-50 rounded-2xl flex items-center gap-4 transition-all text-left group shadow-sm">
+                            <div class="bg-SLATE-100 p-3 rounded-xl shadow-inner group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6 text-SLATE-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             </div>
                             <div>
-                                <div class="font-black text-slate-800 group-hover:text-indigo-900 text-sm">Send to Razorpay Gateway</div>
-                                <div class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-500 uppercase tracking-widest mt-0.5">Generate Live Link</div>
+                                <div class="font-black text-slate-800 group-hover:text-SLATE-900 text-sm">Send to Razorpay Gateway</div>
+                                <div class="text-[10px] font-bold text-slate-400 group-hover:text-SLATE-500 uppercase tracking-widest mt-0.5">Generate Live Link</div>
                             </div>
                         </button>
                         
@@ -3560,42 +3561,42 @@ function promptForPaymentRoute(method, total) {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
+
         document.getElementById('route-internal').onclick = () => { document.getElementById('payment-route-modal').remove(); resolve('INTERNAL'); };
         document.getElementById('route-external').onclick = () => { document.getElementById('payment-route-modal').remove(); resolve('EXTERNAL'); };
         document.getElementById('route-cancel').onclick = () => { document.getElementById('payment-route-modal').remove(); resolve('CANCEL'); };
     });
 }
-window.triggerTokenRedemption = async function(availableTokens) {
+window.triggerTokenRedemption = async function (availableTokens) {
     const config = await getLoyaltyConfig();
     if (!config.enabled) return showToast('Error', 'Loyalty program disabled.', 'error');
 
     // 🚀 FIX: Prevent over-redemption
     const tokensToRedeemStr = await promptForInput(
-        'Redeem Tokens', 
-        `Available: ${availableTokens} tokens. Value: ₹${config.tokenValue}/token.\n\nEnter tokens to redeem:`, 
+        'Redeem Tokens',
+        `Available: ${availableTokens} tokens. Value: ₹${config.tokenValue}/token.\n\nEnter tokens to redeem:`,
         availableTokens.toString()
     );
-    
+
     if (tokensToRedeemStr === null) return;
-    
+
     let parsedTokens = parseInt(tokensToRedeemStr, 10);
     if (isNaN(parsedTokens) || parsedTokens <= 0) return;
-    
+
     // Cap at available balance
     if (parsedTokens > availableTokens) parsedTokens = availableTokens;
 
     const discountAmount = parsedTokens * config.tokenValue;
     const discountInput = DOM.pos.totals.discount;
-    
+
     if (discountInput) {
         // 🚀 FIX: Set the pending deduction globally and explicitly
         window.__pendingTokenDeduction = parsedTokens;
-        
+
         const currentDisc = parseFloat(discountInput.value) || 0;
         discountInput.value = (currentDisc + discountAmount).toFixed(2);
         discountInput.dispatchEvent(new Event('input'));
-        
+
         showToast('Tokens Redeemed', `Applied ₹${discountAmount.toFixed(2)} discount!`, 'success');
     }
 };
@@ -3603,7 +3604,7 @@ window.triggerTokenRedemption = async function(availableTokens) {
 
 const getPinnedCustomersKey = () => `mifela_pinned_customers_${typeof getUserId === 'function' ? getUserId() : 'guest'}`;
 
-window.renderCustomerDropdown = function(searchTerm = '') {
+window.renderCustomerDropdown = function (searchTerm = '') {
     const dropdown = document.getElementById('pinned-customers-dropdown');
     const quickAccess = document.getElementById('quick-pinned-customers');
 
@@ -3615,12 +3616,12 @@ window.renderCustomerDropdown = function(searchTerm = '') {
     if (quickAccess) {
         const pinnedData = localCustomerIndex.filter(c => pinnedCustomers.includes(c.id));
         quickAccess.innerHTML = pinnedData.map(c => `
-            <div class="flex items-center bg-indigo-50 border border-indigo-200 rounded-md overflow-hidden shadow-sm hover:bg-indigo-100 transition-colors">
-                <button type="button" onclick="selectCustomerFromDropdown('${c.id}')" class="px-2 py-1.5 text-indigo-700 text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider h-full">
+            <div class="flex items-center bg-SLATE-50 border border-SLATE-200 rounded-md overflow-hidden shadow-sm hover:bg-SLATE-100 transition-colors">
+                <button type="button" onclick="selectCustomerFromDropdown('${c.id}')" class="px-2 py-1.5 text-SLATE-700 text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider h-full">
                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
                     ${escapeHTML(c.name || c.phone)}
                 </button>
-                <button type="button" onclick="togglePinCustomer(event, '${c.id}')" class="px-1.5 py-1.5 text-indigo-400 hover:text-red-500 hover:bg-indigo-200 transition-colors h-full border-l border-indigo-200 flex items-center justify-center">
+                <button type="button" onclick="togglePinCustomer(event, '${c.id}')" class="px-1.5 py-1.5 text-SLATE-400 hover:text-red-500 hover:bg-SLATE-200 transition-colors h-full border-l border-SLATE-200 flex items-center justify-center">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -3631,9 +3632,9 @@ window.renderCustomerDropdown = function(searchTerm = '') {
 
     let filteredCustomers = localCustomerIndex.filter(c => {
         if (!term) return true;
-        return (c.name || '').toLowerCase().includes(term) || 
-               (c.phone || '').includes(term) || 
-               (c.id || '').toLowerCase().includes(term);
+        return (c.name || '').toLowerCase().includes(term) ||
+            (c.phone || '').includes(term) ||
+            (c.id || '').toLowerCase().includes(term);
     });
 
     filteredCustomers.sort((a, b) => {
@@ -3641,7 +3642,7 @@ window.renderCustomerDropdown = function(searchTerm = '') {
         const bPinned = pinnedCustomers.includes(b.id);
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
-        
+
         // Alphabetical sort fallback
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
@@ -3660,12 +3661,12 @@ window.renderCustomerDropdown = function(searchTerm = '') {
     dropdown.innerHTML = filteredCustomers.map(cust => {
         const isPinned = pinnedCustomers.includes(cust.id);
         return `
-            <div class="flex items-center justify-between p-2.5 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer transition-colors">
+            <div class="flex items-center justify-between p-2.5 border-b border-gray-100 hover:bg-SLATE-50 cursor-pointer transition-colors">
                 <div class="flex-1 min-w-0" onclick="selectCustomerFromDropdown('${cust.id}')">
                     <div class="text-sm font-bold text-gray-800 truncate">${escapeHTML(cust.name || 'Unknown')}</div>
                     <div class="text-xs text-gray-500 font-mono">${escapeHTML(cust.phone || 'No Phone')}</div>
                 </div>
-                <button type="button" class="ml-2 p-1.5 rounded-full transition-colors ${isPinned ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200' : 'text-gray-300 hover:text-indigo-500 hover:bg-gray-100'}" onclick="togglePinCustomer(event, '${cust.id}')" title="${isPinned ? 'Unpin' : 'Pin'}">
+                <button type="button" class="ml-2 p-1.5 rounded-full transition-colors ${isPinned ? 'text-SLATE-600 bg-SLATE-100 hover:bg-SLATE-200' : 'text-gray-300 hover:text-SLATE-500 hover:bg-gray-100'}" onclick="togglePinCustomer(event, '${cust.id}')" title="${isPinned ? 'Unpin' : 'Pin'}">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
                 </button>
             </div>
@@ -3673,29 +3674,29 @@ window.renderCustomerDropdown = function(searchTerm = '') {
     }).join('');
 };
 
-window.togglePinCustomer = function(e, custId) {
+window.togglePinCustomer = function (e, custId) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const pinnedKey = getPinnedCustomersKey();
     let pinned = JSON.parse(localStorage.getItem(pinnedKey) || "[]");
-    
+
     if (pinned.includes(custId)) {
         pinned = pinned.filter(id => id !== custId);
     } else {
         pinned.push(custId);
     }
-    
+
     localStorage.setItem(pinnedKey, JSON.stringify(pinned));
-    
+
     const searchInput = DOM.pos?.customer?.name || document.getElementById('pos-cust-name');
     renderCustomerDropdown(searchInput ? searchInput.value : '');
 };
 
-window.selectCustomerFromDropdown = async function(custId) {
+window.selectCustomerFromDropdown = async function (custId) {
     const dropdown = document.getElementById('pinned-customers-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
-    
+
     const custIdInput = DOM.pos?.customer?.id || document.getElementById('pos-cust-id');
     if (custIdInput) {
         custIdInput.value = custId;
@@ -3708,7 +3709,7 @@ window.selectCustomerFromDropdown = async function(custId) {
     }
 };
 
-window.applyB2BRatesToCart = function(customer) {
+window.applyB2BRatesToCart = function (customer) {
     const currentCart = typeof getCurrentCart === 'function' ? getCurrentCart() : [];
     if (!currentCart || currentCart.length === 0) return;
 
@@ -3716,9 +3717,9 @@ window.applyB2BRatesToCart = function(customer) {
     const updatedCart = currentCart.map(item => {
         // 🚀 THE FIX: Use the batch's originalPrice, NOT the global product index price
         let basePrice = parseFloat(item.originalPrice || item.price || 0);
-        
+
         let newPrice = basePrice;
-        
+
         if (customer && customer.customPricing && customer.customPricing[item.id]) {
             newPrice = parseFloat(customer.customPricing[item.id].price);
         }
@@ -3735,7 +3736,7 @@ window.applyB2BRatesToCart = function(customer) {
         persistCart();
         renderCart();
         updateCartSummary();
-        
+
         if (customer && customer.customPricing) {
             if (typeof showToast === 'function') showToast('Rates Applied', `Pricing updated for ${customer.name}`, 'info');
         } else {
@@ -3751,11 +3752,11 @@ if (custNameInput) {
         renderCustomerDropdown(e.target.value);
         document.getElementById('pinned-customers-dropdown').classList.remove('hidden');
     });
-    
+
     custNameInput.addEventListener('input', (e) => {
         renderCustomerDropdown(e.target.value);
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#pos-cust-name') && !e.target.closest('#pinned-customers-dropdown')) {
             const dropdown = document.getElementById('pinned-customers-dropdown');
@@ -3764,31 +3765,31 @@ if (custNameInput) {
     });
 }
 document.addEventListener('click', (e) => {
-        // Target the "CHANGE" button in the Customer Details card
-        const btn = e.target.closest('button') || e.target.closest('a') || e.target;
-        if (btn && btn.textContent.trim().toUpperCase() === 'CHANGE') {
-            e.preventDefault();
-            resetCustomerPosState();
-            // if (DOM.pos.customer.id) DOM.pos.customer.id.value = '';
-            // if (DOM.pos.customer.name) {
-            //     DOM.pos.customer.name.value = '';
-            //     DOM.pos.customer.name.classList.remove('border-emerald-500', 'bg-emerald-50', 'transition-colors');
-            // }
-            // if (DOM.pos.customer.phone) DOM.pos.customer.phone.value = '';
-            
-            // currentCustomerDues = 0;
-            // const balanceBadge = document.getElementById('pos-customer-balance-badge');
-            // if (balanceBadge) balanceBadge.classList.add('hidden');
-            
-            // window.__pendingTokenDeduction = 0;
-            // if (DOM.pos.totals.discount) {
-            //     DOM.pos.totals.discount.value = '';
-            // }
-            
-            // if (typeof applyB2BRatesToCart === 'function') applyB2BRatesToCart(null);
-            // updateCartSummary();
-        }
-    });
+    // Target the "CHANGE" button in the Customer Details card
+    const btn = e.target.closest('button') || e.target.closest('a') || e.target;
+    if (btn && btn.textContent.trim().toUpperCase() === 'CHANGE') {
+        e.preventDefault();
+        resetCustomerPosState();
+        // if (DOM.pos.customer.id) DOM.pos.customer.id.value = '';
+        // if (DOM.pos.customer.name) {
+        //     DOM.pos.customer.name.value = '';
+        //     DOM.pos.customer.name.classList.remove('border-emerald-500', 'bg-emerald-50', 'transition-colors');
+        // }
+        // if (DOM.pos.customer.phone) DOM.pos.customer.phone.value = '';
+
+        // currentCustomerDues = 0;
+        // const balanceBadge = document.getElementById('pos-customer-balance-badge');
+        // if (balanceBadge) balanceBadge.classList.add('hidden');
+
+        // window.__pendingTokenDeduction = 0;
+        // if (DOM.pos.totals.discount) {
+        //     DOM.pos.totals.discount.value = '';
+        // }
+
+        // if (typeof applyB2BRatesToCart === 'function') applyB2BRatesToCart(null);
+        // updateCartSummary();
+    }
+});
 // 3. Functional 5 Min Auto Cart Cleanup
 let cartIdleTimer;
 let activityTimeout = null;
@@ -3828,7 +3829,7 @@ async function triggerPaymentGateway(totalAmount, method) {
     const currencySymbol = typeof getCurrencySymbol === 'function' ? getCurrencySymbol() : '₹';
     const storeId = typeof getStoreId === 'function' ? getStoreId() : window.primaryStoreId;
     let paymentLink = null;
-    
+
     try {
         const storeSnap = await getDoc(doc(db, `artifacts/${appId}/stores/${storeId}/settings/profile`));
         if (storeSnap.exists() && storeSnap.data().customPaymentLinks && storeSnap.data().customPaymentLinks['pos']) {
@@ -3837,23 +3838,23 @@ async function triggerPaymentGateway(totalAmount, method) {
             showModal("Missing Setup", "No custom payment link configured for this POS terminal. Configure it in Settings > Directory.", "error");
             return false;
         }
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         return false;
     }
 
     return new Promise((resolve) => {
         const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(paymentLink)}`;
-        
+
         const html = `
             <div id="pos-qr-payment-modal" class="fixed inset-0 z-[10000] bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 transition-opacity">
                 <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 flex flex-col items-center text-center relative">
                     <h3 class="text-xl font-black text-slate-800 mb-1">Scan to Pay</h3>
                     <p class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6">Store Purchase</p>
-                    <div class="bg-slate-50 border-2 border-dashed border-indigo-200 p-4 rounded-2xl mb-6 shadow-inner">
+                    <div class="bg-slate-50 border-2 border-dashed border-SLATE-200 p-4 rounded-2xl mb-6 shadow-inner">
                         <img src="${qrSrc}" alt="QR Code" class="w-48 h-48 object-contain mix-blend-multiply">
                     </div>
-                    <div class="text-3xl font-black text-indigo-600 mb-6">${currencySymbol}${parseFloat(totalAmount).toFixed(2)}</div>
+                    <div class="text-3xl font-black text-SLATE-600 mb-6">${currencySymbol}${parseFloat(totalAmount).toFixed(2)}</div>
                     
                     <button id="pos-qr-confirm-btn" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black shadow-lg shadow-emerald-200 transition-all active:scale-95 mb-3">
                         I Have Paid
@@ -3864,7 +3865,7 @@ async function triggerPaymentGateway(totalAmount, method) {
                 </div>
             </div>
         `;
-        
+
         document.body.insertAdjacentHTML('beforeend', html);
         const modal = document.getElementById('pos-qr-payment-modal');
         const cleanup = () => modal.remove();
@@ -3879,11 +3880,11 @@ async function triggerPaymentGateway(totalAmount, method) {
             const btn = document.getElementById('pos-qr-confirm-btn');
             btn.disabled = true;
             btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white inline-block" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating Transaction...`;
-            
+
             setTimeout(async () => {
                 cleanup();
                 try {
-                    await processCheckout(method); 
+                    await processCheckout(method);
                 } catch (e) {
                     showModal('Transaction Failed', e.message, 'error');
                 }
@@ -3893,7 +3894,7 @@ async function triggerPaymentGateway(totalAmount, method) {
     });
 }
 
-window.promptForCatalogQuantity = function(product) {
+window.promptForCatalogQuantity = function (product) {
     const modalId = 'catalog-qty-modal';
     const existing = document.getElementById(modalId);
     if (existing) existing.remove();
@@ -3901,21 +3902,21 @@ window.promptForCatalogQuantity = function(product) {
     const modalHtml = `
         <div id="${modalId}" class="fixed inset-0 z-[250] bg-slate-900/60 flex items-center justify-center p-4  ">
             <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-xs border border-slate-100 transform animate-scaleIn text-center">
-                <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <div class="w-16 h-16 bg-SLATE-50 text-SLATE-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                 </div>
                 <h3 class="text-lg font-black text-slate-800 tracking-tight leading-tight mb-1 line-clamp-2">${escapeHTML(product.name)}</h3>
                 <p class="text-xs font-medium text-slate-500 mb-6 uppercase tracking-widest">Enter Quantity</p>
                 
-<input type="number" id="catalog-qty-input" value="1" step="0.01" class="w-full border-2 border-indigo-100 bg-indigo-50/50 p-4 rounded-xl text-center text-4xl font-black text-indigo-700 focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-inner mb-6">                
+<input type="number" id="catalog-qty-input" value="1" step="0.01" class="w-full border-2 border-SLATE-100 bg-SLATE-50/50 p-4 rounded-xl text-center text-4xl font-black text-SLATE-700 focus:outline-none focus:border-SLATE-500 focus:bg-white focus:ring-4 focus:ring-SLATE-500/20 transition-all shadow-inner mb-6">                
                 <div class="flex gap-3">
                     <button type="button" id="catalog-qty-cancel" class="flex-1 px-4 py-3.5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
-                    <button type="button" id="catalog-qty-confirm" class="flex-[1.5] px-4 py-3.5 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors">Add</button>
+                    <button type="button" id="catalog-qty-confirm" class="flex-[1.5] px-4 py-3.5 bg-SLATE-600 text-white font-black rounded-xl hover:bg-SLATE-700 shadow-lg shadow-SLATE-200 transition-colors">Add</button>
                 </div>
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modal = document.getElementById(modalId);
@@ -3932,7 +3933,7 @@ window.promptForCatalogQuantity = function(product) {
     const closeAndCleanup = () => {
         modal.classList.add('opacity-0');
         setTimeout(() => modal.remove(), 200);
-        
+
         // Return focus to main search bar after closing
         const mainInput = document.getElementById('pos-manual-input');
         if (mainInput) mainInput.focus();
@@ -3945,17 +3946,17 @@ window.promptForCatalogQuantity = function(product) {
             setTimeout(() => input.classList.remove('border-red-500', 'bg-red-50'), 500);
             return;
         }
-        
+
         // Push the item to the cart with the confirmed quantity
         addProductToCart(product.id, product, qty);
-        
+
         // 🚀 THE FIX: Clear the main search bar automatically after a successful catalog add
         const mainInput = document.getElementById('pos-manual-input') || DOM.pos.manualInput;
         if (mainInput && mainInput.value.trim() !== '') {
             mainInput.value = '';
             mainInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        
+
         closeAndCleanup();
     };
 
@@ -3983,14 +3984,14 @@ document.addEventListener('keydown', (e) => {
         const modals = document.querySelectorAll(
             '[id$="-modal"], [id$="-overlay"], #pos-qr-payment-modal, #tx-detail-overlay'
         );
-        
+
         modals.forEach(el => {
             el.classList.add('hidden');
             setTimeout(() => el.remove(), 50);
         });
 
         document.body.classList.remove('overflow-hidden');
-        
+
         if (typeof setCheckoutLoadingState === 'function') {
             isProcessingCheckout = false;
             setCheckoutLoadingState(false);
@@ -4009,8 +4010,8 @@ export async function triggerLowStockAlerts(purchasedItems) {
         if (match) {
             const currentStock = parseFloat(match.stockLevel) || 0;
             // Default threshold is 5 if not explicitly set by the merchant
-            const threshold = parseFloat(match.lowStockThreshold) || 5; 
-            
+            const threshold = parseFloat(match.lowStockThreshold) || 5;
+
             if (currentStock <= threshold && currentStock > 0) {
                 alerts.push(`⚠️ ${match.name} (SKU: ${match.sku}) is running low! Only ${currentStock} left in stock.`);
             } else if (currentStock <= 0) {

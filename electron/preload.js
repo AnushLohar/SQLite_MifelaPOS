@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('dbAPI', {
   logTelemetry: (eventName, data) => ipcRenderer.invoke('db:logTelemetry', eventName, data),
   getSupplierByPhone: (phone) => ipcRenderer.invoke('db:getSupplierByPhone', phone),
   getSupplierByGSTIN: (gstin) => ipcRenderer.invoke('db:getSupplierByGSTIN', gstin),
+  getEntityByGSTIN: (gstin) => ipcRenderer.invoke('db:getEntityByGSTIN', gstin),
   executeBatch: (ops) => ipcRenderer.invoke('db:executeBatch', ops),
   getDoc: (col, id) => ipcRenderer.invoke('db:getDoc', col, id),
   deleteDoc: (col, id) => ipcRenderer.invoke('db:deleteDoc', col, id),

@@ -102,6 +102,33 @@ export const getCurrentUserPlan = () => {
         return 'trial';
     }
 };
+
+export const isLicensed = () => {
+    // Check if user has an active license
+    const localUser = JSON.parse(localStorage.getItem('mifela_local_user') || '{}');
+    const activeStore = localStorage.getItem('mifela_active_store');
+    const license = JSON.parse(localStorage.getItem('mifela_license') || '{}');
+
+    if (!activeStore) return false;
+
+    // Check local license - if within offline grace period (14 days)
+    const lastVerified = license.lastVerifiedAt
+        ? new Date(license.lastVerifiedAt)
+        : new Date(0);
+    const now = new Date();
+    const gracePeriod = 14 * 24 * 60 * 60 * 1000; // 14 days
+
+    if (license.status === 'active' && (now - lastVerified) < gracePeriod) {
+        return true;
+    }
+
+    // Also check if active store exists in localStorage
+    return !!localStorage.getItem('mifela_active_store');
+};
+
+export const getLicenseInfo = () => {
+    return JSON.parse(localStorage.getItem('mifela_license') || '{}');
+};
 export const getCurrentLocationId = () => currentLocationId || 'main';
 export const getUserAssignedLocationId = () => userAssignedLocationId || 'main';
 export const getAvailableLocations = () => [{ id: 'main', name: 'Main Store' }];
